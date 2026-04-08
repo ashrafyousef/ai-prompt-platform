@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
+import rehypeHighlight from "rehype-highlight";
 import { UiMessage } from "@/lib/types";
 import { ArrowDown, Copy, Pencil, RotateCcw, ThumbsDown, ThumbsUp } from "lucide-react";
 
@@ -86,7 +87,7 @@ export function MessageList({ messages, onRegenerate, onEdit, loading }: Props) 
           >
             <ReactMarkdown
               remarkPlugins={[remarkGfm, remarkMath]}
-              rehypePlugins={[rehypeKatex]}
+              rehypePlugins={[rehypeKatex, rehypeHighlight]}
               components={{
                 code(props) {
                   const { className, children } = props;
