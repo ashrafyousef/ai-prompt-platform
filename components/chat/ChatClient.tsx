@@ -174,6 +174,11 @@ export function ChatClient() {
     }
   }
 
+  async function shareSession(sessionId: string) {
+    const shareUrl = `${window.location.origin}/chat?sessionId=${sessionId}`;
+    await navigator.clipboard.writeText(shareUrl);
+  }
+
   if (status === "loading") return <main className="bg-white p-6 text-gray-900">Loading...</main>;
   if (status !== "authenticated") {
     return (
@@ -197,6 +202,7 @@ export function ChatClient() {
         onNewChat={createSession}
         onRename={renameSession}
         onDelete={deleteSession}
+        onShare={shareSession}
       />
       <section className="flex flex-1 flex-col bg-white">
         <div className="border-b border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900">

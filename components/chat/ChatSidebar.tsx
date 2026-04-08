@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyboardEvent, useEffect, useState } from "react";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
 import { UiSession } from "@/lib/types";
 
 type Props = {
@@ -10,11 +10,22 @@ type Props = {
   onNewChat: () => void;
   onRename: (id: string, title: string) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onShare: (id: string) => Promise<void>;
 };
 
-export function ChatSidebar({ sessions, activeSessionId, onSelect, onNewChat, onRename, onDelete }: Props) {
+export function ChatSidebar({
+  sessions,
+  activeSessionId,
+  onSelect,
+  onNewChat,
+  onRename,
+  onDelete,
+  onShare,
+}: Props) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
+  const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (!editingSessionId) return;
@@ -38,6 +49,23 @@ export function ChatSidebar({ sessions, activeSessionId, onSelect, onNewChat, on
     }
   }
 
+  useEffect(() => {
+    function onDocumentClick(event: MouseEvent) {
+      if (!menuRef.current) return;
+      if (menuRef.current.contains(event.target as Node)) return;
+      setMenuSessionId(null);
+    }
+    function onDocumentKeyDown(event: globalThis.KeyboardEvent) {
+      if (event.key === "Escape") setMenuSessionId(null);
+    }
+    document.addEventListener("mousedown", onDocumentClick);
+    document.addEventListener("keydown", onDocumentKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onDocumentClick);
+      document.removeEventListener("keydown", onDocumentKeyDown);
+    };
+  }, []);
+
   return (
     <aside className="w-72 border-r border-gray-200 bg-white p-3 text-gray-900">
       <button
@@ -50,7 +78,7 @@ export function ChatSidebar({ sessions, activeSessionId, onSelect, onNewChat, on
         {sessions.map((session) => (
           <div
             key={session.id}
-            className={`w-full rounded-md px-3 py-2 text-left text-sm text-gray-900 ${
+            className={`group relative w-full rounded-md px-3 py-2 text-left text-sm text-gray-900 ${
               activeSessionId === session.id ? "bg-gray-200" : "bg-gray-100 hover:bg-gray-200"
             }`}
           >
@@ -65,28 +93,59 @@ export function ChatSidebar({ sessions, activeSessionId, onSelect, onNewChat, on
               />
             ) : (
               <div className="flex items-center justify-between gap-2">
-                <button className="truncate" onClick={() => onSelect(session.id)}>
+                <button className="truncate pr-2" onClick={() => onSelect(session.id)}>
                   {session.title}
                 </button>
                 <button
-                  className="text-xs font-medium text-gray-600 hover:text-gray-900"
+                  className={`rounded px-2 py-1 text-base leading-none text-gray-600 hover:bg-gray-300 hover:text-gray-900 ${
+                    activeSessionId === session.id || menuSessionId === session.id
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100"
+                  }`}
                   onClick={() => {
-                    setEditingSessionId(session.id);
-                    setTitleDraft(session.title);
+                    setMenuSessionId((prev) => (prev === session.id ? null : session.id));
                   }}
+                  aria-label="Open chat actions"
                 >
-                  Rename
+                  ...
                 </button>
-                <button
-                  className="text-xs font-medium text-red-600 hover:text-red-700"
-                  onClick={async () => {
-                    const confirmed = window.confirm("Delete this chat and all its messages?");
-                    if (!confirmed) return;
-                    await onDelete(session.id);
-                  }}
-                >
-                  Delete
-                </button>
+                {menuSessionId === session.id ? (
+                  <div
+                    ref={menuRef}
+                    className="absolute right-2 top-10 z-20 min-w-[140px] rounded-md border border-gray-200 bg-white p-1 shadow-lg"
+                  >
+                    <button
+                      className="block w-full rounded px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100"
+                      onClick={() => {
+                        setMenuSessionId(null);
+                        setEditingSessionId(session.id);
+                        setTitleDraft(session.title);
+                      }}
+                    >
+                      Rename
+                    </button>
+                    <button
+                      className="block w-full rounded px-3 py-2 text-left text-xs text-gray-700 hover:bg-gray-100"
+                      onClick={async () => {
+                        setMenuSessionId(null);
+                        await onShare(session.id);
+                      }}
+                    >
+                      Share
+                    </button>
+                    <button
+                      className="block w-full rounded px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+                      onClick={async () => {
+                        setMenuSessionId(null);
+                        const confirmed = window.confirm("Delete this chat and all its messages?");
+                        if (!confirmed) return;
+                        await onDelete(session.id);
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ) : null}
               </div>
             )}
           </div>
