@@ -6,6 +6,7 @@ import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { MessageList } from "@/components/chat/MessageList";
 import { UiAgent, UiMessage, UiSession } from "@/lib/types";
 import { signIn, useSession } from "next-auth/react";
+import { PanelRightClose, PanelRightOpen } from "lucide-react";
 
 export function ChatClient() {
   const { status } = useSession();
@@ -15,9 +16,13 @@ export function ChatClient() {
   const [activeSessionId, setActiveSessionId] = useState<string>();
   const [activeAgentId, setActiveAgentId] = useState<string>("");
   const [loading, setLoading] = useState(false);
+  const [bootstrapping, setBootstrapping] = useState(true);
   const [editTarget, setEditTarget] = useState<{ id: string; text: string } | null>(null);
   const [regenOfId, setRegenOfId] = useState<string | undefined>(undefined);
   const [composerSeedText, setComposerSeedText] = useState<string | undefined>(undefined);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [modelVersion, setModelVersion] = useState("v2.0");
 
   const activeAgentName = useMemo(
     () => agents.find((a) => a.id === activeAgentId)?.name ?? "No Agent",
@@ -30,6 +35,7 @@ export function ChatClient() {
   }, [status]);
 
   async function bootstrap() {
+    setBootstrapping(true);
     const [historyRes, agentsRes] = await Promise.all([
       fetch("/api/chat/history"),
       fetch("/api/agents"),
@@ -39,6 +45,7 @@ export function ChatClient() {
     setSessions(historyData.sessions ?? []);
     setAgents(agentData.agents ?? []);
     if (agentData.agents?.length) setActiveAgentId(agentData.agents[0].id);
+    setBootstrapping(false);
   }
 
   async function refreshSessions() {
@@ -194,7 +201,7 @@ export function ChatClient() {
   }
 
   return (
-    <main className="flex h-screen bg-white text-gray-900">
+    <main className="flex h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
@@ -203,47 +210,82 @@ export function ChatClient() {
         onRename={renameSession}
         onDelete={deleteSession}
         onShare={shareSession}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
       />
-      <section className="flex flex-1 flex-col bg-white">
-        <div className="border-b border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900">
-          Agent: {activeAgentName}
-          <select
-            className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900"
-            value={activeAgentId}
-            onChange={(e) => setActiveAgentId(e.target.value)}
-          >
-            {agents.map((agent) => (
-              <option key={agent.id} value={agent.id}>
-                {agent.name}
-              </option>
-            ))}
-          </select>
+      <section className="relative flex flex-1 flex-col">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-3 text-sm font-medium text-zinc-900 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70 dark:text-zinc-100">
+          <div className="flex items-center gap-3">
+            <span className="text-xs uppercase tracking-wide text-zinc-500">Agent</span>
+            <span>{activeAgentName}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              value={modelVersion}
+              onChange={(e) => setModelVersion(e.target.value)}
+            >
+              <option value="v1.0">v1.0</option>
+              <option value="v2.0">v2.0</option>
+            </select>
+            <select
+              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+              value={activeAgentId}
+              onChange={(e) => setActiveAgentId(e.target.value)}
+            >
+              {agents.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name}
+                </option>
+              ))}
+            </select>
+            <button
+              className="rounded-md p-2 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              onClick={() => setDrawerOpen((prev) => !prev)}
+              aria-label="Toggle context drawer"
+            >
+              {drawerOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
+            </button>
+          </div>
         </div>
-        <MessageList
-          messages={messages}
-          onRegenerate={(messageId) => void regenerateFromAssistant(messageId)}
-          onEdit={(messageId, currentText) => {
-            setEditTarget({ id: messageId, text: currentText });
-            setComposerSeedText(currentText);
-          }}
-        />
-        <ChatComposer
-          onSend={send}
-          disabled={loading || !activeSessionId}
-          initialText={composerSeedText}
-          modeLabel={
-            editTarget
-              ? "Editing a previous prompt. Sending will create a revised turn."
-              : regenOfId
-              ? "Regenerating response from prior context."
-              : undefined
-          }
-          onCancelMode={() => {
-            setEditTarget(null);
-            setRegenOfId(undefined);
-            setComposerSeedText(undefined);
-          }}
-        />
+        <div className="flex min-h-0 flex-1">
+          <MessageList
+            messages={messages}
+            onRegenerate={(messageId) => void regenerateFromAssistant(messageId)}
+            onEdit={(messageId, currentText) => {
+              setEditTarget({ id: messageId, text: currentText });
+              setComposerSeedText(currentText);
+            }}
+            loading={bootstrapping}
+          />
+          {drawerOpen ? (
+            <aside className="hidden w-72 border-l border-zinc-200/70 bg-white/70 p-4 text-xs text-zinc-600 backdrop-blur lg:block dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300">
+              <h3 className="mb-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Context Drawer</h3>
+              <p>Use this space for prompt settings, retrieval context, and metadata.</p>
+            </aside>
+          ) : null}
+        </div>
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-4">
+          <div className="pointer-events-auto px-4">
+            <ChatComposer
+              onSend={send}
+              disabled={loading || !activeSessionId}
+              initialText={composerSeedText}
+              modeLabel={
+                editTarget
+                  ? "Editing a previous prompt. Sending will create a revised turn."
+                  : regenOfId
+                  ? "Regenerating response from prior context."
+                  : undefined
+              }
+              onCancelMode={() => {
+                setEditTarget(null);
+                setRegenOfId(undefined);
+                setComposerSeedText(undefined);
+              }}
+            />
+          </div>
+        </div>
       </section>
     </main>
   );

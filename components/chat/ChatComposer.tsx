@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
+import { Loader2, Mic, Paperclip, Send } from "lucide-react";
 
 type Props = {
   onSend: (text: string, imageFiles?: File[]) => Promise<void>;
@@ -13,12 +14,22 @@ type Props = {
 export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCancelMode }: Props) {
   const [text, setText] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (typeof initialText === "string") {
       setText(initialText);
     }
   }, [initialText]);
+
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "0px";
+    const nextHeight = Math.min(textarea.scrollHeight, 180);
+    textarea.style.height = `${nextHeight}px`;
+  }, [text]);
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -29,7 +40,10 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
   }
 
   return (
-    <form onSubmit={submit} className="border-t border-gray-200 bg-white p-4 text-gray-900">
+    <form
+      onSubmit={submit}
+      className="mx-auto w-full max-w-3xl rounded-2xl border border-zinc-200/80 bg-white/90 p-3 text-zinc-900 shadow-lg backdrop-blur"
+    >
       {modeLabel ? (
         <div className="mb-2 flex items-center justify-between rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <span>{modeLabel}</span>
@@ -41,14 +55,16 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
         </div>
       ) : null}
       <textarea
+        ref={textareaRef}
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="mb-2 h-24 w-full rounded-md border border-gray-300 bg-white p-2 text-gray-900 placeholder:text-gray-500"
-        placeholder="Send a prompt..."
+        className="mb-2 max-h-44 min-h-[48px] w-full resize-none rounded-xl border border-zinc-200 bg-white px-3 py-3 text-sm text-zinc-900 placeholder:text-zinc-500 focus:border-violet-300 focus:outline-none"
+        placeholder="Message your assistant..."
         disabled={disabled}
       />
       <div className="flex items-center justify-between gap-3">
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/*"
           multiple
@@ -56,15 +72,33 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
             const files = Array.from(e.target.files ?? []);
             setImageFiles(files);
           }}
-          className="text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-gray-900 hover:file:bg-gray-200"
+          className="hidden"
           disabled={disabled}
         />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="rounded-full p-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+            title="Attach file"
+          >
+            <Paperclip className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            className="rounded-full p-2 text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900"
+            title="Voice"
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+        </div>
         <button
           type="submit"
-          className="rounded-md bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-4 py-2 text-sm text-white transition hover:bg-zinc-700 disabled:opacity-50"
           disabled={disabled || !text.trim()}
         >
-          Send
+          {disabled ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          {disabled ? "Thinking..." : "Send"}
         </button>
       </div>
       {imageFiles.length > 0 ? (
