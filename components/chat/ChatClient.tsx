@@ -135,10 +135,10 @@ export function ChatClient() {
     }
   }
 
-  if (status === "loading") return <main className="p-6">Loading...</main>;
+  if (status === "loading") return <main className="bg-white p-6 text-gray-900">Loading...</main>;
   if (status !== "authenticated") {
     return (
-      <main className="flex min-h-screen items-center justify-center">
+      <main className="flex min-h-screen items-center justify-center bg-white text-gray-900">
         <button
           onClick={() => signIn("credentials", { email: "demo@example.com", callbackUrl: "/" })}
           className="rounded-md bg-black px-4 py-2 text-white"
@@ -150,18 +150,18 @@ export function ChatClient() {
   }
 
   return (
-    <main className="flex h-screen">
+    <main className="flex h-screen bg-white text-gray-900">
       <ChatSidebar
         sessions={sessions}
         activeSessionId={activeSessionId}
         onSelect={loadMessages}
         onNewChat={createSession}
       />
-      <section className="flex flex-1 flex-col">
-        <div className="border-b border-gray-200 px-4 py-3 text-sm font-medium">
+      <section className="flex flex-1 flex-col bg-white">
+        <div className="border-b border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900">
           Agent: {activeAgentName}
           <select
-            className="ml-2 rounded border px-2 py-1 text-sm"
+            className="ml-2 rounded border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900"
             value={activeAgentId}
             onChange={(e) => setActiveAgentId(e.target.value)}
           >

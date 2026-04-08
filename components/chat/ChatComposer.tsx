@@ -29,7 +29,7 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
   }
 
   return (
-    <form onSubmit={submit} className="border-t border-gray-200 p-4">
+    <form onSubmit={submit} className="border-t border-gray-200 bg-white p-4 text-gray-900">
       {modeLabel ? (
         <div className="mb-2 flex items-center justify-between rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
           <span>{modeLabel}</span>
@@ -43,7 +43,7 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
       <textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        className="mb-2 h-24 w-full rounded-md border border-gray-300 p-2"
+        className="mb-2 h-24 w-full rounded-md border border-gray-300 bg-white p-2 text-gray-900 placeholder:text-gray-500"
         placeholder="Send a prompt..."
         disabled={disabled}
       />
@@ -52,6 +52,7 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
           type="file"
           accept="image/*"
           onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+          className="text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-gray-900 hover:file:bg-gray-200"
           disabled={disabled}
         />
         <button
