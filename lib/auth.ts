@@ -3,6 +3,8 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/lib/db";
 
 export const authOptions: NextAuthOptions = {
+  // Required in production (e.g. Vercel). Without it, sign-in shows "server configuration" error.
+  secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
   providers: [
     CredentialsProvider({
