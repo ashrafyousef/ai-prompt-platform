@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.17.0",
+    "@vercel/speed-insights": "^2.0.0",
     "ajv": "^8.18.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.45",
