@@ -197,7 +197,25 @@ export function ChatClient() {
   }
 
   if (status === "loading" && !authLoadingTimedOut) {
-    return <main className="bg-white p-6 text-gray-900">Loading...</main>;
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-white text-gray-900">
+        <div className="flex flex-col items-center gap-3">
+          <p className="text-sm text-zinc-500">Loading your session...</p>
+          <button
+            onClick={() => signIn("credentials", { email: "demo@example.com", callbackUrl: "/" })}
+            className="rounded-md bg-black px-4 py-2 text-white"
+          >
+            Sign in as demo user
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs text-zinc-500 underline hover:text-zinc-700"
+          >
+            Retry loading
+          </button>
+        </div>
+      </main>
+    );
   }
   if (status !== "authenticated") {
     return (
