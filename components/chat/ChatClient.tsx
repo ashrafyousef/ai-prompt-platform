@@ -41,6 +41,12 @@ export function ChatClient() {
     if (agentData.agents?.length) setActiveAgentId(agentData.agents[0].id);
   }
 
+  async function refreshSessions() {
+    const historyRes = await fetch("/api/chat/history");
+    const historyData = await historyRes.json();
+    setSessions(historyData.sessions ?? []);
+  }
+
   async function loadMessages(sessionId: string) {
     setActiveSessionId(sessionId);
     const res = await fetch(`/api/chat/history?sessionId=${sessionId}`);
@@ -57,19 +63,42 @@ export function ChatClient() {
     }
   }
 
-  async function uploadImage(file?: File | null): Promise<string[] | undefined> {
-    if (!file) return undefined;
-    const formData = new FormData();
-    formData.append("image", file);
-    const uploadRes = await fetch("/api/upload/image", { method: "POST", body: formData });
-    const uploadData = await uploadRes.json();
-    return uploadData.url ? [uploadData.url] : undefined;
+  async function renameSession(sessionId: string, title: string) {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) return;
+
+    setSessions((prev) =>
+      prev.map((session) =>
+        session.id === sessionId ? { ...session, title: cleanTitle } : session
+      )
+    );
+
+    await fetch("/api/chat/title", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, title: cleanTitle }),
+    });
+
+    await refreshSessions();
   }
 
-  async function send(text: string, imageFile?: File | null, overrideImageUrls?: string[]) {
+  async function uploadImages(files?: File[]): Promise<string[] | undefined> {
+    if (!files || files.length === 0) return undefined;
+    const urls: string[] = [];
+    for (const file of files) {
+      const formData = new FormData();
+      formData.append("image", file);
+      const uploadRes = await fetch("/api/upload/image", { method: "POST", body: formData });
+      const uploadData = await uploadRes.json();
+      if (uploadData.url) urls.push(uploadData.url);
+    }
+    return urls.length > 0 ? urls : undefined;
+  }
+
+  async function send(text: string, imageFiles?: File[], overrideImageUrls?: string[]) {
     if (!activeSessionId || !activeAgentId) return;
     setLoading(true);
-    const imageUrls = overrideImageUrls ?? (await uploadImage(imageFile));
+    const imageUrls = overrideImageUrls ?? (await uploadImages(imageFiles));
     const optimisticId = `tmp-${Date.now()}`;
     setMessages((prev) => [...prev, { id: optimisticId, role: "assistant", content: "", createdAt: new Date().toISOString() }]);
 
@@ -118,6 +147,7 @@ export function ChatClient() {
     setRegenOfId(undefined);
     setComposerSeedText(undefined);
     if (activeSessionId) await loadMessages(activeSessionId);
+    await refreshSessions();
   }
 
   async function regenerateFromAssistant(assistantMessageId: string) {
@@ -129,9 +159,18 @@ export function ChatClient() {
       const candidate = messages[i];
       if (candidate.role === "user") {
         setRegenOfId(assistantMessageId);
-        await send(candidate.content, null, candidate.imageUrls);
+        await send(candidate.content, undefined, candidate.imageUrls);
         return;
       }
+    }
+  }
+
+  async function deleteSession(sessionId: string) {
+    await fetch(`/api/chat/history?sessionId=${sessionId}`, { method: "DELETE" });
+    setSessions((prev) => prev.filter((session) => session.id !== sessionId));
+    if (activeSessionId === sessionId) {
+      setActiveSessionId(undefined);
+      setMessages([]);
     }
   }
 
@@ -156,6 +195,8 @@ export function ChatClient() {
         activeSessionId={activeSessionId}
         onSelect={loadMessages}
         onNewChat={createSession}
+        onRename={renameSession}
+        onDelete={deleteSession}
       />
       <section className="flex flex-1 flex-col bg-white">
         <div className="border-b border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-900">

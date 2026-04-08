@@ -27,3 +27,29 @@ export async function GET(req: NextRequest) {
     );
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const userId = await requireUserId();
+    const sessionId = req.nextUrl.searchParams.get("sessionId");
+    if (!sessionId) {
+      return NextResponse.json({ error: "sessionId is required." }, { status: 400 });
+    }
+
+    const session = await db.chatSession.findFirst({
+      where: { id: sessionId, userId },
+      select: { id: true },
+    });
+    if (!session) {
+      return NextResponse.json({ error: "Session not found." }, { status: 404 });
+    }
+
+    await db.chatSession.delete({ where: { id: sessionId } });
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Failed to delete session." },
+      { status: 400 }
+    );
+  }
+}

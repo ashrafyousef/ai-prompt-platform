@@ -92,7 +92,47 @@ export async function finalizeAssistantMessage(params: {
     },
   });
 
+  await autoTitleSession({
+    userId,
+    sessionId,
+    seedText: text,
+  });
+
   return assistantMessage;
+}
+
+async function autoTitleSession(params: {
+  userId: string;
+  sessionId: string;
+  seedText: string;
+}) {
+  const { userId, sessionId, seedText } = params;
+  const session = await db.chatSession.findFirst({
+    where: { id: sessionId, userId },
+    select: { id: true, title: true },
+  });
+  if (!session || session.title !== "New Chat") return;
+
+  const userMessageCount = await db.message.count({
+    where: { sessionId, userId, role: "user" },
+  });
+  if (userMessageCount !== 1) return;
+
+  const nextTitle = buildTitleFromPrompt(seedText);
+  if (!nextTitle) return;
+
+  await db.chatSession.update({
+    where: { id: sessionId },
+    data: { title: nextTitle },
+  });
+}
+
+function buildTitleFromPrompt(input: string): string {
+  const normalized = input.replace(/\s+/g, " ").trim();
+  if (!normalized) return "New Chat";
+  const cleaned = normalized.replace(/^["'`#\-\s]+|["'`#\-\s]+$/g, "");
+  if (cleaned.length <= 60) return cleaned;
+  return `${cleaned.slice(0, 57).trimEnd()}...`;
 }
 
 export async function runOrchestrator(params: {

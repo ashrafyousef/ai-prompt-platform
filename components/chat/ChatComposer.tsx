@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 
 type Props = {
-  onSend: (text: string, imageFile?: File | null) => Promise<void>;
+  onSend: (text: string, imageFiles?: File[]) => Promise<void>;
   disabled?: boolean;
   initialText?: string;
   modeLabel?: string;
@@ -12,7 +12,7 @@ type Props = {
 
 export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCancelMode }: Props) {
   const [text, setText] = useState("");
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imageFiles, setImageFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (typeof initialText === "string") {
@@ -23,9 +23,9 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (!text.trim()) return;
-    await onSend(text.trim(), imageFile);
+    await onSend(text.trim(), imageFiles);
     setText("");
-    setImageFile(null);
+    setImageFiles([]);
   }
 
   return (
@@ -51,7 +51,11 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
         <input
           type="file"
           accept="image/*"
-          onChange={(e) => setImageFile(e.target.files?.[0] ?? null)}
+          multiple
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            setImageFiles(files);
+          }}
           className="text-sm text-gray-900 file:mr-3 file:rounded file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-gray-900 hover:file:bg-gray-200"
           disabled={disabled}
         />
@@ -63,7 +67,22 @@ export function ChatComposer({ onSend, disabled, initialText, modeLabel, onCance
           Send
         </button>
       </div>
-      {imageFile ? <p className="mt-2 text-xs text-gray-500">Attached: {imageFile.name}</p> : null}
+      {imageFiles.length > 0 ? (
+        <div className="mt-2 flex flex-wrap gap-2">
+          {imageFiles.map((file, index) => (
+            <button
+              key={`${file.name}-${index}`}
+              type="button"
+              className="rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-700 hover:bg-gray-200"
+              onClick={() =>
+                setImageFiles((prev) => prev.filter((_, currentIndex) => currentIndex !== index))
+              }
+            >
+              {file.name} ×
+            </button>
+          ))}
+        </div>
+      ) : null}
     </form>
   );
 }
