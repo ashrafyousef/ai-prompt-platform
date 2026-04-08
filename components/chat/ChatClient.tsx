@@ -23,6 +23,7 @@ export function ChatClient() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [modelVersion, setModelVersion] = useState("v2.0");
+  const [authLoadingTimedOut, setAuthLoadingTimedOut] = useState(false);
 
   const activeAgentName = useMemo(
     () => agents.find((a) => a.id === activeAgentId)?.name ?? "No Agent",
@@ -32,6 +33,15 @@ export function ChatClient() {
   useEffect(() => {
     if (status !== "authenticated") return;
     void bootstrap();
+  }, [status]);
+
+  useEffect(() => {
+    if (status !== "loading") {
+      setAuthLoadingTimedOut(false);
+      return;
+    }
+    const timer = setTimeout(() => setAuthLoadingTimedOut(true), 3500);
+    return () => clearTimeout(timer);
   }, [status]);
 
   async function bootstrap() {
@@ -186,16 +196,31 @@ export function ChatClient() {
     await navigator.clipboard.writeText(shareUrl);
   }
 
-  if (status === "loading") return <main className="bg-white p-6 text-gray-900">Loading...</main>;
+  if (status === "loading" && !authLoadingTimedOut) {
+    return <main className="bg-white p-6 text-gray-900">Loading...</main>;
+  }
   if (status !== "authenticated") {
     return (
       <main className="flex min-h-screen items-center justify-center bg-white text-gray-900">
-        <button
-          onClick={() => signIn("credentials", { email: "demo@example.com", callbackUrl: "/" })}
-          className="rounded-md bg-black px-4 py-2 text-white"
-        >
-          Sign in as demo user
-        </button>
+        <div className="flex flex-col items-center gap-3">
+          {authLoadingTimedOut ? (
+            <p className="text-sm text-zinc-500">
+              Session check is taking longer than expected. You can still continue.
+            </p>
+          ) : null}
+          <button
+            onClick={() => signIn("credentials", { email: "demo@example.com", callbackUrl: "/" })}
+            className="rounded-md bg-black px-4 py-2 text-white"
+          >
+            Sign in as demo user
+          </button>
+          <button
+            onClick={() => window.location.reload()}
+            className="text-xs text-zinc-500 underline hover:text-zinc-700"
+          >
+            Retry loading
+          </button>
+        </div>
       </main>
     );
   }
