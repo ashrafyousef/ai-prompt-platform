@@ -1,6 +1,7 @@
 import { ChatMessage } from "@/lib/orchestration/buildMessages";
 
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
 
 type CompletionOptions = {
   model?: string;
@@ -101,4 +102,44 @@ export async function* streamChatCompletion(
       }
     }
   }
+}
+
+export async function checkOpenAiReachable(timeoutMs = 3000): Promise<boolean> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) return false;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(OPENAI_MODELS_URL, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: controller.signal,
+    });
+    return response.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function repairStructuredOutputWithModel(params: {
+  rawOutput: string;
+  outputSchema: unknown;
+}): Promise<string | null> {
+  const prompt = [
+    "Fix your output to match the required JSON schema exactly.",
+    `Schema: ${JSON.stringify(params.outputSchema)}`,
+    "Return valid JSON only.",
+    `Invalid output: ${params.rawOutput}`,
+  ].join("\n\n");
+
+  const fixed = await createChatCompletion(
+    [
+      { role: "system", content: "Return valid JSON only." },
+      { role: "user", content: prompt },
+    ],
+    { temperature: 0, maxTokens: 800 }
+  );
+  return fixed?.trim() || null;
 }

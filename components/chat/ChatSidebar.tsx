@@ -14,6 +14,7 @@ type Props = {
   onShare: (id: string) => Promise<void>;
   collapsed: boolean;
   onToggleCollapse: () => void;
+  onSearch: (query: string) => Promise<void>;
 };
 
 export function ChatSidebar({
@@ -26,6 +27,7 @@ export function ChatSidebar({
   onShare,
   collapsed,
   onToggleCollapse,
+  onSearch,
 }: Props) {
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [titleDraft, setTitleDraft] = useState("");
@@ -33,6 +35,7 @@ export function ChatSidebar({
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (!editingSessionId) return;
@@ -75,6 +78,13 @@ export function ChatSidebar({
       document.removeEventListener("keydown", onDocumentKeyDown);
     };
   }, []);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      void onSearch(search.trim());
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [search, onSearch]);
 
   const groupedSessions = useMemo(() => {
     const now = new Date();
@@ -125,6 +135,14 @@ export function ChatSidebar({
           {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
         </button>
       </div>
+      {!collapsed ? (
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search chats..."
+          className="mb-3 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500"
+        />
+      ) : null}
 
       <div className="flex-1 space-y-4 overflow-auto">
         {Object.entries(groupedSessions).map(([group, items]) =>

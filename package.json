@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "prisma generate && node scripts/run-migrate-deploy.js && next build",
     "start": "next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@prisma/client": "^5.17.0",
+    "@upstash/redis": "^1.37.0",
     "ajv": "^8.18.0",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.45",

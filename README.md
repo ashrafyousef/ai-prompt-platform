@@ -1,6 +1,7 @@
-# AI Prompt Platform (MVP)
+# AI Prompt Platform
 
 Monolithic Next.js + PostgreSQL platform for controlled prompt engineering with:
+
 - chat sessions and history
 - configurable AI agents
 - text + image input
@@ -8,12 +9,14 @@ Monolithic Next.js + PostgreSQL platform for controlled prompt engineering with:
 - streaming responses to the UI
 
 ## Tech Stack
+
 - Next.js App Router + TypeScript
 - Prisma + PostgreSQL
 - NextAuth (credentials-based MVP sign-in)
 - OpenAI chat completions API
 
 ## Setup
+
 1. Copy environment file:
    - `cp .env.example .env.local`
 2. Update values in `.env.local`.
@@ -29,6 +32,7 @@ Monolithic Next.js + PostgreSQL platform for controlled prompt engineering with:
    - `npm run dev`
 
 ## Implemented Endpoints
+
 - `POST /api/chat/send`
 - `POST /api/chat/new`
 - `GET /api/chat/history`
@@ -37,6 +41,7 @@ Monolithic Next.js + PostgreSQL platform for controlled prompt engineering with:
 - `POST /api/prompts/save`
 
 ## Smoke Test Checklist
+
 1. Open `/chat`, click `Sign in as demo user`.
 2. Click `New Chat`.
 3. Send text prompt and verify streamed assistant response.
@@ -46,6 +51,8 @@ Monolithic Next.js + PostgreSQL platform for controlled prompt engineering with:
 7. Refresh page and verify history persists.
 
 ## Notes
-- If `OPENAI_API_KEY` is missing, assistant returns a clear configuration message.
-- Rate limiting is enforced in-memory per user for MVP.
-- Long-term memory and vector retrieval are intentionally left as phase-2 extensions.
+
+- Health endpoint is available at `GET /api/health`.
+- Upstash-backed rate limiting is used when configured; in-memory fallback is used locally.
+- Token soft limits are configurable via `TOKEN_SOFT_LIMIT`.
+- Never store secrets in source files.

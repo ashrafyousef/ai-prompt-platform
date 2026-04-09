@@ -46,20 +46,30 @@ export function ChatClient() {
 
   async function bootstrap() {
     setBootstrapping(true);
-    const [historyRes, agentsRes] = await Promise.all([
-      fetch("/api/chat/history"),
-      fetch("/api/agents"),
-    ]);
-    const historyData = await historyRes.json();
-    const agentData = await agentsRes.json();
-    setSessions(historyData.sessions ?? []);
-    setAgents(agentData.agents ?? []);
-    if (agentData.agents?.length) setActiveAgentId(agentData.agents[0].id);
-    setBootstrapping(false);
+    try {
+      const [historyRes, agentsRes] = await Promise.all([
+        fetch("/api/chat/history"),
+        fetch("/api/agents"),
+      ]);
+      const historyData = await historyRes.json();
+      const agentData = await agentsRes.json();
+      setSessions(historyData.sessions ?? []);
+      setAgents(agentData.agents ?? []);
+      if (agentData.agents?.length) setActiveAgentId(agentData.agents[0].id);
+    } finally {
+      setBootstrapping(false);
+    }
   }
 
   async function refreshSessions() {
     const historyRes = await fetch("/api/chat/history");
+    const historyData = await historyRes.json();
+    setSessions(historyData.sessions ?? []);
+  }
+
+  async function searchSessions(query: string) {
+    const encoded = encodeURIComponent(query);
+    const historyRes = await fetch(`/api/chat/history?search=${encoded}`);
     const historyData = await historyRes.json();
     setSessions(historyData.sessions ?? []);
   }
@@ -192,7 +202,13 @@ export function ChatClient() {
   }
 
   async function shareSession(sessionId: string) {
-    const shareUrl = `${window.location.origin}/chat?sessionId=${sessionId}`;
+    const response = await fetch("/api/chat/share", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId }),
+    });
+    const data = await response.json();
+    const shareUrl = data.url ?? `${window.location.origin}/chat?sessionId=${sessionId}`;
     await navigator.clipboard.writeText(shareUrl);
   }
 
@@ -255,6 +271,7 @@ export function ChatClient() {
         onShare={shareSession}
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+        onSearch={searchSessions}
       />
       <section className="relative flex flex-1 flex-col">
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-3 text-sm font-medium text-zinc-900 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70 dark:text-zinc-100">

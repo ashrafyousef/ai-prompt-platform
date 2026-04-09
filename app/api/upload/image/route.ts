@@ -3,10 +3,23 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { requireUserId } from "@/lib/auth";
+import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   try {
-    await requireUserId();
+    const userId = await requireUserId();
+    const limit = await checkRateLimit({
+      userId,
+      endpoint: "/api/upload/image",
+      limit: 10,
+      windowSec: 60,
+    });
+    if (!limit.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded." },
+        { status: 429, headers: { "Retry-After": String(limit.retryAfterSec) } }
+      );
+    }
     const formData = await req.formData();
     const file = formData.get("image") as File | null;
 

@@ -1,7 +1,8 @@
 import { db } from "@/lib/db";
 import { buildMessages } from "@/lib/orchestration/buildMessages";
 import { validateStructuredOutput } from "@/lib/orchestration/validateStructuredOutput";
-import { createChatCompletion } from "@/lib/openai/client";
+import { createChatCompletion, repairStructuredOutputWithModel } from "@/lib/openai/client";
+import { sanitizeUserInput } from "@/lib/security";
 
 export async function prepareOrchestrator(params: {
   userId: string;
@@ -12,7 +13,8 @@ export async function prepareOrchestrator(params: {
   editedFromId?: string;
   regenOfId?: string;
 }) {
-  const { userId, sessionId, agentId, text, imageUrls, editedFromId, regenOfId } = params;
+  const { userId, sessionId, agentId, imageUrls, editedFromId, regenOfId } = params;
+  const text = sanitizeUserInput(params.text);
 
   const [session, agent] = await Promise.all([
     db.chatSession.findFirst({ where: { id: sessionId, userId } }),
@@ -67,8 +69,29 @@ export async function finalizeAssistantMessage(params: {
     agent.outputFormat,
     agent.outputSchema
   );
-  if (!outputCheck.ok && outputCheck.repairedOutput) {
-    finalOutput = outputCheck.repairedOutput;
+  if (!outputCheck.ok) {
+    const retryFixed =
+      agent.outputFormat === "json" && agent.outputSchema
+        ? await repairStructuredOutputWithModel({
+            rawOutput: finalOutput,
+            outputSchema: agent.outputSchema,
+          })
+        : null;
+
+    if (retryFixed) {
+      const retryCheck = validateStructuredOutput(
+        retryFixed,
+        agent.outputFormat,
+        agent.outputSchema
+      );
+      if (retryCheck.ok) {
+        finalOutput = retryFixed;
+      } else if (retryCheck.repairedOutput) {
+        finalOutput = retryCheck.repairedOutput;
+      }
+    } else if (outputCheck.repairedOutput) {
+      finalOutput = outputCheck.repairedOutput;
+    }
   }
 
   const assistantMessage = await db.message.create({

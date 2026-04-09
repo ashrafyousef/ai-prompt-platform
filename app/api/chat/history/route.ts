@@ -6,11 +6,27 @@ export async function GET(req: NextRequest) {
   try {
     const userId = await requireUserId();
     const sessionId = req.nextUrl.searchParams.get("sessionId");
+    const search = req.nextUrl.searchParams.get("search")?.trim();
 
     if (!sessionId) {
       const sessions = await db.chatSession.findMany({
-        where: { userId },
+        where: search
+          ? {
+              userId,
+              OR: [
+                { title: { contains: search, mode: "insensitive" } },
+                {
+                  messages: {
+                    some: {
+                      content: { contains: search, mode: "insensitive" },
+                    },
+                  },
+                },
+              ],
+            }
+          : { userId },
         orderBy: { updatedAt: "desc" },
+        take: 100,
       });
       return NextResponse.json({ sessions });
     }

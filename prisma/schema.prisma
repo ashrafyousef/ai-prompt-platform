@@ -39,8 +39,10 @@ model ChatSession {
   updatedAt DateTime  @updatedAt
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages  Message[]
+  shares    SharedChat[]
 
   @@index([userId, updatedAt])
+  @@index([userId])
 }
 
 model Message {
@@ -59,6 +61,7 @@ model Message {
   agentConfig   AgentConfig? @relation(fields: [agentConfigId], references: [id], onDelete: SetNull)
 
   @@index([sessionId, createdAt])
+  @@index([sessionId])
   @@index([userId, createdAt])
 }
 
@@ -104,4 +107,15 @@ model TokenUsage {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model SharedChat {
+  id         String      @id @default(cuid())
+  sessionId  String
+  token      String      @unique
+  createdAt  DateTime    @default(now())
+  expiresAt  DateTime?
+  session    ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
 }
