@@ -1,8 +1,12 @@
 "use client";
 
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Ellipsis, LogOut, Plus, Settings, Share2, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Ellipsis, LogOut, Plus, Share2, Trash2, Zap } from "lucide-react";
 import { UiSession } from "@/lib/types";
+import { signOut, useSession } from "next-auth/react";
+import useSWR from "swr";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type Props = {
   sessions: UiSession[];
@@ -36,6 +40,8 @@ export function ChatSidebar({
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
+  const { data: session } = useSession();
+  const { data: usageData } = useSWR("/api/usage", fetcher, { refreshInterval: 30000 });
 
   useEffect(() => {
     if (!editingSessionId) return;
@@ -113,34 +119,55 @@ export function ChatSidebar({
 
   return (
     <aside
-      className={`flex h-screen flex-col border-r border-zinc-200/70 bg-white/80 p-3 text-zinc-900 backdrop-blur transition-all duration-200 ${
+      className={`flex h-screen flex-col border-r border-zinc-200/70 bg-white/80 p-3 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
         collapsed ? "w-16" : "w-72"
       }`}
     >
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <button
-          onClick={onNewChat}
-          className={`rounded-md bg-zinc-900 px-3 py-2 text-sm text-white transition hover:bg-zinc-700 ${
-            collapsed ? "w-full px-0" : "w-full"
-          }`}
-          title="New Chat"
-        >
-          {collapsed ? <Plus className="mx-auto h-4 w-4" /> : "New Chat"}
-        </button>
-        <button
-          onClick={onToggleCollapse}
-          className="rounded-md p-2 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-        >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-        </button>
+      <div className="mb-3 flex flex-col gap-2">
+        {collapsed ? (
+          <>
+            <button
+              onClick={onNewChat}
+              className="flex w-full items-center justify-center rounded-md bg-zinc-900 p-2 text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              title="New Chat"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+            <button
+              onClick={onToggleCollapse}
+              className="flex w-full items-center justify-center rounded-md bg-zinc-200 p-2 text-zinc-700 transition hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600"
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <div className="flex items-center justify-between gap-2">
+            <button
+              onClick={onNewChat}
+              className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              title="New Chat"
+            >
+              New Chat
+            </button>
+            <button
+              onClick={onToggleCollapse}
+              className="flex-shrink-0 rounded-md bg-zinc-200 p-2 text-zinc-700 transition hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600"
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          </div>
+        )}
       </div>
       {!collapsed ? (
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats..."
-          className="mb-3 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500"
+          className="mb-3 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-400"
         />
       ) : null}
 
@@ -149,7 +176,7 @@ export function ChatSidebar({
           items.length === 0 ? null : (
             <div key={group}>
               {!collapsed ? (
-                <h3 className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-zinc-500">
+                <h3 className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   {group}
                 </h3>
               ) : null}
@@ -157,10 +184,10 @@ export function ChatSidebar({
                 {items.map((session) => (
                   <div
                     key={session.id}
-                    className={`group relative w-full rounded-md px-3 py-2 text-left text-sm text-zinc-900 transition ${
+                    className={`group relative w-full rounded-md px-3 py-2 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
                       activeSessionId === session.id
-                        ? "bg-zinc-200"
-                        : "bg-zinc-100/80 hover:bg-zinc-200/70"
+                        ? "bg-zinc-200 dark:bg-zinc-700"
+                        : "bg-zinc-100/80 hover:bg-zinc-200/70 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/70"
                     }`}
                   >
                     {editingSessionId === session.id ? (
@@ -170,7 +197,7 @@ export function ChatSidebar({
                         onChange={(e) => setTitleDraft(e.target.value)}
                         onBlur={() => void submitRename(session.id)}
                         onKeyDown={(e) => onInputKeyDown(e, session.id)}
-                        className="w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900"
+                        className="w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
                       />
                     ) : (
                       <div className="flex items-center justify-between gap-2">
@@ -182,7 +209,7 @@ export function ChatSidebar({
                           {collapsed ? session.title.slice(0, 1).toUpperCase() : session.title}
                         </button>
                         <button
-                          className={`rounded p-1 text-zinc-600 hover:bg-zinc-300 hover:text-zinc-900 ${
+                          className={`rounded p-1 text-zinc-600 hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
                             activeSessionId === session.id || menuSessionId === session.id
                               ? "opacity-100"
                               : "opacity-0 group-hover:opacity-100"
@@ -197,10 +224,10 @@ export function ChatSidebar({
                         {menuSessionId === session.id ? (
                           <div
                             ref={menuRef}
-                            className="absolute right-2 top-10 z-20 min-w-[160px] rounded-md border border-zinc-200 bg-white p-1 shadow-lg"
+                            className="absolute right-2 top-10 z-20 min-w-[160px] rounded-md border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
                           >
                             <button
-                              className="block w-full rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                              className="block w-full rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
                               onClick={() => {
                                 setMenuSessionId(null);
                                 setEditingSessionId(session.id);
@@ -210,7 +237,7 @@ export function ChatSidebar({
                               Rename
                             </button>
                             <button
-                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100"
+                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
                               onClick={async () => {
                                 setMenuSessionId(null);
                                 await onShare(session.id);
@@ -220,7 +247,7 @@ export function ChatSidebar({
                               Share
                             </button>
                             <button
-                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50"
+                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
                               onClick={async () => {
                                 setMenuSessionId(null);
                                 const confirmed = window.confirm("Delete this chat and all its messages?");
@@ -244,20 +271,26 @@ export function ChatSidebar({
       </div>
 
       <div ref={profileRef} className="relative mt-3">
+        {!collapsed && usageData ? (
+          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+            <Zap className="h-3 w-3 text-amber-500" />
+            <span>{(usageData.totalTokens ?? 0).toLocaleString()} tokens used</span>
+          </div>
+        ) : null}
         <button
-          className="flex w-full items-center justify-between rounded-md bg-zinc-100 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-200"
+          className="flex w-full items-center justify-between rounded-md bg-zinc-100 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           onClick={() => setProfileOpen((prev) => !prev)}
+          aria-label="Profile menu"
         >
-          {collapsed ? "•••" : "Profile & Settings"}
+          {collapsed ? "•••" : (session?.user?.name ?? session?.user?.email ?? "Profile & Settings")}
           {!collapsed ? <Ellipsis className="h-4 w-4" /> : null}
         </button>
         {profileOpen ? (
-          <div className="absolute bottom-11 left-0 right-0 z-20 rounded-md border border-zinc-200 bg-white p-1 shadow-lg">
-            <button className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100">
-              <Settings className="h-3.5 w-3.5" />
-              Settings
-            </button>
-            <button className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100">
+          <div className="absolute bottom-11 left-0 right-0 z-20 rounded-md border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            <button
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              onClick={() => signOut({ callbackUrl: "/" })}
+            >
               <LogOut className="h-3.5 w-3.5" />
               Sign out
             </button>

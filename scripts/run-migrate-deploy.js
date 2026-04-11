@@ -5,7 +5,7 @@ if (!process.env.DATABASE_URL) {
   process.exit(0);
 }
 
-const result = spawnSync("npx", ["prisma", "migrate", "deploy"], {
+const result = spawnSync("npx prisma migrate deploy", {
   stdio: "inherit",
   shell: true,
 });

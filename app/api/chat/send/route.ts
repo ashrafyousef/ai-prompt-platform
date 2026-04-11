@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { readFile } from "fs/promises";
+import path from "path";
 import { requireUserId } from "@/lib/auth";
 import { finalizeAssistantMessage, prepareOrchestrator } from "@/lib/orchestration/chatOrchestrator";
 import { checkRateLimit } from "@/lib/rateLimit";
@@ -8,13 +10,32 @@ import { assertUserWithinSoftTokenLimit } from "@/lib/usage";
 import { captureError } from "@/lib/sentry";
 import { logJson } from "@/lib/logger";
 
+const MIME_MAP: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  gif: "image/gif",
+  webp: "image/webp",
+};
+
+async function toBase64DataUri(url: string): Promise<string> {
+  if (url.startsWith("data:")) return url;
+  if (url.startsWith("http")) return url;
+  const filePath = path.join(process.cwd(), "public", url);
+  const buffer = await readFile(filePath);
+  const ext = path.extname(filePath).slice(1).toLowerCase();
+  const mime = MIME_MAP[ext] ?? "image/png";
+  return `data:${mime};base64,${buffer.toString("base64")}`;
+}
+
 const sendSchema = z.object({
   sessionId: z.string().min(1),
   agentId: z.string().min(1),
   text: z.string().min(1),
-  imageUrls: z.array(z.string().url()).optional(),
+  imageUrls: z.array(z.string().min(1)).optional(),
   editedFromId: z.string().optional(),
   regenOfId: z.string().optional(),
+  modelVersion: z.string().optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -41,8 +62,19 @@ export async function POST(req: NextRequest) {
       userId,
       additionalEstimatedTokens: Math.ceil(payload.text.length / 4) + 1200,
     });
+
+    const hasImages = Boolean(payload.imageUrls && payload.imageUrls.length > 0);
+
+    const resolvedImageUrls = hasImages
+      ? await Promise.all(payload.imageUrls!.map(toBase64DataUri))
+      : undefined;
+
     const encoder = new TextEncoder();
-    const prepared = await prepareOrchestrator({ userId, ...payload });
+    const prepared = await prepareOrchestrator({
+      userId,
+      ...payload,
+      resolvedImageUrls,
+    });
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -51,6 +83,8 @@ export async function POST(req: NextRequest) {
           for await (const delta of streamChatCompletion(prepared.messages, {
             temperature: prepared.agent.temperature,
             maxTokens: prepared.agent.maxTokens,
+            modelVersion: payload.modelVersion,
+            hasImages,
           })) {
             output += delta;
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ delta })}\n\n`));
@@ -62,6 +96,8 @@ export async function POST(req: NextRequest) {
             agentId: payload.agentId,
             text: payload.text,
             responseText: output,
+            messages: prepared.messages,
+            modelVersion: payload.modelVersion,
           });
           logJson("info", {
             route: "/api/chat/send",
@@ -87,7 +123,7 @@ export async function POST(req: NextRequest) {
             status: "error",
             error: error instanceof Error ? { message: error.message, stack: error.stack } : message,
           });
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: message })}\n\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: "Internal server error" })}\n\n`));
           controller.close();
         }
       },
@@ -110,9 +146,15 @@ export async function POST(req: NextRequest) {
       status: "error",
       error: error instanceof Error ? { message: error.message, stack: error.stack } : String(error),
     });
+    const message = error instanceof Error ? error.message : "Internal server error";
+    const status = message === "Unauthorized" ? 401
+      : message.includes("Token soft limit") ? 403
+      : 400;
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to send message." },
-      { status: 400 }
+      { error: message === "Unauthorized" ? "Please sign in to continue."
+        : message.includes("Token soft limit") ? "Monthly token limit reached. Please try again next month."
+        : "Something went wrong. Please try again." },
+      { status }
     );
   }
 }

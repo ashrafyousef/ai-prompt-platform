@@ -10,12 +10,10 @@
   --background-end-rgb: 244, 244, 245;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 244, 244, 245;
-    --background-start-rgb: 9, 9, 11;
-    --background-end-rgb: 24, 24, 27;
-  }
+.dark {
+  --foreground-rgb: 244, 244, 245;
+  --background-start-rgb: 9, 9, 11;
+  --background-end-rgb: 24, 24, 27;
 }
 
 body {

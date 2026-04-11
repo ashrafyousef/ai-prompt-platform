@@ -1,12 +1,38 @@
 import { ChatMessage } from "@/lib/orchestration/buildMessages";
 
+// Groq is OpenAI-compatible. If GROQ_API_KEY is set it takes priority.
+// Falls back to OpenAI if only OPENAI_API_KEY is set.
+const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
+
+const GROQ_MODELS: Record<string, string> = {
+  "v1.0": "llama-3.1-8b-instant",
+  "v2.0": "llama-3.3-70b-versatile",
+};
+
+const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+
+export function resolveModelName(modelVersion?: string): string {
+  return resolveProvider(modelVersion).defaultModel;
+}
+
+function resolveProvider(modelVersion?: string): { apiUrl: string; apiKey: string; defaultModel: string } {
+  const groqKey = process.env.GROQ_API_KEY;
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (groqKey) {
+    const model = (modelVersion && GROQ_MODELS[modelVersion]) ?? GROQ_MODELS["v2.0"];
+    return { apiUrl: GROQ_API_URL, apiKey: groqKey, defaultModel: model };
+  }
+  return { apiUrl: OPENAI_API_URL, apiKey: openaiKey ?? "", defaultModel: "gpt-4o-mini" };
+}
 
 type CompletionOptions = {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  modelVersion?: string;
+  hasImages?: boolean;
 };
 
 export async function createChatCompletion(messages: ChatMessage[], options: {
@@ -14,19 +40,19 @@ export async function createChatCompletion(messages: ChatMessage[], options: {
   temperature?: number;
   maxTokens?: number;
 }): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const { apiUrl, apiKey, defaultModel } = resolveProvider();
   if (!apiKey) {
-    return "OPENAI_API_KEY is not configured. Add it to your environment to enable real model responses.";
+    return "No API key configured. Set GROQ_API_KEY or OPENAI_API_KEY in your environment.";
   }
 
-  const response = await fetch(OPENAI_API_URL, {
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: options.model ?? "gpt-4o-mini",
+      model: options.model ?? defaultModel,
       messages,
       temperature: options.temperature ?? 0.4,
       max_tokens: options.maxTokens ?? 900,
@@ -36,7 +62,7 @@ export async function createChatCompletion(messages: ChatMessage[], options: {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`OpenAI request failed: ${response.status} ${text}`);
+    throw new Error(`LLM request failed: ${response.status} ${text}`);
   }
 
   const data = await response.json();
@@ -47,20 +73,25 @@ export async function* streamChatCompletion(
   messages: ChatMessage[],
   options: CompletionOptions
 ): AsyncGenerator<string, void, unknown> {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const { apiUrl, apiKey, defaultModel } = resolveProvider(options.modelVersion);
   if (!apiKey) {
-    yield "OPENAI_API_KEY is not configured. Add it to your environment to enable real model responses.";
+    yield "No API key configured. Set GROQ_API_KEY or OPENAI_API_KEY in your environment.";
     return;
   }
 
-  const response = await fetch(OPENAI_API_URL, {
+  let model = options.model ?? defaultModel;
+  if (options.hasImages && process.env.GROQ_API_KEY) {
+    model = GROQ_VISION_MODEL;
+  }
+
+  const response = await fetch(apiUrl, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: options.model ?? "gpt-4o-mini",
+      model,
       messages,
       temperature: options.temperature ?? 0.4,
       max_tokens: options.maxTokens ?? 900,
@@ -70,7 +101,7 @@ export async function* streamChatCompletion(
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`OpenAI request failed: ${response.status} ${text}`);
+    throw new Error(`LLM request failed: ${response.status} ${text}`);
   }
 
   if (!response.body) return;
