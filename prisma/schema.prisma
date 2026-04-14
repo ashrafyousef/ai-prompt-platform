@@ -19,16 +19,51 @@ enum OutputFormat {
   template
 }
 
+enum UserRole {
+  USER
+  TEAM_LEAD
+  ADMIN
+}
+
+enum AgentStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AgentScope {
+  TEAM
+  GLOBAL
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
   name         String?
+  role         UserRole      @default(USER)
+  teamId       String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   chatSessions ChatSession[]
   messages     Message[]
   savedPrompts SavedPrompt[]
   tokenUsages  TokenUsage[]
+  team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@index([role])
+  @@index([teamId])
+}
+
+model Team {
+  id        String        @id @default(cuid())
+  name      String
+  slug      String        @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  agents    AgentConfig[]
+  members   User[]
+
+  @@index([slug])
 }
 
 model ChatSession {
@@ -67,20 +102,28 @@ model Message {
 }
 
 model AgentConfig {
-  id           String      @id @default(cuid())
-  slug         String      @unique
+  id           String       @id @default(cuid())
+  slug         String       @unique
   name         String
   description  String?
   systemPrompt String
   inputSchema  Json?
   outputFormat OutputFormat @default(markdown)
   outputSchema Json?
-  temperature  Float       @default(0.4)
-  maxTokens    Int         @default(800)
-  isEnabled    Boolean     @default(true)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  temperature  Float        @default(0.4)
+  maxTokens    Int          @default(800)
+  isEnabled    Boolean      @default(true)
+  status       AgentStatus  @default(PUBLISHED)
+  scope        AgentScope   @default(GLOBAL)
+  teamId       String?
+  team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
   messages     Message[]
+
+  @@index([teamId])
+  @@index([status])
+  @@index([scope])
 }
 
 model SavedPrompt {

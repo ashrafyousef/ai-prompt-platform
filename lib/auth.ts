@@ -20,18 +20,41 @@ export const authOptions: NextAuthOptions = {
           update: {},
           create: { email, name: email.split("@")[0] },
         });
-        return { id: user.id, email: user.email, name: user.name ?? undefined };
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name ?? undefined,
+          role: user.role,
+          teamId: user.teamId,
+        };
       },
     }),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      if (user?.id) token.sub = user.id;
+      if (user?.id) {
+        token.sub = user.id;
+        token.role = (user as { role?: string }).role;
+        token.teamId = (user as { teamId?: string | null }).teamId ?? null;
+      } else if (token.sub && token.role === undefined) {
+        const u = await db.user.findUnique({
+          where: { id: token.sub },
+          select: { role: true, teamId: true },
+        });
+        if (u) {
+          token.role = u.role;
+          token.teamId = u.teamId;
+        }
+      }
       return token;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
+        const r = token.role;
+        session.user.role =
+          r === "USER" || r === "TEAM_LEAD" || r === "ADMIN" ? r : undefined;
+        session.user.teamId = token.teamId ?? null;
       }
       return session;
     },

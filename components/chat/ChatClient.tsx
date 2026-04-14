@@ -17,6 +17,8 @@ export function ChatClient() {
   const {
     sessions,
     agents,
+    agentsLoading,
+    agentsError,
     refreshSessions,
     createSession,
     renameSession,
@@ -46,10 +48,12 @@ export function ChatClient() {
     onError: (msg) => toast(msg, "error"),
   });
 
-  const activeAgentName = useMemo(
-    () => agents.find((a) => a.id === activeAgentId)?.name ?? "No Agent",
+  const activeAgent = useMemo(
+    () => agents.find((a) => a.id === activeAgentId),
     [agents, activeAgentId]
   );
+
+  const activeAgentName = activeAgent?.name ?? "Assistant";
 
   useEffect(() => {
     if (agents.length && !activeAgentId) {
@@ -108,6 +112,14 @@ export function ChatClient() {
     setEditTarget(null);
     setRegenOfId(undefined);
     setComposerSeedText(undefined);
+  };
+
+  const handleAgentChange = (id: string) => {
+    if (id === activeAgentId) return;
+    if (messages.length > 0) {
+      setActiveSessionId(undefined);
+    }
+    setActiveAgentId(id);
   };
 
   if (status === "loading" && !authLoadingTimedOut) {
@@ -169,12 +181,13 @@ export function ChatClient() {
       onToggleDrawer={() => setDrawerOpen((prev) => !prev)}
       savedPromptsOpen={savedPromptsOpen}
       onToggleSavedPrompts={() => setSavedPromptsOpen((prev) => !prev)}
-      mobileSidebarOpen={mobileSidebarOpen}
-      onToggleMobileSidebar={() => setMobileSidebarOpen((prev) => !prev)}
-      activeAgentName={activeAgentName}
       activeAgentId={activeAgentId}
       agents={agents}
-      onAgentChange={setActiveAgentId}
+      agentsLoading={agentsLoading}
+      agentsError={agentsError}
+      onAgentChange={handleAgentChange}
+      mobileSidebarOpen={mobileSidebarOpen}
+      onToggleMobileSidebar={() => setMobileSidebarOpen((prev) => !prev)}
     >
       <div className="flex w-full h-full min-h-0 relative">
         <div className="flex flex-1 flex-col h-full min-h-0 relative">
@@ -187,6 +200,7 @@ export function ChatClient() {
             }}
             onSuggestionClick={(text) => setComposerSeedText(text)}
             loading={loading}
+            activeAgent={activeAgent}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-4">
             <div className="pointer-events-auto px-4">

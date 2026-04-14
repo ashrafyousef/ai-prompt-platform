@@ -16,4 +16,8 @@ export type UiAgent = {
   id: string;
   name: string;
   slug: string;
+  description: string | null;
+  icon: string | null;
+  category: string | null;
+  starterPrompts: string[];
 };

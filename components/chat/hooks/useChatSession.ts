@@ -5,7 +5,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function useChatSession() {
   const { data: historyData, mutate: refreshSessions } = useSWR<{ sessions: UiSession[] }>("/api/chat/history", fetcher);
-  const { data: agentsData } = useSWR<{ agents: UiAgent[] }>("/api/agents", fetcher);
+  const { data: agentsData, error: agentsError, isLoading: agentsLoading } = useSWR<{ agents: UiAgent[] }>("/api/agents", fetcher);
 
   const sessions = historyData?.sessions ?? [];
   const agents = agentsData?.agents ?? [];
@@ -68,6 +68,8 @@ export function useChatSession() {
   return {
     sessions,
     agents,
+    agentsLoading,
+    agentsError: agentsError ? (agentsError instanceof Error ? agentsError.message : String(agentsError)) : null,
     refreshSessions,
     createSession,
     renameSession,

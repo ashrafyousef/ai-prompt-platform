@@ -2,6 +2,7 @@ import { ReactNode } from "react";
 import { PanelRightClose, PanelRightOpen, Bookmark, Menu } from "lucide-react";
 import { UiAgent } from "@/lib/types";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { AgentSelector } from "@/components/chat/AgentSelector";
 
 export function ChatLayout({
   sidebar,
@@ -9,9 +10,10 @@ export function ChatLayout({
   onToggleDrawer,
   savedPromptsOpen,
   onToggleSavedPrompts,
-  activeAgentName,
   activeAgentId,
   agents,
+  agentsLoading,
+  agentsError,
   onAgentChange,
   mobileSidebarOpen,
   onToggleMobileSidebar,
@@ -22,9 +24,10 @@ export function ChatLayout({
   onToggleDrawer: () => void;
   savedPromptsOpen: boolean;
   onToggleSavedPrompts: () => void;
-  activeAgentName: string;
   activeAgentId: string;
   agents: UiAgent[];
+  agentsLoading?: boolean;
+  agentsError?: string | null;
   onAgentChange: (id: string) => void;
   mobileSidebarOpen: boolean;
   onToggleMobileSidebar: () => void;
@@ -47,7 +50,7 @@ export function ChatLayout({
       ) : null}
 
       <section className="relative flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-3 text-sm font-medium text-zinc-900 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70 dark:text-zinc-100">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
           <div className="flex items-center gap-3">
             <button
               className="rounded-md p-2 text-zinc-600 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
@@ -56,22 +59,15 @@ export function ChatLayout({
             >
               <Menu className="h-4 w-4" />
             </button>
-            <span className="hidden sm:inline text-xs uppercase tracking-wide text-zinc-500">Agent</span>
-            <span className="hidden sm:inline">{activeAgentName}</span>
+            <AgentSelector
+              agents={agents}
+              activeAgentId={activeAgentId}
+              onAgentChange={onAgentChange}
+              loading={agentsLoading}
+              error={agentsError}
+            />
           </div>
-          <div className="flex items-center gap-2">
-            <select
-              className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
-              value={activeAgentId}
-              onChange={(e) => onAgentChange(e.target.value)}
-              aria-label="Select agent"
-            >
-              {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
-                  {agent.name}
-                </option>
-              ))}
-            </select>
+          <div className="flex items-center gap-1.5">
             <ThemeToggle />
             <button
               className={`rounded-md p-2 transition hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${

@@ -6,10 +6,11 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
-import { UiMessage } from "@/lib/types";
+import { UiMessage, UiAgent } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
 import { mutate } from "swr";
 import { ArrowDown, Bookmark, Copy, Pencil, RotateCcw } from "lucide-react";
+import { AgentStarterPrompts } from "@/components/chat/AgentStarterPrompts";
 
 type Props = {
   messages: UiMessage[];
@@ -17,6 +18,7 @@ type Props = {
   onEdit: (messageId: string, currentText: string) => void;
   onSuggestionClick?: (text: string) => void;
   loading?: boolean;
+  activeAgent?: UiAgent;
 };
 
 type MessageBubbleProps = {
@@ -186,7 +188,7 @@ const MessageBubble = memo(function MessageBubble({ message, onRegenerate, onEdi
   );
 });
 
-export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick, loading }: Props) {
+export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick, loading, activeAgent }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
@@ -212,30 +214,58 @@ export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick,
 
   const empty = useMemo(() => messages.length === 0 && !loading, [messages.length, loading]);
 
+  const hasAgentStarters = activeAgent?.starterPrompts && activeAgent.starterPrompts.length > 0;
+
   if (empty) {
     return (
       <div className="flex flex-1 items-center justify-center px-6 pb-44 pt-8">
         <div className="mx-auto w-full max-w-3xl">
-          <h2 className="text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-100">Welcome to your AI Workspace</h2>
-          <p className="mt-2 text-center text-sm text-zinc-500">
-            Start with a prompt or pick a suggestion to explore.
-          </p>
-          <div className="mt-6 grid gap-3 md:grid-cols-2">
-            {[
-              "Design a launch strategy for a new AI product in MENA.",
-              "Rewrite this prompt to be clearer and outcome-focused.",
-              "Generate a brand voice guide with examples and tone rules.",
-              "Turn these notes into a project plan with milestones.",
-            ].map((card) => (
-              <button
-                key={card}
-                onClick={() => onSuggestionClick?.(card)}
-                className="rounded-xl border border-zinc-200 bg-white/70 p-4 text-left text-sm text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:border-violet-500 dark:hover:bg-violet-900/10"
-              >
-                {card}
-              </button>
-            ))}
-          </div>
+          {activeAgent ? (
+            <div className="flex flex-col items-center">
+              <span className="text-4xl">{activeAgent.icon || "🤖"}</span>
+              <h2 className="mt-3 text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                {activeAgent.name}
+              </h2>
+              {activeAgent.description ? (
+                <p className="mt-2 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
+                  {activeAgent.description}
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              <h2 className="text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                Welcome to your AI Workspace
+              </h2>
+              <p className="mt-2 text-center text-sm text-zinc-500">
+                Start with a prompt or pick a suggestion to explore.
+              </p>
+            </>
+          )}
+
+          {hasAgentStarters ? (
+            <AgentStarterPrompts
+              agent={activeAgent}
+              onPromptClick={(text) => onSuggestionClick?.(text)}
+            />
+          ) : (
+            <div className="mt-6 grid gap-3 md:grid-cols-2">
+              {[
+                "Design a launch strategy for a new AI product in MENA.",
+                "Rewrite this prompt to be clearer and outcome-focused.",
+                "Generate a brand voice guide with examples and tone rules.",
+                "Turn these notes into a project plan with milestones.",
+              ].map((card) => (
+                <button
+                  key={card}
+                  onClick={() => onSuggestionClick?.(card)}
+                  className="rounded-xl border border-zinc-200 bg-white/70 p-4 text-left text-sm text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:border-violet-500 dark:hover:bg-violet-900/10"
+                >
+                  {card}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
