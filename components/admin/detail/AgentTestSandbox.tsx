@@ -1,9 +1,18 @@
 "use client";
 
-import { useState } from "react";
-import { FlaskConical, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import {
+  FlaskConical,
+  Trash2,
+  BookOpen,
+  FileText,
+  AlertTriangle,
+  Info,
+} from "lucide-react";
 import { useAdminAgent } from "@/hooks/useAdminAgent";
 import { useToast } from "@/components/ui/Toast";
+import { normalizeAgentInputSchema } from "@/lib/agentConfig";
+import type { AgentBuilderInputSchema } from "@/lib/agentConfig";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 import { AgentTestInput } from "./AgentTestInput";
 import { AgentTestOutput, type TestResult } from "./AgentTestOutput";
@@ -19,11 +28,101 @@ function Skeleton() {
   );
 }
 
+type ConfigHint = { level: "warn" | "info"; text: string };
+
+function computeConfigHints(config: AgentBuilderInputSchema, systemPrompt: string): ConfigHint[] {
+  const hints: ConfigHint[] = [];
+  const oc = config.outputConfig;
+  const activeKnowledge = config.knowledgeItems.filter((i) => i.isActive);
+
+  if (!systemPrompt.trim()) {
+    hints.push({ level: "warn", text: "System prompt is empty — agent has no base instructions." });
+  }
+  if (config.knowledgeItems.length === 0) {
+    hints.push({ level: "info", text: "No knowledge sources attached. Responses rely on base instructions only." });
+  } else if (activeKnowledge.length === 0) {
+    hints.push({ level: "warn", text: "All knowledge sources are inactive — none will be used." });
+  }
+  if (oc.format === "template" && !oc.template?.trim()) {
+    hints.push({ level: "warn", text: "Template format selected but template body is empty." });
+  }
+  if (oc.citationsPolicy === "required" && activeKnowledge.length === 0) {
+    hints.push({ level: "warn", text: "Citations are required but no knowledge is available to cite." });
+  }
+  if (oc.format === "json") {
+    hints.push({ level: "info", text: "JSON output — schema validation will be checked automatically." });
+  }
+  if (oc.requiredSections.length > 0) {
+    hints.push({ level: "info", text: `Response should include: ${oc.requiredSections.join(", ")}.` });
+  }
+  return hints;
+}
+
+function ConfigContextCard({ config, systemPrompt }: { config: AgentBuilderInputSchema; systemPrompt: string }) {
+  const oc = config.outputConfig;
+  const activeCount = config.knowledgeItems.filter((i) => i.isActive).length;
+  const totalCount = config.knowledgeItems.length;
+  const hints = computeConfigHints(config, systemPrompt);
+  const warnings = hints.filter((h) => h.level === "warn");
+  const infos = hints.filter((h) => h.level === "info");
+
+  return (
+    <div className="rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <div className="flex flex-wrap gap-x-6 gap-y-2 px-5 py-3.5">
+        <div className="flex items-center gap-1.5">
+          <BookOpen className="h-3.5 w-3.5 text-zinc-400" />
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Knowledge:</span>
+          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200">
+            {activeCount} active{totalCount > activeCount ? ` / ${totalCount} total` : ""}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <FileText className="h-3.5 w-3.5 text-zinc-400" />
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">Output:</span>
+          <span className="text-xs font-medium text-zinc-700 dark:text-zinc-200">{oc.format}</span>
+          <span className="text-[10px] text-zinc-400">·</span>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">{oc.responseDepth}</span>
+          {oc.citationsPolicy !== "none" ? (
+            <>
+              <span className="text-[10px] text-zinc-400">·</span>
+              <span className="text-xs text-zinc-500 dark:text-zinc-400">citations {oc.citationsPolicy}</span>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {hints.length > 0 ? (
+        <div className="border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
+          <div className="space-y-1.5">
+            {warnings.map((h, i) => (
+              <div key={`w-${i}`} className="flex items-start gap-1.5">
+                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-500" />
+                <span className="text-xs text-amber-700 dark:text-amber-400">{h.text}</span>
+              </div>
+            ))}
+            {infos.map((h, i) => (
+              <div key={`i-${i}`} className="flex items-start gap-1.5">
+                <Info className="mt-0.5 h-3 w-3 shrink-0 text-blue-400" />
+                <span className="text-xs text-zinc-500 dark:text-zinc-400">{h.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function AgentTestSandbox({ agentId }: { agentId: string }) {
   const { agent, isLoading, error, runTest } = useAdminAgent(agentId);
   const { toast } = useToast();
   const [results, setResults] = useState<TestResult[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const normalizedConfig = useMemo(
+    () => (agent ? normalizeAgentInputSchema(agent.inputSchema) : null),
+    [agent]
+  );
 
   async function handleTest(prompt: string) {
     if (!agent) return;
@@ -63,9 +162,7 @@ export function AgentTestSandbox({ agentId }: { agentId: string }) {
     );
   }
 
-  const starterPrompts = (
-    (agent.inputSchema as Record<string, unknown>)?.starterPrompts ?? []
-  ) as string[];
+  const starterPrompts = normalizedConfig?.starterPrompts ?? [];
 
   return (
     <div className="space-y-6">
@@ -88,7 +185,7 @@ export function AgentTestSandbox({ agentId }: { agentId: string }) {
             <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Testing: {agent.name}</p>
             <div className="mt-0.5 flex items-center gap-2">
               <AgentStatusBadge status={agent.status} />
-              <span className="text-[11px] text-zinc-400">{agent.outputFormat} output</span>
+              <span className="text-[11px] text-zinc-400">{normalizedConfig?.outputConfig.format ?? agent.outputFormat} output</span>
             </div>
           </div>
         </div>
@@ -103,6 +200,11 @@ export function AgentTestSandbox({ agentId }: { agentId: string }) {
           </button>
         ) : null}
       </div>
+
+      {/* Config context */}
+      {normalizedConfig ? (
+        <ConfigContextCard config={normalizedConfig} systemPrompt={agent.systemPrompt} />
+      ) : null}
 
       {/* Input */}
       <div className="rounded-2xl border border-zinc-200/80 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">

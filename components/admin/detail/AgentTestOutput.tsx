@@ -3,6 +3,16 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, CheckCircle2, XCircle, Clock, FlaskConical, AlertTriangle } from "lucide-react";
 
+export type TestConfigSummary = {
+  knowledgeCount: number;
+  knowledgeTotal: number;
+  outputFormat: string;
+  responseDepth: string;
+  citationsPolicy: string;
+  requiredSections: string[];
+  hasTemplate: boolean;
+};
+
 export type TestResult = {
   prompt: string;
   response: string;
@@ -11,6 +21,7 @@ export type TestResult = {
   outputFormat: string;
   schemaValid: boolean | null;
   error?: string;
+  configSummary?: TestConfigSummary;
 };
 
 function ResultCard({ result, index }: { result: TestResult; index: number }) {
@@ -78,7 +89,7 @@ function ResultCard({ result, index }: { result: TestResult; index: number }) {
           </div>
 
           {!hasError ? (
-            <div className="flex flex-wrap gap-4 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
+            <div className="flex flex-wrap gap-x-4 gap-y-1 border-t border-zinc-100 px-5 py-3 dark:border-zinc-800">
               <span className="text-[11px] text-zinc-400">Format: <span className="font-medium text-zinc-600 dark:text-zinc-300">{result.outputFormat}</span></span>
               <span className="text-[11px] text-zinc-400">Duration: <span className="font-medium text-zinc-600 dark:text-zinc-300">{result.durationMs}ms</span></span>
               {result.schemaValid !== null ? (
@@ -87,6 +98,13 @@ function ResultCard({ result, index }: { result: TestResult; index: number }) {
                     {result.schemaValid ? "Valid" : "Invalid"}
                   </span>
                 </span>
+              ) : null}
+              {result.configSummary ? (
+                <>
+                  <span className="text-[11px] text-zinc-400">Depth: <span className="font-medium text-zinc-600 dark:text-zinc-300">{result.configSummary.responseDepth}</span></span>
+                  <span className="text-[11px] text-zinc-400">Citations: <span className="font-medium text-zinc-600 dark:text-zinc-300">{result.configSummary.citationsPolicy}</span></span>
+                  <span className="text-[11px] text-zinc-400">Knowledge: <span className="font-medium text-zinc-600 dark:text-zinc-300">{result.configSummary.knowledgeCount} active</span></span>
+                </>
               ) : null}
             </div>
           ) : null}

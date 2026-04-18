@@ -3,11 +3,22 @@
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, Loader2 } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { useAgentWizard, canProceed, validateIdentity, validateBehavior } from "@/hooks/useAgentWizard";
+import {
+  useAgentWizard,
+  canProceed,
+  STEP_LABELS,
+  validateIdentity,
+  validateBehavior,
+  validateKnowledge,
+  validateOutput,
+} from "@/hooks/useAgentWizard";
 import type { WizardStep } from "@/hooks/useAgentWizard";
+import { buildOutputConfigFromDraft, buildKnowledgePayload } from "@/lib/agentConstants";
 import { WizardStepper } from "./WizardStepper";
 import { AgentPreviewPanel } from "./AgentPreviewPanel";
 import { ImportMethodStep } from "./ImportMethodStep";
+import { GuidedExtractionStep } from "./GuidedExtractionStep";
+import { KnowledgeIntakeStep } from "./KnowledgeIntakeStep";
 import { AgentIdentityStep } from "./AgentIdentityStep";
 import { AgentBehaviorStep } from "./AgentBehaviorStep";
 import { AgentKnowledgeStep } from "./AgentKnowledgeStep";
@@ -33,19 +44,54 @@ export function AgentWizard({ mode }: { mode: "create" | "import" }) {
   }
 
   async function handleSave(publish: boolean) {
+    if (saving) return;
+
+    if (!draft.name.trim()) {
+      toast("Agent name is required — add one in Identity.", "error");
+      return;
+    }
+    if (!draft.systemInstructions.trim()) {
+      toast("System instructions are empty — add them in Behavior.", "error");
+      return;
+    }
+    if (draft.scope === "TEAM" && !draft.teamId) {
+      toast("Team-scoped agents require a team assignment.", "error");
+      return;
+    }
+
     if (publish) {
-      const identityErrors = validateIdentity(draft);
-      const behaviorErrors = validateBehavior(draft);
-      const allErrors = [...identityErrors, ...behaviorErrors];
+      const allErrors = [
+        ...validateIdentity(draft),
+        ...validateBehavior(draft),
+        ...validateKnowledge(draft),
+        ...validateOutput(draft),
+      ];
       if (allErrors.length > 0) {
         toast(`Cannot publish: ${allErrors[0]}`, "error");
         return;
       }
     }
 
+    const readySources = draft.knowledgeSources.filter(
+      (k) =>
+        k.status === "ready" &&
+        k.title.trim().length > 0 &&
+        ((k.content ?? "").trim().length > 0 || k.fileRef?.fileName)
+    );
+    const uploadingCount = draft.knowledgeSources.filter((k) => k.status === "uploading").length;
+    if (uploadingCount > 0) {
+      toast("Please wait for uploads to finish before saving.", "error");
+      return;
+    }
+
     dispatch({ type: "SET_SAVING", saving: true });
     try {
+      const starterPrompts = draft.starterPrompts
+        .map((p) => p.text.trim())
+        .filter(Boolean);
+
       const body = {
+        importMethod: draft.importMethod,
         name: draft.name.trim(),
         description: draft.description.trim() || null,
         category: draft.category.trim() || null,
@@ -61,16 +107,18 @@ export function AgentWizard({ mode }: { mode: "create" | "import" }) {
         maxTokens: draft.maxTokens,
         strictMode: draft.strictMode,
         outputMode: draft.outputMode,
-        structuredSections: draft.structuredSections,
+        structuredSections: draft.structuredSections.filter((s) => s.title.trim()),
         jsonSchema: draft.jsonSchema,
         templateText: draft.templateText,
         markdownRules: draft.markdownRules,
-        knowledgeSources: draft.knowledgeSources.map((k) => ({
-          type: k.type,
+        outputConfig: buildOutputConfigFromDraft(draft),
+        knowledgeItems: buildKnowledgePayload(readySources),
+        knowledgeSources: readySources.map((k) => ({
+          type: k.sourceType,
           title: k.title,
-          content: k.content,
+          content: k.content ?? "",
         })),
-        starterPrompts: draft.starterPrompts.map((p) => p.text),
+        starterPrompts,
       };
 
       const res = await fetch("/api/admin/agents", {
@@ -81,7 +129,7 @@ export function AgentWizard({ mode }: { mode: "create" | "import" }) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Save failed");
 
-      toast(publish ? "Agent published successfully" : "Draft saved successfully");
+      toast(publish ? "Agent published and available to users." : "Draft saved. You can return to edit anytime.");
       router.push(`/admin/agents/${data.agent.id}`);
     } catch (err) {
       toast(err instanceof Error ? err.message : "Save failed", "error");
@@ -94,6 +142,16 @@ export function AgentWizard({ mode }: { mode: "create" | "import" }) {
     switch (step) {
       case "import-method":
         return <ImportMethodStep draft={draft} updateDraft={updateDraft} />;
+      case "guided-extraction":
+        return <GuidedExtractionStep draft={draft} updateDraft={updateDraft} />;
+      case "knowledge-intake":
+        return (
+          <KnowledgeIntakeStep
+            draft={draft}
+            updateDraft={updateDraft}
+            dispatch={dispatch}
+          />
+        );
       case "identity":
         return <AgentIdentityStep draft={draft} updateDraft={updateDraft} />;
       case "behavior":
@@ -121,6 +179,10 @@ export function AgentWizard({ mode }: { mode: "create" | "import" }) {
 
   const isFirst = stepIndex === 0;
   const isLast = step === "review";
+  const nextStep = !isLast ? steps[stepIndex + 1] : null;
+  const continueLabel = step === "import-method" && nextStep
+    ? `Continue to ${STEP_LABELS[nextStep]}`
+    : "Continue";
 
   return (
     <div className="flex min-h-[calc(100vh-7rem)] flex-col gap-6 lg:flex-row">
@@ -163,7 +225,7 @@ export function AgentWizard({ mode }: { mode: "create" | "import" }) {
               disabled={!wiz.canProceedCurrent}
               className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-6 py-2.5 text-sm font-medium text-white shadow-sm transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200"
             >
-              Continue
+              {continueLabel}
               <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>

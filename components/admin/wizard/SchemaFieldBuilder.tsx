@@ -18,9 +18,12 @@ export function SchemaFieldBuilder({
 }) {
   return (
     <div className="space-y-4">
+      <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+        Define the fields every JSON response must include. Use stable, descriptive names.
+      </p>
       <div className="flex items-center justify-between">
         <p className="text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-          JSON Schema Fields ({fields.length})
+          Schema fields ({fields.length})
         </p>
         <button
           type="button"
@@ -44,7 +47,9 @@ export function SchemaFieldBuilder({
       </div>
 
       {fields.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">No fields yet — click "Add field" to start.</p>
+        <p className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-400">
+          No fields defined. Add at least one (e.g. `summary`, `next_steps`) to define the response shape.
+        </p>
       ) : null}
 
       {fields.map((field) => (

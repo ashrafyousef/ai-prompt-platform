@@ -1,8 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import useSWR from "swr";
+import { Sparkles } from "lucide-react";
 import type { AgentDraft } from "@/hooks/useAgentWizard";
 import { validateIdentity } from "@/hooks/useAgentWizard";
+import { AGENT_PRESETS, type AgentPreset } from "@/lib/agentConstants";
 
 const EMOJIS = ["🤖", "🧠", "✍️", "📸", "🎨", "📊", "💡", "🔬", "📝", "🚀", "🎯", "💬"];
 
@@ -22,6 +25,27 @@ const teamFetcher = async (url: string) => {
   return data as { teams: { id: string; name: string }[] };
 };
 
+function applyPreset(
+  preset: AgentPreset,
+  updateDraft: (p: Partial<AgentDraft>) => void
+) {
+  const d = preset.defaults;
+  updateDraft({
+    icon: preset.icon,
+    category: preset.category,
+    systemInstructions: d.systemInstructions,
+    toneGuidance: d.toneGuidance,
+    outputMode: d.outputMode,
+    responseDepth: d.responseDepth,
+    citationsPolicy: d.citationsPolicy,
+    fallbackBehavior: d.fallbackBehavior,
+    temperature: d.temperature,
+    maxTokens: d.maxTokens,
+    structuredSections: d.structuredSections,
+    starterPrompts: d.starterPrompts,
+  });
+}
+
 export function AgentIdentityStep({
   draft,
   updateDraft,
@@ -32,15 +56,87 @@ export function AgentIdentityStep({
   const { data: teamsData } = useSWR("/api/admin/teams", teamFetcher);
   const teams = teamsData?.teams ?? [];
   const errors = validateIdentity(draft);
+  const [appliedPreset, setAppliedPreset] = useState<string | null>(null);
+  const [showPresets, setShowPresets] = useState(true);
+
+  function handlePreset(preset: AgentPreset) {
+    applyPreset(preset, updateDraft);
+    setAppliedPreset(preset.id);
+  }
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Agent Identity</h2>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Identity</h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Define how the agent appears and is organized within the platform.
+          Set the agent's name, description, and visibility. This is what users see before they start a conversation.
         </p>
       </div>
+
+      {/* Preset picker */}
+      {showPresets ? (
+        <div className="rounded-2xl border border-zinc-200 bg-zinc-50/60 p-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-violet-500" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                Quick start
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPresets(false)}
+              className="text-[11px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+            >
+              Dismiss
+            </button>
+          </div>
+          <p className="mb-3 text-[11px] text-zinc-500 dark:text-zinc-400">
+            Pick a preset to prefill behavior, output, and starters. Everything stays editable.
+          </p>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {AGENT_PRESETS.map((preset) => {
+              const active = appliedPreset === preset.id;
+              return (
+                <button
+                  key={preset.id}
+                  type="button"
+                  onClick={() => handlePreset(preset)}
+                  className={`flex items-start gap-2.5 rounded-xl border-2 p-3 text-left transition ${
+                    active
+                      ? "border-violet-500 bg-violet-50/60 dark:border-violet-400 dark:bg-violet-950/30"
+                      : "border-zinc-200 bg-white hover:border-zinc-300 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
+                  }`}
+                >
+                  <span className="mt-0.5 text-lg leading-none">{preset.icon}</span>
+                  <div className="min-w-0">
+                    <p className={`text-xs font-semibold ${active ? "text-violet-800 dark:text-violet-200" : "text-zinc-900 dark:text-zinc-100"}`}>
+                      {preset.label}
+                    </p>
+                    <p className="mt-0.5 text-[10px] leading-snug text-zinc-500 dark:text-zinc-400">
+                      {preset.description}
+                    </p>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+          {appliedPreset ? (
+            <p className="mt-3 text-[11px] text-emerald-600 dark:text-emerald-400">
+              Preset applied. Behavior, output, and starters have been prefilled. All fields remain editable.
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setShowPresets(true)}
+          className="flex items-center gap-1.5 text-[11px] text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+        >
+          <Sparkles className="h-3 w-3" />
+          Show quick-start presets
+        </button>
+      )}
 
       {/* Icon */}
       <fieldset>
@@ -78,6 +174,9 @@ export function AgentIdentityStep({
           placeholder="e.g. Brand Copy Writer"
           className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm shadow-sm focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
         />
+        <p className="mt-1 text-[11px] text-zinc-400">
+          Choose a clear, role-based name — this appears in the agent picker.
+        </p>
       </div>
 
       {/* Description */}
@@ -129,6 +228,9 @@ export function AgentIdentityStep({
             <option value="GLOBAL">Global</option>
             <option value="TEAM">Team</option>
           </select>
+          <p className="mt-1 text-[11px] text-zinc-400">
+            Global = visible to all users. Team = visible only to team members.
+          </p>
         </div>
         <div>
           <label htmlFor="wiz-team" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -140,13 +242,18 @@ export function AgentIdentityStep({
             onChange={(e) => updateDraft({ teamId: e.target.value })}
             className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           >
-            <option value="">— None —</option>
+            <option value="">— Select team —</option>
             {teams.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
               </option>
             ))}
           </select>
+          <p className="mt-1 text-[11px] text-zinc-400">
+            {draft.scope === "TEAM"
+              ? "Required. Only members of this team will see the agent."
+              : "Only needed when scope is Team."}
+          </p>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
 import type { AgentScope, AgentStatus, OutputFormat } from "@prisma/client";
+import type { AgentBuilderInputSchema, AgentKnowledgeItem, AgentOutputConfig } from "@/lib/agentConfig";
 
 export type AdminAgentListItem = {
   id: string;
@@ -19,9 +20,11 @@ export type AdminAgentDetail = {
   name: string;
   description: string | null;
   systemPrompt: string;
-  inputSchema: Record<string, unknown> | null;
+  inputSchema: AgentBuilderInputSchema | Record<string, unknown> | null;
   outputFormat: OutputFormat;
   outputSchema: Record<string, unknown> | null;
+  knowledgeItems?: AgentKnowledgeItem[];
+  outputConfig?: AgentOutputConfig;
   temperature: number;
   maxTokens: number;
   isEnabled: boolean;

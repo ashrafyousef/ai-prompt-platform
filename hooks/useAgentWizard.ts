@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useReducer } from "react";
+import type { AgentCitationsPolicy, AgentKnowledgeSourceType, AgentResponseDepth } from "@/lib/agentConfig";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -26,15 +27,33 @@ export type StructuredSection = {
 
 export type KnowledgeSource = {
   id: string;
-  type: "text" | "file";
+  sourceType: AgentKnowledgeSourceType;
   title: string;
-  content: string;
-  fileName?: string;
+  content: string | null;
+  fileRef?: { fileName: string; mimeType?: string; sizeBytes?: number; url?: string } | null;
+  summary: string;
+  tags: string[];
+  priority: number;
+  appliesTo: "all" | string;
+  isActive: boolean;
+  ownerNote: string;
+  lastReviewedAt?: string | null;
   status: "ready" | "uploading" | "error";
 };
 
 export type AgentDraft = {
   importMethod: ImportMethod;
+  guidedRawText: string;
+  guidedUnmappedText: string;
+  guidedWarnings: string[];
+  guidedSuggestions: {
+    name: string;
+    description: string;
+    behaviorNotes: string;
+    starterPrompts: string[];
+    knowledgeCandidates: KnowledgeSource[];
+  };
+  knowledgeIntakeText: string;
 
   name: string;
   description: string;
@@ -59,12 +78,17 @@ export type AgentDraft = {
   jsonSchema: SchemaField[];
   templateText: string;
   markdownRules: string;
+  responseDepth: AgentResponseDepth;
+  citationsPolicy: AgentCitationsPolicy;
+  fallbackBehavior: string;
 
   starterPrompts: Array<{ id: string; text: string }>;
 };
 
 export type WizardStep =
   | "import-method"
+  | "guided-extraction"
+  | "knowledge-intake"
   | "identity"
   | "behavior"
   | "knowledge"
@@ -74,6 +98,8 @@ export type WizardStep =
 
 export const WIZARD_STEPS: WizardStep[] = [
   "import-method",
+  "guided-extraction",
+  "knowledge-intake",
   "identity",
   "behavior",
   "knowledge",
@@ -84,12 +110,14 @@ export const WIZARD_STEPS: WizardStep[] = [
 
 export const STEP_LABELS: Record<WizardStep, string> = {
   "import-method": "Import Method",
+  "guided-extraction": "Suggested Mapping",
+  "knowledge-intake": "Knowledge Intake",
   identity: "Identity",
-  behavior: "Behavior & Instructions",
+  behavior: "Behavior",
   knowledge: "Knowledge",
-  output: "Output Rules",
-  "starter-prompts": "Starter Prompts",
-  review: "Review",
+  output: "Output",
+  "starter-prompts": "Starters",
+  review: "Review & Publish",
 };
 
 /* ------------------------------------------------------------------ */
@@ -98,6 +126,17 @@ export const STEP_LABELS: Record<WizardStep, string> = {
 
 export const DEFAULT_DRAFT: AgentDraft = {
   importMethod: "manual",
+  guidedRawText: "",
+  guidedUnmappedText: "",
+  guidedWarnings: [],
+  guidedSuggestions: {
+    name: "",
+    description: "",
+    behaviorNotes: "",
+    starterPrompts: [],
+    knowledgeCandidates: [],
+  },
+  knowledgeIntakeText: "",
   name: "",
   description: "",
   category: "",
@@ -118,6 +157,10 @@ export const DEFAULT_DRAFT: AgentDraft = {
   jsonSchema: [],
   templateText: "",
   markdownRules: "",
+  responseDepth: "standard",
+  citationsPolicy: "none",
+  fallbackBehavior:
+    "Provide a best-effort response in markdown when strict formatting cannot be satisfied.",
   starterPrompts: [],
 };
 
@@ -287,27 +330,52 @@ function initState(isImportFlow: boolean): WizardState {
 
 export function validateIdentity(d: AgentDraft): string[] {
   const errs: string[] = [];
-  if (!d.name.trim()) errs.push("Agent name is required.");
-  if (d.scope === "TEAM" && !d.teamId) errs.push("Team is required when scope is TEAM.");
+  if (!d.name.trim()) errs.push("Agent name is required — users need a clear label.");
+  if (d.scope === "TEAM" && !d.teamId) errs.push("Team assignment is required for team-scoped agents.");
   return errs;
 }
 
 export function validateBehavior(d: AgentDraft): string[] {
   const errs: string[] = [];
-  if (!d.systemInstructions.trim()) errs.push("System instructions cannot be empty.");
+  if (!d.systemInstructions.trim()) errs.push("System instructions are empty — the agent has no core guidance.");
   return errs;
 }
 
 export function validateOutput(d: AgentDraft): string[] {
   const errs: string[] = [];
+  if (!d.fallbackBehavior.trim()) {
+    errs.push("Fallback behavior is empty — the agent has no uncertainty handling.");
+  }
   if (d.outputMode === "json" && d.jsonSchema.length === 0) {
-    errs.push("Add at least one schema field for JSON output.");
+    errs.push("JSON mode requires at least one schema field.");
   }
   if (d.outputMode === "template" && !d.templateText.trim()) {
-    errs.push("Template text is required.");
+    errs.push("Template mode requires a template body.");
   }
   if (d.outputMode === "structured-markdown" && d.structuredSections.length === 0) {
-    errs.push("Add at least one section for structured markdown.");
+    errs.push("Structured markdown requires at least one section.");
+  }
+  if (
+    d.outputMode === "structured-markdown" &&
+    d.structuredSections.some((section) => !section.title.trim())
+  ) {
+    errs.push("Every section needs a title — remove or name untitled sections.");
+  }
+  if (d.citationsPolicy === "required" && d.responseDepth === "brief") {
+    errs.push("Required citations with brief depth may feel too compressed for clear sourcing.");
+  }
+  return errs;
+}
+
+export function validateKnowledge(d: AgentDraft): string[] {
+  const errs: string[] = [];
+  const badItem = d.knowledgeSources.find((item) => {
+    const hasContent = Boolean(item.content && item.content.trim().length > 0);
+    const hasFileRef = Boolean(item.fileRef?.fileName);
+    return !item.title.trim() || (!hasContent && !hasFileRef);
+  });
+  if (badItem) {
+    errs.push("A knowledge item is missing a title or content — fix or remove it.");
   }
   return errs;
 }
@@ -316,12 +384,16 @@ export function canProceed(step: WizardStep, d: AgentDraft): boolean {
   switch (step) {
     case "import-method":
       return true;
+    case "guided-extraction":
+      return true;
+    case "knowledge-intake":
+      return true;
     case "identity":
       return validateIdentity(d).length === 0;
     case "behavior":
       return validateBehavior(d).length === 0;
     case "knowledge":
-      return true;
+      return validateKnowledge(d).length === 0;
     case "output":
       return validateOutput(d).length === 0;
     case "starter-prompts":
@@ -340,9 +412,23 @@ export function canProceed(step: WizardStep, d: AgentDraft): boolean {
 export function useAgentWizard(isImportFlow: boolean) {
   const [state, dispatch] = useReducer(reducer, isImportFlow, initState);
 
-  const steps = state.isImportFlow
-    ? WIZARD_STEPS
-    : WIZARD_STEPS.filter((s) => s !== "import-method");
+  const steps: WizardStep[] = state.isImportFlow
+    ? [
+        "import-method",
+        ...(state.draft.importMethod === "guided" ? (["guided-extraction"] as WizardStep[]) : []),
+        ...(state.draft.importMethod === "knowledge-first"
+          ? (["knowledge-intake"] as WizardStep[])
+          : []),
+        "identity",
+        "behavior",
+        "knowledge",
+        "output",
+        "starter-prompts",
+        "review",
+      ]
+    : WIZARD_STEPS.filter(
+        (s) => s !== "import-method" && s !== "guided-extraction" && s !== "knowledge-intake"
+      );
 
   const stepIndex = steps.indexOf(state.step);
 

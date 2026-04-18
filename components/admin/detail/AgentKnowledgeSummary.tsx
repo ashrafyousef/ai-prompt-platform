@@ -1,13 +1,11 @@
 "use client";
 
 import type { AdminAgentDetail } from "@/lib/adminTypes";
+import { normalizeAgentInputSchema } from "@/lib/agentConfig";
 import { AgentSummaryCard } from "./AgentSummaryCard";
 
-type KnowledgeEntry = { type: string; title: string; content: string };
-
 export function AgentKnowledgeSummary({ agent }: { agent: AdminAgentDetail }) {
-  const schema = agent.inputSchema as Record<string, unknown> | null;
-  const knowledge = (schema?.knowledge ?? []) as KnowledgeEntry[];
+  const knowledge = normalizeAgentInputSchema(agent.inputSchema).knowledgeItems;
 
   return (
     <AgentSummaryCard title="Knowledge">
@@ -19,7 +17,7 @@ export function AgentKnowledgeSummary({ agent }: { agent: AdminAgentDetail }) {
             <li key={i} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-700 dark:bg-zinc-900">
               <p className="font-medium text-zinc-800 dark:text-zinc-200">{k.title}</p>
               <p className="mt-0.5 text-xs text-zinc-500">
-                {k.type} · {(k.content.length / 1000).toFixed(1)}k chars
+                {k.sourceType} · {((k.content ?? "").length / 1000).toFixed(1)}k chars
               </p>
             </li>
           ))}

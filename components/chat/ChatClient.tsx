@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { MessageList } from "@/components/chat/MessageList";
@@ -10,9 +10,14 @@ import { signIn, useSession } from "next-auth/react";
 import { useChatSession } from "@/components/chat/hooks/useChatSession";
 import { useChatStream } from "@/components/chat/hooks/useChatStream";
 import { useToast } from "@/components/ui/Toast";
+import type { UiStarterPrompt } from "@/lib/types";
+import {
+  chatLastUsedAgentStorageKey,
+  resolveChatDefaultAgentId,
+} from "@/lib/chatDefaultAgent";
 
 export function ChatClient() {
-  const { status } = useSession();
+  const { status, data: session } = useSession();
 
   const {
     sessions,
@@ -28,6 +33,8 @@ export function ChatClient() {
 
   const [activeSessionId, setActiveSessionId] = useState<string>();
   const [activeAgentId, setActiveAgentId] = useState<string>("");
+  const [agentSelectionReady, setAgentSelectionReady] = useState(false);
+  const initAgentForUserRef = useRef<string | null>(null);
   const [editTarget, setEditTarget] = useState<{ id: string; text: string } | null>(null);
   const [regenOfId, setRegenOfId] = useState<string | undefined>(undefined);
   const [composerSeedText, setComposerSeedText] = useState<string | undefined>(undefined);
@@ -35,7 +42,7 @@ export function ChatClient() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [savedPromptsOpen, setSavedPromptsOpen] = useState(false);
-  const [modelVersion, setModelVersion] = useState("v2.0");
+  const [selectedModelId, setSelectedModelId] = useState("openai-gpt-4o-mini");
   const [authLoadingTimedOut, setAuthLoadingTimedOut] = useState(false);
 
   const { toast } = useToast();
@@ -44,7 +51,7 @@ export function ChatClient() {
     sessionId: activeSessionId,
     agentId: activeAgentId,
     onMessageAdded: refreshSessions,
-    modelVersion,
+    modelVersion: selectedModelId,
     onError: (msg) => toast(msg, "error"),
   });
 
@@ -53,13 +60,85 @@ export function ChatClient() {
     [agents, activeAgentId]
   );
 
-  const activeAgentName = activeAgent?.name ?? "Assistant";
+  const composerPlaceholder = useMemo(() => {
+    if (!activeAgent) return "Ask Assistant...";
+
+    const sortedStarters = [...activeAgent.starterPrompts]
+      .filter((starter) => starter.isActive !== false && starter.prompt.trim().length > 0)
+      .sort(
+        (a: UiStarterPrompt, b: UiStarterPrompt) =>
+          (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+      );
+    const topStarter = sortedStarters[0];
+    if (topStarter) {
+      const sample = topStarter.prompt.replace(/\s+/g, " ").trim();
+      const condensed = sample.length > 72 ? `${sample.slice(0, 69)}...` : sample;
+      return `${activeAgent.name}: ${condensed}`;
+    }
+
+    if (activeAgent.category) {
+      return `Ask ${activeAgent.name} (${activeAgent.category})...`;
+    }
+
+    return `Ask ${activeAgent.name}...`;
+  }, [activeAgent]);
+
+  const attachmentUrls = useMemo(() => {
+    const urls = new Set<string>();
+    for (const message of messages) {
+      for (const url of message.imageUrls ?? []) {
+        if (typeof url === "string" && url.length > 0) {
+          urls.add(url);
+        }
+      }
+    }
+    return Array.from(urls);
+  }, [messages]);
 
   useEffect(() => {
-    if (agents.length && !activeAgentId) {
-      setActiveAgentId(agents[0].id);
+    if (status !== "authenticated" || !session?.user?.id) {
+      initAgentForUserRef.current = null;
+      setActiveAgentId("");
+      setAgentSelectionReady(false);
+      return;
     }
-  }, [agents, activeAgentId]);
+
+    if (agentsLoading) return;
+
+    const uid = session.user.id;
+
+    if (agentsError) {
+      setActiveAgentId("");
+      setAgentSelectionReady(true);
+      return;
+    }
+
+    if (agents.length === 0) {
+      setActiveAgentId("");
+      setAgentSelectionReady(true);
+      return;
+    }
+
+    if (initAgentForUserRef.current === uid) return;
+
+    const saved =
+      typeof window !== "undefined"
+        ? window.localStorage.getItem(chatLastUsedAgentStorageKey(uid))
+        : null;
+    const workspaceDefaultAgentId = agents.find((a) => a.isDefault)?.id ?? null;
+
+    const resolved = resolveChatDefaultAgentId(agents, {
+      lastUsedAgentId: saved,
+      workspaceDefaultAgentId,
+    });
+
+    setActiveAgentId(resolved);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(chatLastUsedAgentStorageKey(uid), resolved);
+    }
+    initAgentForUserRef.current = uid;
+    setAgentSelectionReady(true);
+  }, [status, session?.user?.id, agents, agentsLoading, agentsError]);
 
   useEffect(() => {
     if (status !== "loading") {
@@ -120,6 +199,10 @@ export function ChatClient() {
       setActiveSessionId(undefined);
     }
     setActiveAgentId(id);
+    const uid = session?.user?.id;
+    if (uid && typeof window !== "undefined") {
+      window.localStorage.setItem(chatLastUsedAgentStorageKey(uid), id);
+    }
   };
 
   if (status === "loading" && !authLoadingTimedOut) {
@@ -182,8 +265,13 @@ export function ChatClient() {
       savedPromptsOpen={savedPromptsOpen}
       onToggleSavedPrompts={() => setSavedPromptsOpen((prev) => !prev)}
       activeAgentId={activeAgentId}
+      activeSessionId={activeSessionId}
+      sessions={sessions}
+      messageCount={messages.length}
+      attachmentUrls={attachmentUrls}
+      selectedModelId={selectedModelId}
       agents={agents}
-      agentsLoading={agentsLoading}
+      agentsLoading={agentsLoading || (agentSelectionReady === false && !agentsError)}
       agentsError={agentsError}
       onAgentChange={handleAgentChange}
       mobileSidebarOpen={mobileSidebarOpen}
@@ -208,6 +296,7 @@ export function ChatClient() {
                 onSend={handleSend}
                 disabled={loading}
                 initialText={composerSeedText}
+                activeAgent={activeAgent}
                 modeLabel={
                   editTarget
                     ? "Editing a previous prompt. Sending will create a revised turn."
@@ -221,9 +310,9 @@ export function ChatClient() {
                   setComposerSeedText(undefined);
                 }}
                 onCancelStream={loading ? cancel : undefined}
-                activeAgentName={activeAgentName}
-                modelVersion={modelVersion}
-                onModelVersionChange={setModelVersion}
+                placeholderText={composerPlaceholder}
+                selectedModelId={selectedModelId}
+                onModelChange={setSelectedModelId}
               />
             </div>
           </div>

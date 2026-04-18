@@ -61,6 +61,15 @@ export function useAdminAgent(id: string) {
         model: string;
         outputFormat: string;
         schemaValid: boolean | null;
+        configSummary?: {
+          knowledgeCount: number;
+          knowledgeTotal: number;
+          outputFormat: string;
+          responseDepth: string;
+          citationsPolicy: string;
+          requiredSections: string[];
+          hasTemplate: boolean;
+        };
       };
     },
     [id]

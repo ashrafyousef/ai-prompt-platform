@@ -1,9 +1,21 @@
 "use client";
 
 import { DragEvent, FormEvent, KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Loader2, Plus, ArrowUp, ChevronDown, Square, X } from "lucide-react";
+import { AlertTriangle, ArrowUp, Plus, Square, WandSparkles, X } from "lucide-react";
+import { ModelSelector } from "@/components/chat/ModelSelector";
+import useSWR from "swr";
+import type { UiAgent, UiModelSummary, UiModelsResponse } from "@/lib/types";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]);
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
+
+type CompatibilityIssue = {
+  id: string;
+  severity: "warning" | "blocking";
+  message: string;
+  suggestedModelId?: string;
+  suggestedModelName?: string;
+};
 
 type Props = {
   onSend: (text: string, imageFiles?: File[]) => Promise<void>;
@@ -12,9 +24,10 @@ type Props = {
   modeLabel?: string;
   onCancelMode?: () => void;
   onCancelStream?: () => void;
-  activeAgentName: string;
-  modelVersion: string;
-  onModelVersionChange: (v: string) => void;
+  placeholderText?: string;
+  activeAgent?: UiAgent;
+  selectedModelId: string;
+  onModelChange: (id: string) => void;
 };
 
 export function ChatComposer({
@@ -24,9 +37,10 @@ export function ChatComposer({
   modeLabel,
   onCancelMode,
   onCancelStream,
-  activeAgentName,
-  modelVersion,
-  onModelVersionChange,
+  placeholderText,
+  activeAgent,
+  selectedModelId,
+  onModelChange,
 }: Props) {
   const [text, setText] = useState("");
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -34,6 +48,10 @@ export function ChatComposer({
   const dragCounter = useRef(0);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { data: modelsData, isLoading: modelsLoading } = useSWR<UiModelsResponse>("/api/models", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
 
   function handleDragEnter(e: DragEvent) {
     e.preventDefault();
@@ -73,6 +91,99 @@ export function ChatComposer({
     () => imageFiles.map((file) => ({ file, url: URL.createObjectURL(file) })),
     [imageFiles]
   );
+  const models = modelsData?.models ?? [];
+  const selectedModel = models.find((m) => m.id === selectedModelId);
+
+  const compatibilityIssues = useMemo<CompatibilityIssue[]>(() => {
+    if (!selectedModel) return [];
+
+    const issues: CompatibilityIssue[] = [];
+    const allowedSet =
+      activeAgent?.allowedModelIds && activeAgent.allowedModelIds.length > 0
+        ? new Set(activeAgent.allowedModelIds)
+        : null;
+    const isAllowedForAgent = (candidate: UiModelSummary) =>
+      !allowedSet || allowedSet.has(candidate.id);
+    const firstSuggested = (predicate: (candidate: UiModelSummary) => boolean) =>
+      models.find((candidate) => candidate.enabled && isAllowedForAgent(candidate) && predicate(candidate));
+
+    if (allowedSet && !allowedSet.has(selectedModel.id)) {
+      const suggested = firstSuggested((candidate) => allowedSet.has(candidate.id));
+      issues.push({
+        id: "agent-allowlist",
+        severity: "blocking",
+        message: `${activeAgent?.name ?? "This agent"} only allows specific models.`,
+        suggestedModelId: suggested?.id,
+        suggestedModelName: suggested?.displayName,
+      });
+    }
+
+    if (imageFiles.length > 0 && !selectedModel.capabilities.includes("vision")) {
+      const suggested = firstSuggested((candidate) => candidate.capabilities.includes("vision"));
+      issues.push({
+        id: "vision-required",
+        severity: "blocking",
+        message: "Attached images require a Vision-capable model.",
+        suggestedModelId: suggested?.id,
+        suggestedModelName: suggested?.displayName,
+      });
+    }
+
+    const requiresStructured =
+      Boolean(activeAgent?.requiresStructuredOutput) ||
+      activeAgent?.outputFormat === "json" ||
+      activeAgent?.outputFormat === "template";
+    if (requiresStructured && !selectedModel.capabilities.includes("structured_output")) {
+      const suggested = firstSuggested((candidate) =>
+        candidate.capabilities.includes("structured_output")
+      );
+      issues.push({
+        id: "structured-required",
+        severity: "warning",
+        message: `${activeAgent?.name ?? "This agent"} is configured for structured responses.`,
+        suggestedModelId: suggested?.id,
+        suggestedModelName: suggested?.displayName,
+      });
+    }
+
+    if (activeAgent?.preferredModelId && activeAgent.preferredModelId !== selectedModel.id) {
+      const preferred = models.find((candidate) => candidate.id === activeAgent.preferredModelId);
+      if (preferred && preferred.enabled && isAllowedForAgent(preferred)) {
+        issues.push({
+          id: "agent-preferred",
+          severity: "warning",
+          message: `${activeAgent.name} works best with ${preferred.displayName}.`,
+          suggestedModelId: preferred.id,
+          suggestedModelName: preferred.displayName,
+        });
+      } else {
+        issues.push({
+          id: "preferred-unavailable",
+          severity: "warning",
+          message: `${activeAgent.name} has a preferred model that is not available for your current access/runtime.`,
+        });
+      }
+    }
+
+    return issues;
+  }, [selectedModel, models, imageFiles.length, activeAgent]);
+
+  const blockingIssue = compatibilityIssues.find((issue) => issue.severity === "blocking");
+
+  useEffect(() => {
+    if (!models.length) return;
+    if (models.some((model) => model.id === selectedModelId && model.enabled)) return;
+    const configuredDefaultId = modelsData?.defaults?.defaultModelId;
+    const configuredFallbackId = modelsData?.defaults?.fallbackModelId;
+    const fallback =
+      models.find((model) => model.id === configuredDefaultId && model.enabled) ??
+      models.find((model) => model.id === configuredFallbackId && model.enabled) ??
+      models.find((model) => model.enabled && model.preferredFor.includes("default")) ??
+      models.find((model) => model.enabled);
+    if (fallback) {
+      onModelChange(fallback.id);
+    }
+  }, [models, modelsData?.defaults?.defaultModelId, modelsData?.defaults?.fallbackModelId, selectedModelId, onModelChange]);
 
   useEffect(() => {
     return () => {
@@ -99,7 +210,7 @@ export function ChatComposer({
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
-    if (!text.trim()) return;
+    if (!text.trim() || blockingIssue) return;
     await onSend(text.trim(), imageFiles);
     setText("");
     setImageFiles([]);
@@ -142,6 +253,37 @@ export function ChatComposer({
           ) : null}
         </div>
       ) : null}
+      {compatibilityIssues.length > 0 ? (
+        <div className="mb-2 space-y-1.5 px-1">
+          {compatibilityIssues.map((issue) => (
+            <div
+              key={issue.id}
+              className={`flex items-start justify-between gap-2 rounded-xl px-3 py-2 text-xs ${
+                issue.severity === "blocking"
+                  ? "bg-red-100/70 text-red-800 dark:bg-red-900/30 dark:text-red-200"
+                  : "bg-amber-100/70 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
+              }`}
+            >
+              <div className="flex min-w-0 items-start gap-1.5">
+                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <p className="leading-relaxed">{issue.message}</p>
+              </div>
+              {issue.suggestedModelId ? (
+                <button
+                  type="button"
+                  onClick={() => onModelChange(issue.suggestedModelId!)}
+                  className="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-medium transition hover:opacity-80"
+                >
+                  <span className="inline-flex items-center gap-1">
+                    <WandSparkles className="h-3 w-3" />
+                    Switch{issue.suggestedModelName ? ` to ${issue.suggestedModelName}` : ""}
+                  </span>
+                </button>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      ) : null}
       {imagePreviews.length > 0 ? (
         <div className="mb-2 flex flex-wrap gap-2 px-2">
           {imagePreviews.map((preview, index) => (
@@ -169,7 +311,7 @@ export function ChatComposer({
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         className="mb-2 max-h-44 min-h-[48px] w-full resize-none overflow-y-hidden bg-transparent px-4 py-3 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-500 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400"
-        placeholder={`Ask ${activeAgentName || "Assistant"}...`}
+        placeholder={placeholderText ?? "Ask Assistant..."}
         disabled={disabled}
       />
       <div className="flex items-center justify-between px-2 pb-1">
@@ -201,19 +343,21 @@ export function ChatComposer({
         </div>
         
         <div className="flex items-center gap-2">
-          <div className="relative">
-            <select
-              disabled={disabled}
-              value={modelVersion}
-              onChange={(e) => onModelVersionChange(e.target.value)}
-              aria-label="Select model"
-              className="appearance-none rounded-full bg-transparent py-2 pl-3 pr-8 text-sm font-medium text-zinc-600 transition hover:bg-zinc-200 focus:outline-none dark:text-zinc-400 dark:hover:bg-zinc-800 cursor-pointer"
-            >
-              <option value="v1.0" className="dark:bg-[#1e1e1e]">Fast</option>
-              <option value="v2.0" className="dark:bg-[#1e1e1e]">Powerful</option>
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
-          </div>
+          <ModelSelector
+            selectedModelId={selectedModelId}
+            onModelChange={onModelChange}
+            models={models}
+            loading={modelsLoading}
+            budgetStatus={
+              modelsData?.governance?.team?.status === "blocked" || modelsData?.governance?.user.status === "blocked"
+                ? "blocked"
+                : modelsData?.governance?.team?.status === "warning" || modelsData?.governance?.user.status === "warning"
+                ? "warning"
+                : "ok"
+            }
+            disabled={disabled}
+            hasImages={imageFiles.length > 0}
+          />
 
           {disabled && onCancelStream ? (
             <button
@@ -233,7 +377,7 @@ export function ChatComposer({
                   ? "bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-white dark:text-black dark:hover:bg-zinc-300"
                   : "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600"
               }`}
-              disabled={disabled || !text.trim()}
+              disabled={disabled || !text.trim() || Boolean(blockingIssue)}
               aria-label="Send message"
             >
               <ArrowUp className="h-5 w-5" />

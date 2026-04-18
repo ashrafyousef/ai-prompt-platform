@@ -3,10 +3,60 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAdminUserId } from "@/lib/adminAuth";
 import { createChatCompletion } from "@/lib/openai/client";
+import { normalizeAgentInputSchema } from "@/lib/agentConfig";
+import type { AgentKnowledgeItem, AgentOutputConfig } from "@/lib/agentConfig";
 
 const testSchema = z.object({
   prompt: z.string().min(1),
 });
+
+function buildKnowledgeBlock(items: AgentKnowledgeItem[]): string {
+  const active = items.filter((i) => i.isActive);
+  if (active.length === 0) return "";
+
+  const lines = active.map((item) => {
+    const body = item.content?.trim()
+      ? item.content.trim().slice(0, 2000)
+      : `[Uploaded file: ${item.fileRef?.fileName ?? "unknown"}]`;
+    return `### ${item.title}\nType: ${item.sourceType}\n${body}`;
+  });
+
+  return `\n\n---\nReference Knowledge:\n${lines.join("\n\n")}`;
+}
+
+function buildOutputInstructions(config: AgentOutputConfig): string {
+  const parts: string[] = [];
+
+  if (config.format === "json") {
+    parts.push("Respond with valid JSON only.");
+  } else if (config.format === "template") {
+    if (config.template?.trim()) {
+      parts.push(`Use this response template:\n${config.template.trim()}`);
+    }
+  }
+
+  if (config.requiredSections.length > 0) {
+    parts.push(`Include these sections: ${config.requiredSections.join(", ")}.`);
+  }
+
+  if (config.responseDepth === "brief") {
+    parts.push("Keep the response concise and brief.");
+  } else if (config.responseDepth === "detailed") {
+    parts.push("Provide a thorough, detailed response.");
+  }
+
+  if (config.citationsPolicy === "required") {
+    parts.push("You must cite your sources when referencing knowledge.");
+  } else if (config.citationsPolicy === "optional") {
+    parts.push("Cite sources when helpful.");
+  }
+
+  if (config.fallbackBehavior?.trim()) {
+    parts.push(`If you cannot fully answer: ${config.fallbackBehavior.trim()}`);
+  }
+
+  return parts.length > 0 ? `\n\n---\nOutput Instructions:\n${parts.join("\n")}` : "";
+}
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -18,8 +68,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
 
+    const normalized = normalizeAgentInputSchema(agent.inputSchema);
+    const activeKnowledge = normalized.knowledgeItems.filter((i) => i.isActive);
+
+    const enrichedSystemPrompt = [
+      agent.systemPrompt,
+      buildKnowledgeBlock(normalized.knowledgeItems),
+      buildOutputInstructions(normalized.outputConfig),
+    ].join("");
+
     const messages: Array<{ role: "system" | "user"; content: string }> = [
-      { role: "system", content: agent.systemPrompt },
+      { role: "system", content: enrichedSystemPrompt },
       { role: "user", content: prompt },
     ];
 
@@ -31,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const durationMs = Date.now() - startMs;
 
     let schemaValid: boolean | null = null;
-    if (agent.outputFormat === "json" && agent.outputSchema) {
+    if (normalized.outputConfig.format === "json") {
       try {
         JSON.parse(response);
         schemaValid = true;
@@ -45,8 +104,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         response,
         durationMs,
         model: "auto",
-        outputFormat: agent.outputFormat,
+        outputFormat: normalized.outputConfig.format,
         schemaValid,
+        configSummary: {
+          knowledgeCount: activeKnowledge.length,
+          knowledgeTotal: normalized.knowledgeItems.length,
+          outputFormat: normalized.outputConfig.format,
+          responseDepth: normalized.outputConfig.responseDepth,
+          citationsPolicy: normalized.outputConfig.citationsPolicy,
+          requiredSections: normalized.outputConfig.requiredSections,
+          hasTemplate: Boolean(normalized.outputConfig.template?.trim()),
+        },
       },
     });
   } catch (error) {

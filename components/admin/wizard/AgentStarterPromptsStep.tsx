@@ -19,10 +19,9 @@ export function AgentStarterPromptsStep({
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Starter Prompts</h2>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Starters</h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Add quick-start suggestions that appear when users open this agent with no prior messages.
-          Keep them concise and high-value.
+          These appear when users first open the agent. Good starters show what the agent is best at.
         </p>
       </div>
 
@@ -40,7 +39,7 @@ export function AgentStarterPromptsStep({
                   text: e.target.value,
                 })
               }
-              placeholder="Write a compelling starter prompt…"
+              placeholder="e.g. Draft a product launch email for…"
               className="flex-1 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm leading-relaxed dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
             />
             <button
@@ -71,7 +70,7 @@ export function AgentStarterPromptsStep({
 
       {draft.starterPrompts.length === 0 ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No prompts yet. Users will see a generic empty state until you add starter suggestions.
+          No starters yet. Without these, users see an empty chat with no guidance on what to ask.
         </p>
       ) : null}
     </div>

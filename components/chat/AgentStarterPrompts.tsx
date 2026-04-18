@@ -11,7 +11,9 @@ export function AgentStarterPrompts({
   onPromptClick: (text: string) => void;
 }) {
   if (!agent) return null;
-  const prompts = agent.starterPrompts;
+  const prompts = agent.starterPrompts
+    .filter((prompt) => prompt.isActive !== false)
+    .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
   if (!prompts || prompts.length === 0) return null;
 
   return (
@@ -21,15 +23,18 @@ export function AgentStarterPrompts({
         Try one of these
       </div>
       <div className="grid gap-2.5 sm:grid-cols-2">
-        {prompts.slice(0, 4).map((prompt, i) => (
+        {prompts.slice(0, 4).map((prompt) => (
           <button
-            key={i}
+            key={prompt.id}
             type="button"
-            onClick={() => onPromptClick(prompt)}
+            onClick={() => onPromptClick(prompt.prompt)}
             className="group rounded-xl border border-zinc-200 bg-white/70 p-4 text-left text-sm text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm active:scale-[0.99] dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:border-violet-500 dark:hover:bg-violet-900/10"
           >
+            <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+              {prompt.label}
+            </p>
             <span className="line-clamp-2 leading-relaxed">
-              {prompt.length > 120 ? prompt.slice(0, 117) + "…" : prompt}
+              {prompt.prompt.length > 120 ? prompt.prompt.slice(0, 117) + "..." : prompt.prompt}
             </span>
           </button>
         ))}

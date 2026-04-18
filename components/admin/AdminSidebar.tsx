@@ -134,7 +134,7 @@ export function AdminSidebar({
 
   return (
     <>
-      <aside className="hidden h-screen w-64 shrink-0 flex-col border-r border-zinc-200/80 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 md:flex">
+      <aside className="hidden h-full w-64 shrink-0 flex-col overflow-y-auto border-r border-zinc-200/80 bg-white/90 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/90 md:flex">
         {inner}
       </aside>
       {mobileOpen ? (

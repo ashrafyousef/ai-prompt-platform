@@ -2,11 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { readFile } from "fs/promises";
 import path from "path";
-import { requireUserId } from "@/lib/auth";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { finalizeAssistantMessage, prepareOrchestrator } from "@/lib/orchestration/chatOrchestrator";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { streamChatCompletion } from "@/lib/openai/client";
-import { assertUserWithinSoftTokenLimit } from "@/lib/usage";
+import { assertUserWithinSoftTokenLimit, assertModelAccessForRole, getGovernedModelsForUser } from "@/lib/usage";
+import { resolveModelById } from "@/lib/models";
+import { normalizeAgentInputSchema } from "@/lib/agentConfig";
 import { captureError } from "@/lib/sentry";
 import { logJson } from "@/lib/logger";
 
@@ -42,7 +45,11 @@ export async function POST(req: NextRequest) {
   const start = Date.now();
   let userIdForLogs = "unknown";
   try {
-    const userId = await requireUserId();
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) throw new Error("Unauthorized");
+    const userId = session.user.id;
+    const userRole = session.user.role ?? "USER";
+    const teamId = session.user.teamId ?? null;
     userIdForLogs = userId;
     const limit = await checkRateLimit({
       userId,
@@ -58,12 +65,37 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = sendSchema.parse(await req.json());
+
+    if (payload.modelVersion) {
+      assertModelAccessForRole(payload.modelVersion, userRole);
+      const { models } = await getGovernedModelsForUser({
+        userId,
+        userRole: userRole as "USER" | "TEAM_LEAD" | "ADMIN",
+        teamId,
+        additionalEstimatedTokens: Math.ceil(payload.text.length / 4) + 1200,
+      });
+      const selectedVisibleModel = models.find((model) => model.id === payload.modelVersion);
+      if (selectedVisibleModel && !selectedVisibleModel.enabled) {
+        throw new Error(
+          selectedVisibleModel.disabledReason ?? `${selectedVisibleModel.displayName} is currently unavailable.`
+        );
+      }
+    }
+
+    const hasImages = Boolean(payload.imageUrls && payload.imageUrls.length > 0);
+    if (hasImages && payload.modelVersion) {
+      const model = resolveModelById(payload.modelVersion);
+      if (model && !model.capabilities.includes("vision")) {
+        throw new Error(`${model.displayName} does not support image inputs. Select a Vision model.`);
+      }
+    }
+
     await assertUserWithinSoftTokenLimit({
       userId,
       additionalEstimatedTokens: Math.ceil(payload.text.length / 4) + 1200,
+      userRole,
+      teamId,
     });
-
-    const hasImages = Boolean(payload.imageUrls && payload.imageUrls.length > 0);
 
     const resolvedImageUrls = hasImages
       ? await Promise.all(payload.imageUrls!.map(toBase64DataUri))
@@ -75,6 +107,37 @@ export async function POST(req: NextRequest) {
       ...payload,
       resolvedImageUrls,
     });
+
+    if (payload.modelVersion) {
+      const selectedModel = resolveModelById(payload.modelVersion);
+      if (selectedModel) {
+        const normalized = normalizeAgentInputSchema(prepared.agent.inputSchema);
+        const behaviorMeta =
+          normalized.meta.behavior &&
+          typeof normalized.meta.behavior === "object"
+            ? (normalized.meta.behavior as Record<string, unknown>)
+            : {};
+        const allowedModelIds = Array.isArray(behaviorMeta.allowedModelIds)
+          ? behaviorMeta.allowedModelIds
+              .filter((value): value is string => typeof value === "string")
+              .map((value) => value.trim())
+              .filter(Boolean)
+          : [];
+        const requiresStructuredOutput =
+          (typeof behaviorMeta.requiresStructuredOutput === "boolean"
+            ? behaviorMeta.requiresStructuredOutput
+            : false) || prepared.agent.outputFormat !== "markdown";
+
+        if (allowedModelIds.length > 0 && !allowedModelIds.includes(selectedModel.id)) {
+          throw new Error(`${prepared.agent.name} does not allow ${selectedModel.displayName}.`);
+        }
+        if (requiresStructuredOutput && !selectedModel.capabilities.includes("structured_output")) {
+          throw new Error(
+            `${selectedModel.displayName} has weak structured output support for ${prepared.agent.name}.`
+          );
+        }
+      }
+    }
 
     const stream = new ReadableStream({
       async start(controller) {
@@ -150,9 +213,17 @@ export async function POST(req: NextRequest) {
     const status = message === "Unauthorized" ? 401
       : message.includes("Token soft limit") ? 403
       : 400;
+    const isModelError =
+      message.includes("does not support image inputs") ||
+      message.includes("does not have access") ||
+      message.includes("does not allow") ||
+      message.includes("structured output support") ||
+      message.includes("unavailable") ||
+      message.includes("credentials");
     return NextResponse.json(
       { error: message === "Unauthorized" ? "Please sign in to continue."
         : message.includes("Token soft limit") ? "Monthly token limit reached. Please try again next month."
+        : isModelError ? message
         : "Something went wrong. Please try again." },
       { status }
     );

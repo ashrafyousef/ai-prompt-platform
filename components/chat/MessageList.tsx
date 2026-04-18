@@ -214,7 +214,9 @@ export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick,
 
   const empty = useMemo(() => messages.length === 0 && !loading, [messages.length, loading]);
 
-  const hasAgentStarters = activeAgent?.starterPrompts && activeAgent.starterPrompts.length > 0;
+  const hasAgentStarters = Boolean(
+    activeAgent?.starterPrompts?.some((prompt) => prompt.isActive !== false && prompt.prompt.trim().length > 0)
+  );
 
   if (empty) {
     return (
@@ -249,22 +251,11 @@ export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick,
               onPromptClick={(text) => onSuggestionClick?.(text)}
             />
           ) : (
-            <div className="mt-6 grid gap-3 md:grid-cols-2">
-              {[
-                "Design a launch strategy for a new AI product in MENA.",
-                "Rewrite this prompt to be clearer and outcome-focused.",
-                "Generate a brand voice guide with examples and tone rules.",
-                "Turn these notes into a project plan with milestones.",
-              ].map((card) => (
-                <button
-                  key={card}
-                  onClick={() => onSuggestionClick?.(card)}
-                  className="rounded-xl border border-zinc-200 bg-white/70 p-4 text-left text-sm text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:border-violet-500 dark:hover:bg-violet-900/10"
-                >
-                  {card}
-                </button>
-              ))}
-            </div>
+            <p className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
+              {activeAgent
+                ? `${activeAgent.name} has no starter prompts configured yet. Type a message below to get started.`
+                : "Type a message below to get started."}
+            </p>
           )}
         </div>
       </div>

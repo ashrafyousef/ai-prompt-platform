@@ -49,25 +49,37 @@ export function AgentBehaviorStep({
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const warnings: string[] = [];
-  if (!draft.systemInstructions.trim()) warnings.push("System instructions are empty — the agent won't have core guidance.");
+  if (!draft.systemInstructions.trim()) warnings.push("System instructions are empty — the agent has no role definition.");
   if (draft.systemInstructions.length > 0 && draft.systemInstructions.length < 40)
-    warnings.push("Instructions seem very short; consider being more specific.");
+    warnings.push("Instructions are very short. More detail usually improves response quality.");
   if (draft.avoidRules && draft.systemInstructions.includes(draft.avoidRules.slice(0, 30)))
-    warnings.push("Avoid rules overlap with system instructions — check for contradictions.");
+    warnings.push("Guardrails overlap with system instructions — check for contradictions.");
+  if (
+    draft.systemInstructions.trim() &&
+    !draft.behaviorRules.trim() &&
+    !draft.toneGuidance.trim() &&
+    !draft.avoidRules.trim()
+  ) {
+    warnings.push("Consider adding behavior rules, tone, or guardrails for more predictable output.");
+  }
 
   return (
     <div className="space-y-8">
       <div>
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Behavior & Instructions</h2>
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Behavior</h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Define <strong>how</strong> the agent responds. Knowledge is about <em>what</em> the agent knows (next step).
+          Define <strong>how</strong> the agent communicates. The next step (Knowledge) covers <em>what</em> it knows.
         </p>
+      </div>
+
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        Start with system instructions for the agent's role, then layer in rules, tone, and constraints.
       </div>
 
       <Textarea
         id="wiz-sys"
         label="System Instructions *"
-        helper="The core instructions given to the LLM. This shapes the agent's personality and role."
+        helper="The primary instructions that shape the agent's role, personality, and purpose."
         placeholder="You are a professional copywriter who creates compelling marketing content…"
         value={draft.systemInstructions}
         onChange={(v) => updateDraft({ systemInstructions: v })}
@@ -77,7 +89,7 @@ export function AgentBehaviorStep({
       <Textarea
         id="wiz-rules"
         label="Behavior Rules"
-        helper="Specific rules for responses (structure, formatting, scope)."
+        helper="Specific do/don't rules — response length, formatting constraints, or topic boundaries."
         placeholder="Always include 3 variant options. Keep responses under 300 words…"
         value={draft.behaviorRules}
         onChange={(v) => updateDraft({ behaviorRules: v })}
@@ -85,8 +97,8 @@ export function AgentBehaviorStep({
 
       <Textarea
         id="wiz-tone"
-        label="Tone & Style"
-        helper="Describe the voice and style the agent should use."
+        label="Tone & Voice"
+        helper="How the agent should sound — formal, casual, empathetic, concise, etc."
         placeholder="Professional but approachable. Avoid jargon. Use active voice…"
         value={draft.toneGuidance}
         onChange={(v) => updateDraft({ toneGuidance: v })}
@@ -95,8 +107,8 @@ export function AgentBehaviorStep({
 
       <Textarea
         id="wiz-avoid"
-        label="What to Avoid"
-        helper="Things the agent must not do or say."
+        label="Guardrails"
+        helper="Topics, patterns, or actions the agent should never produce."
         placeholder="Never invent statistics. Avoid unverified claims. Don't apologize excessively…"
         value={draft.avoidRules}
         onChange={(v) => updateDraft({ avoidRules: v })}
@@ -125,7 +137,7 @@ export function AgentBehaviorStep({
           onClick={() => setShowAdvanced(!showAdvanced)}
           className="flex items-center gap-2 text-sm font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
         >
-          Advanced settings
+          Generation settings
           {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
         </button>
 
@@ -163,15 +175,20 @@ export function AgentBehaviorStep({
               />
             </div>
             <div className="flex items-end">
-              <label className="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300">
-                <input
-                  type="checkbox"
-                  checked={draft.strictMode}
-                  onChange={(e) => updateDraft({ strictMode: e.target.checked })}
-                  className="h-4 w-4 rounded border-zinc-300 accent-violet-600"
-                />
-                Strict response mode
-              </label>
+              <div>
+                <label className="flex items-center gap-3 text-sm text-zinc-700 dark:text-zinc-300">
+                  <input
+                    type="checkbox"
+                    checked={draft.strictMode}
+                    onChange={(e) => updateDraft({ strictMode: e.target.checked })}
+                    className="h-4 w-4 rounded border-zinc-300 accent-violet-600"
+                  />
+                  Strict mode
+                </label>
+                <p className="mt-1 text-[11px] text-zinc-400">
+                  Enforces formatting constraints more aggressively. May reduce creative flexibility.
+                </p>
+              </div>
             </div>
           </div>
         ) : null}

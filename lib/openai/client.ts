@@ -1,17 +1,14 @@
 import { ChatMessage } from "@/lib/orchestration/buildMessages";
+import { resolveModelById } from "@/lib/models";
 
-// Groq is OpenAI-compatible. If GROQ_API_KEY is set it takes priority.
-// Falls back to OpenAI if only OPENAI_API_KEY is set.
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const OPENAI_MODELS_URL = "https://api.openai.com/v1/models";
 
-const GROQ_MODELS: Record<string, string> = {
-  "v1.0": "llama-3.1-8b-instant",
-  "v2.0": "llama-3.3-70b-versatile",
+const LEGACY_MODEL_MAP: Record<string, string> = {
+  "v1.0": "groq-llama-8b",
+  "v2.0": "groq-llama-70b",
 };
-
-const GROQ_VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
 
 export function resolveModelName(modelVersion?: string): string {
   return resolveProvider(modelVersion).defaultModel;
@@ -20,9 +17,18 @@ export function resolveModelName(modelVersion?: string): string {
 function resolveProvider(modelVersion?: string): { apiUrl: string; apiKey: string; defaultModel: string } {
   const groqKey = process.env.GROQ_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
+
+  const registryId = (modelVersion && LEGACY_MODEL_MAP[modelVersion]) ?? modelVersion;
+  const resolved = registryId ? resolveModelById(registryId) : undefined;
+
+  if (resolved && (resolved.provider === "groq" || resolved.provider === "openai")) {
+    const apiKey = resolved.provider === "groq" ? (groqKey ?? "") : (openaiKey ?? "");
+    const apiUrl = resolved.provider === "groq" ? GROQ_API_URL : OPENAI_API_URL;
+    return { apiUrl, apiKey, defaultModel: resolved.modelId };
+  }
+
   if (groqKey) {
-    const model = (modelVersion && GROQ_MODELS[modelVersion]) ?? GROQ_MODELS["v2.0"];
-    return { apiUrl: GROQ_API_URL, apiKey: groqKey, defaultModel: model };
+    return { apiUrl: GROQ_API_URL, apiKey: groqKey, defaultModel: "llama-3.3-70b-versatile" };
   }
   return { apiUrl: OPENAI_API_URL, apiKey: openaiKey ?? "", defaultModel: "gpt-4o-mini" };
 }
@@ -79,10 +85,7 @@ export async function* streamChatCompletion(
     return;
   }
 
-  let model = options.model ?? defaultModel;
-  if (options.hasImages && process.env.GROQ_API_KEY) {
-    model = GROQ_VISION_MODEL;
-  }
+  const model = options.model ?? defaultModel;
 
   const response = await fetch(apiUrl, {
     method: "POST",
