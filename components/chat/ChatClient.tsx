@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { MessageList } from "@/components/chat/MessageList";
@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import type { UiStarterPrompt } from "@/lib/types";
 import {
   chatLastUsedAgentStorageKey,
+  getWorkspaceDefaultAgentId,
   resolveChatDefaultAgentId,
 } from "@/lib/chatDefaultAgent";
 
@@ -34,7 +35,6 @@ export function ChatClient() {
   const [activeSessionId, setActiveSessionId] = useState<string>();
   const [activeAgentId, setActiveAgentId] = useState<string>("");
   const [agentSelectionReady, setAgentSelectionReady] = useState(false);
-  const initAgentForUserRef = useRef<string | null>(null);
   const [editTarget, setEditTarget] = useState<{ id: string; text: string } | null>(null);
   const [regenOfId, setRegenOfId] = useState<string | undefined>(undefined);
   const [composerSeedText, setComposerSeedText] = useState<string | undefined>(undefined);
@@ -42,17 +42,26 @@ export function ChatClient() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [savedPromptsOpen, setSavedPromptsOpen] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState("openai-gpt-4o-mini");
+  /** Reconciled by `ChatComposer` once `/api/models` loads (server `defaults` + governed list). */
+  const [selectedModelId, setSelectedModelId] = useState("");
+  const [modelRoutingMode, setModelRoutingMode] = useState<"manual" | "auto" | "suggested">("manual");
   const [authLoadingTimedOut, setAuthLoadingTimedOut] = useState(false);
 
   const { toast } = useToast();
 
-  const { messages, loading, send, regenerate, cancel, loadMessages } = useChatStream({
+  const { messages, loading, send, regenerate, retryTurn, cancel, loadMessages, lastRouteMeta } = useChatStream({
     sessionId: activeSessionId,
     agentId: activeAgentId,
     onMessageAdded: refreshSessions,
     modelVersion: selectedModelId,
-    onError: (msg) => toast(msg, "error"),
+    modelRoutingMode,
+    onError: (msg, opts) => {
+      if (opts?.detailShownInThread) {
+        toast("Couldn't complete this reply — see the message above.", "error");
+      } else {
+        toast(msg, "error");
+      }
+    },
   });
 
   const activeAgent = useMemo(
@@ -61,7 +70,12 @@ export function ChatClient() {
   );
 
   const composerPlaceholder = useMemo(() => {
-    if (!activeAgent) return "Ask Assistant...";
+    if (!agentSelectionReady) {
+      return "Loading assistant…";
+    }
+    if (!activeAgent) {
+      return "Choose an assistant to begin…";
+    }
 
     const sortedStarters = [...activeAgent.starterPrompts]
       .filter((starter) => starter.isActive !== false && starter.prompt.trim().length > 0)
@@ -71,17 +85,27 @@ export function ChatClient() {
       );
     const topStarter = sortedStarters[0];
     if (topStarter) {
+      const label = topStarter.label.trim();
+      const genericLabel = /^Starter\s+\d+$/i.test(label);
+      if (label && !genericLabel && label.length <= 52) {
+        return `Ask ${activeAgent.name}: ${label}…`;
+      }
       const sample = topStarter.prompt.replace(/\s+/g, " ").trim();
-      const condensed = sample.length > 72 ? `${sample.slice(0, 69)}...` : sample;
-      return `${activeAgent.name}: ${condensed}`;
+      const condensed = sample.length > 64 ? `${sample.slice(0, 61)}…` : sample;
+      return `Ask ${activeAgent.name} — ${condensed}`;
     }
 
-    if (activeAgent.category) {
-      return `Ask ${activeAgent.name} (${activeAgent.category})...`;
+    if (activeAgent.category?.trim()) {
+      return `Message ${activeAgent.name} (${activeAgent.category.trim()})…`;
+    }
+    if (activeAgent.description?.trim()) {
+      const d = activeAgent.description.replace(/\s+/g, " ").trim();
+      const short = d.length > 72 ? `${d.slice(0, 69)}…` : d;
+      return `${activeAgent.name}: ${short}`;
     }
 
-    return `Ask ${activeAgent.name}...`;
-  }, [activeAgent]);
+    return `Message ${activeAgent.name}…`;
+  }, [activeAgent, agentSelectionReady]);
 
   const attachmentUrls = useMemo(() => {
     const urls = new Set<string>();
@@ -97,7 +121,6 @@ export function ChatClient() {
 
   useEffect(() => {
     if (status !== "authenticated" || !session?.user?.id) {
-      initAgentForUserRef.current = null;
       setActiveAgentId("");
       setAgentSelectionReady(false);
       return;
@@ -119,13 +142,11 @@ export function ChatClient() {
       return;
     }
 
-    if (initAgentForUserRef.current === uid) return;
-
     const saved =
       typeof window !== "undefined"
         ? window.localStorage.getItem(chatLastUsedAgentStorageKey(uid))
         : null;
-    const workspaceDefaultAgentId = agents.find((a) => a.isDefault)?.id ?? null;
+    const workspaceDefaultAgentId = getWorkspaceDefaultAgentId(agents);
 
     const resolved = resolveChatDefaultAgentId(agents, {
       lastUsedAgentId: saved,
@@ -136,7 +157,6 @@ export function ChatClient() {
     if (typeof window !== "undefined") {
       window.localStorage.setItem(chatLastUsedAgentStorageKey(uid), resolved);
     }
-    initAgentForUserRef.current = uid;
     setAgentSelectionReady(true);
   }, [status, session?.user?.id, agents, agentsLoading, agentsError]);
 
@@ -282,13 +302,17 @@ export function ChatClient() {
           <MessageList
             messages={messages}
             onRegenerate={regenerate}
+            onRetryTurn={retryTurn}
             onEdit={(id, text) => {
               setEditTarget({ id, text });
               setComposerSeedText(text);
             }}
             onSuggestionClick={(text) => setComposerSeedText(text)}
             loading={loading}
+            agentSelectionReady={agentSelectionReady}
             activeAgent={activeAgent}
+            selectedModelId={selectedModelId}
+            onModelChange={setSelectedModelId}
           />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-4">
             <div className="pointer-events-auto px-4">
@@ -313,6 +337,9 @@ export function ChatClient() {
                 placeholderText={composerPlaceholder}
                 selectedModelId={selectedModelId}
                 onModelChange={setSelectedModelId}
+                modelRoutingMode={modelRoutingMode}
+                onModelRoutingModeChange={setModelRoutingMode}
+                lastRouteMeta={lastRouteMeta}
               />
             </div>
           </div>

@@ -1,11 +1,45 @@
-import { useRef, useState } from "react";
-import { UiMessage } from "@/lib/types";
+import { useCallback, useRef, useState } from "react";
+import type { UiGenerationState, UiMessage } from "@/lib/types";
 import { parseSSEStream } from "@/lib/streaming/parseStream";
+import { classifyChatError } from "@/lib/chatErrorTaxonomy";
 
-export function useChatStream({ sessionId, agentId, onMessageAdded, modelVersion, onError }: { sessionId?: string; agentId: string; onMessageAdded?: () => void; modelVersion?: string; onError?: (message: string) => void; }) {
+export type ChatRouteMeta = {
+  assistantMessageId?: string;
+  turnId?: string;
+  routedModelId?: string;
+  routerMode?: string;
+  reasonCodes?: string[];
+  suggestedModelId?: string | null;
+  taskClass?: string;
+};
+
+/** Secondary toast when the thread already shows full failure copy. */
+export type ChatStreamErrorOptions = {
+  /** When true, ChatClient should use a short ping instead of duplicating the error body. */
+  detailShownInThread?: boolean;
+};
+
+export function useChatStream({
+  sessionId,
+  agentId,
+  onMessageAdded,
+  modelVersion,
+  modelRoutingMode = "manual",
+  onError,
+}: {
+  sessionId?: string;
+  agentId: string;
+  onMessageAdded?: () => void;
+  modelVersion?: string;
+  modelRoutingMode?: "manual" | "auto" | "suggested";
+  onError?: (message: string, options?: ChatStreamErrorOptions) => void;
+}) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [lastRouteMeta, setLastRouteMeta] = useState<ChatRouteMeta | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  /** Prevents double-submit / accidental repeat while a turn is in flight. */
+  const sendCooldownUntilRef = useRef(0);
 
   const compressImage = async (file: File): Promise<File> => {
     if (file.size < 3 * 1024 * 1024) return file;
@@ -53,16 +87,67 @@ export function useChatStream({ sessionId, agentId, onMessageAdded, modelVersion
     return urls.length > 0 ? urls : undefined;
   };
 
-  const loadMessages = async (id: string, customFetch?: boolean) => {
+  const loadMessages = useCallback(async (id: string, customFetch?: boolean) => {
     if (!customFetch && id === sessionId) return;
     const res = await fetch(`/api/chat/history?sessionId=${id}`);
     const data = await res.json();
-    setMessages(data.messages ?? []);
-  };
+    const list = (data.messages ?? []) as Array<
+      UiMessage & {
+        deliveryStatus?: "PENDING" | "STREAMING" | "FAILED" | "COMPLETED" | "CANCELLED";
+        errorCode?: string | null;
+        errorMessage?: string | null;
+      }
+    >;
+    setMessages(
+      list.map((m) => ({
+        ...m,
+        generation:
+          m.role !== "assistant"
+            ? undefined
+            : m.deliveryStatus === "FAILED"
+            ? (() => {
+                const classified = classifyChatError(m.errorMessage ?? m.content);
+                return {
+                  status: "failed",
+                  code: m.errorCode ?? classified.code,
+                  title: classified.title,
+                  detail: m.errorMessage ?? classified.detail,
+                } satisfies UiGenerationState;
+              })()
+            : m.deliveryStatus === "STREAMING"
+            ? ({ status: "streaming" } satisfies UiGenerationState)
+            : ({ status: "complete" } satisfies UiGenerationState),
+      }))
+    );
+  }, [sessionId]);
+
+  const markAssistantFailed = useCallback(
+    (assistantId: string, rawError: string, partialContent: string) => {
+      const classified = classifyChatError(rawError);
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== assistantId) return m;
+          const gen: UiGenerationState = {
+            status: "failed",
+            code: classified.code,
+            title: classified.title,
+            detail: classified.detail,
+          };
+          return {
+            ...m,
+            content: partialContent.trim().length > 0 ? partialContent : "",
+            generation: gen,
+          };
+        })
+      );
+      onError?.(classified.detail, { detailShownInThread: true });
+    },
+    [onError]
+  );
 
   const send = async (
-    text: string, 
-    imageFiles?: File[], 
+    text: string,
+    imageFiles?: File[],
     overrideImageUrls?: string[],
     editedFromId?: string,
     regenOfId?: string,
@@ -70,26 +155,73 @@ export function useChatStream({ sessionId, agentId, onMessageAdded, modelVersion
   ) => {
     const effectiveSessionId = sessionOverride || sessionId;
     if (!effectiveSessionId || !agentId) return;
+
+    if (Date.now() < sendCooldownUntilRef.current) return;
+    if (loading) return;
+
     setLoading(true);
-    
+
     const userMsgOptimisticId = `usr-${Date.now()}`;
     const assistantMsgOptimisticId = `tmp-${Date.now()}`;
-    
     const imageUrls = overrideImageUrls ?? (await uploadImages(imageFiles));
-    
-    // Only conditionally append optimistic user message if it's not a direct regenerate
-    // but typically it's fine. For a perfect optimistic UI we should check.
-    // For now we'll stick to mostly tracking the assistant response optimism.
-    if (!regenOfId || text) {
-      setMessages((prev) => [
-        ...prev, 
-        ...(text ? [{ id: userMsgOptimisticId, role: "user" as const, content: text, imageUrls, createdAt: new Date().toISOString() }] : []),
-        { id: assistantMsgOptimisticId, role: "assistant" as const, content: "", createdAt: new Date().toISOString() }
-      ]);
+
+    const isRegenerate = Boolean(regenOfId);
+    let turnId = crypto.randomUUID();
+
+    if (isRegenerate && !messages.some((m) => m.id === regenOfId)) {
+      setLoading(false);
+      return;
+    }
+
+    if (isRegenerate) {
+      setMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === regenOfId);
+        if (idx < 0) return prev;
+        let userTurnId = "";
+        for (let i = idx - 1; i >= 0; i--) {
+          if (prev[i].role === "user") {
+            userTurnId = prev[i].turnId ?? prev[i].id;
+            break;
+          }
+        }
+        turnId = userTurnId || crypto.randomUUID();
+        const streaming: UiGenerationState = { status: "streaming" };
+        return prev.map((m) =>
+          m.id === regenOfId
+            ? {
+                ...m,
+                id: assistantMsgOptimisticId,
+                content: "",
+                turnId,
+                generation: streaming,
+                createdAt: new Date().toISOString(),
+              }
+            : m
+        );
+      });
     } else {
       setMessages((prev) => [
-        ...prev, 
-        { id: assistantMsgOptimisticId, role: "assistant" as const, content: "", createdAt: new Date().toISOString() }
+        ...prev,
+        ...(text
+          ? [
+              {
+                id: userMsgOptimisticId,
+                role: "user" as const,
+                turnId,
+                content: text,
+                imageUrls,
+                createdAt: new Date().toISOString(),
+              },
+            ]
+          : []),
+        {
+          id: assistantMsgOptimisticId,
+          role: "assistant" as const,
+          turnId,
+          content: "",
+          createdAt: new Date().toISOString(),
+          generation: { status: "streaming" },
+        },
       ]);
     }
 
@@ -97,22 +229,42 @@ export function useChatStream({ sessionId, agentId, onMessageAdded, modelVersion
     abortRef.current = controller;
 
     try {
+      setLastRouteMeta(null);
       const res = await fetch("/api/chat/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId: effectiveSessionId, agentId, text, imageUrls, editedFromId, regenOfId, modelVersion
+          sessionId: effectiveSessionId,
+          agentId,
+          text,
+          imageUrls,
+          editedFromId,
+          regenOfId,
+          turnId,
+          modelVersion,
+          modelRoutingMode,
         }),
         signal: controller.signal,
       });
 
-      if (!res.ok && res.headers.get("content-type")?.includes("application/json")) {
-        const errorData = await res.json();
-        const errorMsg = res.status === 429
-          ? "Rate limit exceeded. Please wait a moment and try again."
-          : errorData.error || "Something went wrong. Please try again.";
-        onError?.(errorMsg);
-        setMessages((prev) => prev.filter((m) => m.id !== assistantMsgOptimisticId && m.id !== userMsgOptimisticId));
+      if (!res.ok) {
+        let errorMsg = "Something went wrong. Please try again.";
+        const ct = res.headers.get("content-type") ?? "";
+        try {
+          if (ct.includes("application/json")) {
+            const errorData = (await res.json()) as { error?: string };
+            errorMsg =
+              res.status === 429
+                ? "Rate limit exceeded. Please wait a moment and try again."
+                : errorData.error || errorMsg;
+          } else {
+            const t = (await res.text()).trim();
+            errorMsg = t ? t.slice(0, 400) : `Request failed (${res.status}).`;
+          }
+        } catch {
+          errorMsg = `Request failed (${res.status}).`;
+        }
+        markAssistantFailed(assistantMsgOptimisticId, errorMsg, "");
         return;
       }
 
@@ -121,19 +273,43 @@ export function useChatStream({ sessionId, agentId, onMessageAdded, modelVersion
         res,
         (chunk) => {
           currentOutput += chunk;
-          setMessages((prev) => 
-            prev.map((m) => m.id === assistantMsgOptimisticId ? { ...m, content: currentOutput } : m)
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === assistantMsgOptimisticId
+                ? {
+                    ...m,
+                    content: currentOutput,
+                    generation: { status: "streaming" },
+                  }
+                : m
+            )
           );
         },
         (errMsg) => {
-          const friendlyMsg = errMsg === "Internal server error"
-            ? "An error occurred while generating the response."
-            : errMsg;
-          onError?.(friendlyMsg);
+          const friendlyMsg =
+            errMsg === "Internal server error"
+              ? "An error occurred while generating the response."
+              : errMsg;
+          markAssistantFailed(assistantMsgOptimisticId, friendlyMsg, currentOutput);
         },
-        controller.signal
+        controller.signal,
+        (meta) => {
+          if (!meta || typeof meta !== "object") return;
+          const typed = meta as ChatRouteMeta;
+          setLastRouteMeta(typed);
+          const persistedAssistantId = typed.assistantMessageId;
+          if (persistedAssistantId) {
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantMsgOptimisticId
+                  ? { ...m, id: persistedAssistantId, turnId: typed.turnId ?? m.turnId }
+                  : m
+              )
+            );
+          }
+        }
       );
-      
+
       await loadMessages(effectiveSessionId, true);
       onMessageAdded?.();
     } catch (e) {
@@ -142,13 +318,164 @@ export function useChatStream({ sessionId, agentId, onMessageAdded, modelVersion
         onMessageAdded?.();
       } else {
         console.error(e);
+        markAssistantFailed(
+          assistantMsgOptimisticId,
+          e instanceof Error ? e.message : "Request failed.",
+          ""
+        );
       }
     } finally {
       abortRef.current = null;
       setLoading(false);
+      sendCooldownUntilRef.current = Date.now() + 400;
     }
   };
-  
+
+  /** Retry a failed turn: same user bubble, new assistant attempt linked in DB lineage. */
+  const retryTurn = useCallback(
+    async (turnId: string) => {
+      if (!sessionId || !agentId || loading) return;
+      if (Date.now() < sendCooldownUntilRef.current) return;
+      const user = messages.find((m) => m.role === "user" && m.turnId === turnId);
+      const failedAsst = messages.find(
+        (m) =>
+          m.role === "assistant" &&
+          m.turnId === turnId &&
+          m.generation?.status === "failed"
+      );
+      if (!user || !failedAsst) return;
+
+      const newAssistantId = `tmp-${Date.now()}`;
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === failedAsst.id
+            ? {
+                ...m,
+                id: newAssistantId,
+                content: "",
+                generation: { status: "streaming" },
+                createdAt: new Date().toISOString(),
+              }
+            : m
+        )
+      );
+
+      setLoading(true);
+      const controller = new AbortController();
+      abortRef.current = controller;
+
+      try {
+        setLastRouteMeta(null);
+        const res = await fetch("/api/chat/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId,
+            agentId,
+            text: user.content,
+            imageUrls: user.imageUrls,
+            editedFromId: undefined,
+            regenOfId: undefined,
+            turnId,
+            retryOfAssistantMessageId: failedAsst.id,
+            modelVersion,
+            modelRoutingMode,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          let errorMsg = "Something went wrong. Please try again.";
+          const ct = res.headers.get("content-type") ?? "";
+          try {
+            if (ct.includes("application/json")) {
+              const errorData = (await res.json()) as { error?: string };
+              errorMsg =
+                res.status === 429
+                  ? "Rate limit exceeded. Please wait a moment and try again."
+                  : errorData.error || errorMsg;
+            } else {
+              const t = (await res.text()).trim();
+              errorMsg = t ? t.slice(0, 400) : `Request failed (${res.status}).`;
+            }
+          } catch {
+            errorMsg = `Request failed (${res.status}).`;
+          }
+          markAssistantFailed(newAssistantId, errorMsg, "");
+          return;
+        }
+
+        let currentOutput = "";
+        await parseSSEStream(
+          res,
+          (chunk) => {
+            currentOutput += chunk;
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === newAssistantId
+                  ? { ...m, content: currentOutput, generation: { status: "streaming" } }
+                  : m
+              )
+            );
+          },
+          (errMsg) => {
+            const friendlyMsg =
+              errMsg === "Internal server error"
+                ? "An error occurred while generating the response."
+                : errMsg;
+            markAssistantFailed(newAssistantId, friendlyMsg, currentOutput);
+          },
+          controller.signal,
+          (meta) => {
+            if (!meta || typeof meta !== "object") return;
+            const typed = meta as ChatRouteMeta;
+            setLastRouteMeta(typed);
+            const persistedAssistantId = typed.assistantMessageId;
+            if (persistedAssistantId) {
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === newAssistantId
+                    ? { ...m, id: persistedAssistantId, turnId: typed.turnId ?? m.turnId }
+                    : m
+                )
+              );
+            }
+          }
+        );
+
+        await loadMessages(sessionId, true);
+        onMessageAdded?.();
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") {
+          await loadMessages(sessionId, true);
+          onMessageAdded?.();
+        } else {
+          console.error(e);
+          markAssistantFailed(
+            newAssistantId,
+            e instanceof Error ? e.message : "Request failed.",
+            ""
+          );
+        }
+      } finally {
+        abortRef.current = null;
+        setLoading(false);
+        sendCooldownUntilRef.current = Date.now() + 400;
+      }
+    },
+    [
+      sessionId,
+      agentId,
+      loading,
+      messages,
+      modelVersion,
+      modelRoutingMode,
+      markAssistantFailed,
+      loadMessages,
+      onMessageAdded,
+    ]
+  );
+
   const regenerate = async (assistantMessageId: string) => {
     const assistantIndex = messages.findIndex(
       (m) => m.id === assistantMessageId && m.role === "assistant"
@@ -172,8 +499,10 @@ export function useChatStream({ sessionId, agentId, onMessageAdded, modelVersion
     loading,
     send,
     regenerate,
+    retryTurn,
     cancel,
     loadMessages,
-    setMessages
+    setMessages,
+    lastRouteMeta,
   };
 }

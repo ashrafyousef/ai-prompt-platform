@@ -1,36 +1,59 @@
 "use client";
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import useSWR from "swr";
+import Image from "next/image";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
-import { UiMessage, UiAgent } from "@/lib/types";
+import { compactAgentModelSummaryLine } from "@/lib/chatAgentModelGuidance";
+import { UiMessage, UiAgent, UiModelsResponse } from "@/lib/types";
 import { useToast } from "@/components/ui/Toast";
 import { mutate } from "swr";
-import { ArrowDown, Bookmark, Copy, Pencil, RotateCcw } from "lucide-react";
+import { ArrowDown, Bookmark, Copy, Pencil, RotateCcw, WandSparkles } from "lucide-react";
 import { AgentStarterPrompts } from "@/components/chat/AgentStarterPrompts";
 
 type Props = {
   messages: UiMessage[];
   onRegenerate: (messageId: string) => void;
   onEdit: (messageId: string, currentText: string) => void;
+  /** Retry the failed assistant turn (same user message, new attempt). */
+  onRetryTurn?: (turnId: string) => void;
   onSuggestionClick?: (text: string) => void;
   loading?: boolean;
+  /** When false, empty state waits for default agent resolution (avoids generic copy flash). */
+  agentSelectionReady?: boolean;
   activeAgent?: UiAgent;
+  selectedModelId?: string;
+  onModelChange?: (id: string) => void;
 };
 
 type MessageBubbleProps = {
   message: UiMessage;
   onRegenerate: (messageId: string) => void;
   onEdit: (messageId: string, currentText: string) => void;
+  onRetryTurn?: (turnId: string) => void;
+  selectedModelId?: string;
+  onModelChange?: (id: string) => void;
+  models?: UiModelsResponse["models"];
 };
 
 const remarkPlugins = [remarkGfm, remarkMath];
 const rehypePlugins = [rehypeKatex, rehypeHighlight];
 
-const MessageBubble = memo(function MessageBubble({ message, onRegenerate, onEdit }: MessageBubbleProps) {
+const modelsFetcher = (url: string) => fetch(url).then((r) => r.json());
+
+const MessageBubble = memo(function MessageBubble({
+  message,
+  onRegenerate,
+  onEdit,
+  onRetryTurn,
+  selectedModelId,
+  onModelChange,
+  models = [],
+}: MessageBubbleProps) {
   const { toast } = useToast();
 
   const savePrompt = useCallback(
@@ -96,6 +119,17 @@ const MessageBubble = memo(function MessageBubble({ message, onRegenerate, onEdi
 
   const images = message.imageUrls?.filter((u): u is string => typeof u === "string" && u.length > 0);
 
+  const gen = message.generation;
+  const isAssistantFailed = message.role === "assistant" && gen?.status === "failed";
+  const isAssistantStreaming = message.role === "assistant" && gen?.status === "streaming";
+
+  const visionAlt = useMemo(() => {
+    if (!isAssistantFailed || gen?.status !== "failed" || gen.code !== "vision_required") return null;
+    return models.find((m) => m.enabled && m.visionCapable && m.id !== selectedModelId) ?? null;
+  }, [isAssistantFailed, gen, models, selectedModelId]);
+
+  const failedGen = gen?.status === "failed" ? gen : null;
+
   return (
     <div className="group">
       <div
@@ -109,22 +143,79 @@ const MessageBubble = memo(function MessageBubble({ message, onRegenerate, onEdi
           <div className="mb-3 flex flex-wrap gap-2">
             {images.map((url, i) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
-                <img
+                <Image
                   src={url}
                   alt={`Attached image ${i + 1}`}
-                  className="h-32 w-auto max-w-[200px] rounded-xl object-cover border border-zinc-200 dark:border-zinc-700 cursor-pointer hover:opacity-90 transition"
+                  width={200}
+                  height={128}
+                  unoptimized
+                  className="h-32 w-auto max-w-[200px] cursor-pointer rounded-xl border border-zinc-200 object-cover transition hover:opacity-90 dark:border-zinc-700"
                 />
               </a>
             ))}
           </div>
         ) : null}
-        <ReactMarkdown
-          remarkPlugins={remarkPlugins}
-          rehypePlugins={rehypePlugins}
-          components={codeComponents as never}
-        >
-          {message.content}
-        </ReactMarkdown>
+        {message.role === "assistant" && isAssistantFailed && failedGen ? (
+          <>
+            <div className="mb-3 rounded-xl border border-amber-200/90 bg-amber-50/80 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25">
+              <p className="text-xs font-semibold text-amber-950 dark:text-amber-100">{failedGen.title}</p>
+              <p className="mt-1 text-xs leading-relaxed text-amber-900/95 dark:text-amber-100/90">{failedGen.detail}</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                {message.turnId && onRetryTurn ? (
+                  <button
+                    type="button"
+                    className="rounded-full bg-zinc-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                    onClick={() => onRetryTurn(message.turnId!)}
+                  >
+                    Retry
+                  </button>
+                ) : null}
+                {visionAlt && onModelChange ? (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-300/80 px-2.5 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-100/80 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                    onClick={() => onModelChange(visionAlt.id)}
+                  >
+                    <WandSparkles className="h-3 w-3" />
+                    Switch to {visionAlt.displayName}
+                  </button>
+                ) : null}
+              </div>
+            </div>
+            {message.content.trim().length > 0 ? (
+              <div className="mt-2 border-t border-zinc-200/80 pt-3 text-xs text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+                <p className="mb-1 font-medium text-zinc-600 dark:text-zinc-300">Partial response</p>
+                <ReactMarkdown
+                  remarkPlugins={remarkPlugins}
+                  rehypePlugins={rehypePlugins}
+                  components={codeComponents as never}
+                >
+                  {message.content}
+                </ReactMarkdown>
+              </div>
+            ) : null}
+          </>
+        ) : message.role === "assistant" && isAssistantStreaming && !message.content.trim() ? (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            <span className="inline-flex items-center gap-2">
+              <span className="inline-block h-2 w-2 animate-pulse rounded-full bg-violet-500" />
+              Generating…
+            </span>
+          </p>
+        ) : (
+          <>
+            <ReactMarkdown
+              remarkPlugins={remarkPlugins}
+              rehypePlugins={rehypePlugins}
+              components={codeComponents as never}
+            >
+              {message.content || (isAssistantStreaming ? "\u00a0" : "")}
+            </ReactMarkdown>
+            {isAssistantStreaming && message.content.trim().length > 0 ? (
+              <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-violet-500 align-middle" aria-hidden />
+            ) : null}
+          </>
+        )}
       </div>
       <div
         className={`mt-2 flex items-center gap-1 text-zinc-500 transition-opacity dark:text-zinc-400 ${
@@ -135,7 +226,11 @@ const MessageBubble = memo(function MessageBubble({ message, onRegenerate, onEdi
       >
         <button
           className="rounded p-1.5 hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
-          onClick={() => { navigator.clipboard.writeText(message.content); toast("Copied to clipboard"); }}
+          onClick={() => {
+            const t = isAssistantFailed && failedGen ? failedGen.detail : message.content;
+            navigator.clipboard.writeText(t);
+            toast("Copied to clipboard");
+          }}
           title="Copy"
           aria-label="Copy message"
         >
@@ -161,7 +256,7 @@ const MessageBubble = memo(function MessageBubble({ message, onRegenerate, onEdi
               <Pencil className="h-3.5 w-3.5" />
             </button>
           </>
-        ) : (
+        ) : isAssistantFailed ? null : (
           <>
             <button
               type="button"
@@ -188,7 +283,18 @@ const MessageBubble = memo(function MessageBubble({ message, onRegenerate, onEdi
   );
 });
 
-export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick, loading, activeAgent }: Props) {
+export function MessageList({
+  messages,
+  onRegenerate,
+  onEdit,
+  onRetryTurn,
+  onSuggestionClick,
+  loading,
+  agentSelectionReady = true,
+  activeAgent,
+  selectedModelId,
+  onModelChange,
+}: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
 
@@ -218,7 +324,25 @@ export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick,
     activeAgent?.starterPrompts?.some((prompt) => prompt.isActive !== false && prompt.prompt.trim().length > 0)
   );
 
+  const { data: modelsData } = useSWR<UiModelsResponse>("/api/models", modelsFetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 60_000,
+  });
+  const modelsForBubbles = modelsData?.models ?? [];
+  const emptyStateModelLine = useMemo(
+    () => compactAgentModelSummaryLine(activeAgent, modelsForBubbles),
+    [activeAgent, modelsForBubbles]
+  );
+
   if (empty) {
+    if (!agentSelectionReady) {
+      return (
+        <div className="flex flex-1 items-center justify-center px-6 pb-44 pt-8">
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assistant…</p>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-1 items-center justify-center px-6 pb-44 pt-8">
         <div className="mx-auto w-full max-w-3xl">
@@ -233,30 +357,34 @@ export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick,
                   {activeAgent.description}
                 </p>
               ) : null}
+              {emptyStateModelLine ? (
+                <p className="mt-3 max-w-lg text-center text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-500">
+                  {emptyStateModelLine}
+                </p>
+              ) : null}
             </div>
           ) : (
-            <>
-              <h2 className="text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-                Welcome to your AI Workspace
+            <div className="text-center">
+              <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+                No assistant available
               </h2>
-              <p className="mt-2 text-center text-sm text-zinc-500">
-                Start with a prompt or pick a suggestion to explore.
+              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                There are no published agents for your account yet. Check back after an admin publishes one.
               </p>
-            </>
+            </div>
           )}
 
-          {hasAgentStarters ? (
+          {activeAgent && hasAgentStarters ? (
             <AgentStarterPrompts
+              key={activeAgent.id}
               agent={activeAgent}
               onPromptClick={(text) => onSuggestionClick?.(text)}
             />
-          ) : (
+          ) : activeAgent ? (
             <p className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
-              {activeAgent
-                ? `${activeAgent.name} has no starter prompts configured yet. Type a message below to get started.`
-                : "Type a message below to get started."}
+              {`${activeAgent.name} has no starter prompts configured yet. Type a message below to get started.`}
             </p>
-          )}
+          ) : null}
         </div>
       </div>
     );
@@ -280,6 +408,10 @@ export function MessageList({ messages, onRegenerate, onEdit, onSuggestionClick,
           message={message}
           onRegenerate={stableOnRegenerate}
           onEdit={stableOnEdit}
+          onRetryTurn={onRetryTurn}
+          selectedModelId={selectedModelId}
+          onModelChange={onModelChange}
+          models={modelsForBubbles}
         />
       ))}
       </div>
