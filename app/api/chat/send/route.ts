@@ -116,7 +116,10 @@ export async function POST(req: NextRequest) {
   let userIdForLogs = "unknown";
   let assistantAttemptId: string | null = null;
   const finalizeAttemptFailed = async (id: string, cause: unknown) => {
-    const clientMessage = sseErrorMessageForClient(cause);
+    const clientMessage =
+      typeof cause === "string" && cause.trim().length > 0
+        ? cause.trim()
+        : sseErrorMessageForClient(cause);
     const classified = classifyChatError(clientMessage);
     await db.message.update({
       where: { id },
@@ -196,9 +199,48 @@ export async function POST(req: NextRequest) {
     }
     const effectiveTurnId = payload.turnId?.trim() || retrySource?.turnId || crypto.randomUUID();
 
+    const activeAttempt = await db.message.findFirst({
+      where: {
+        sessionId: payload.sessionId,
+        userId,
+        role: "assistant",
+        turnId: effectiveTurnId,
+        deliveryStatus: { in: ["PENDING", "STREAMING"] },
+      },
+      select: { id: true },
+    });
+    if (activeAttempt) throw new Error("ACTIVE_TURN_ATTEMPT");
+
+    const { models: governedModels, snapshot } = await getGovernedModelsForUser({
+      userId,
+      userRole: userRole as "USER" | "TEAM_LEAD" | "ADMIN",
+      teamId,
+      additionalEstimatedTokens: Math.ceil(payload.text.length / 4) + 1200,
+    });
+
+    await assertUserWithinSoftTokenLimit({
+      userId,
+      additionalEstimatedTokens: Math.ceil(payload.text.length / 4) + 1200,
+      userRole,
+      teamId,
+    });
+
+    const hasImages = Boolean(payload.imageUrls && payload.imageUrls.length > 0);
+    const resolvedImageUrls = hasImages
+      ? await Promise.all(payload.imageUrls!.map(toBase64DataUri))
+      : undefined;
+
+    const prepared = await prepareOrchestrator({
+      userId,
+      ...payload,
+      turnId: effectiveTurnId,
+      skipUserInsert: Boolean(retrySource),
+      resolvedImageUrls,
+    });
+
     const assistantAttempt = await db.$transaction(
       async (tx) => {
-        const activeAttempt = await tx.message.findFirst({
+        const conflict = await tx.message.findFirst({
           where: {
             sessionId: payload.sessionId,
             userId,
@@ -208,7 +250,7 @@ export async function POST(req: NextRequest) {
           },
           select: { id: true },
         });
-        if (activeAttempt) throw new Error("ACTIVE_TURN_ATTEMPT");
+        if (conflict) throw new Error("ACTIVE_TURN_ATTEMPT");
 
         const attemptCursor = await tx.message.findFirst({
           where: {
@@ -253,33 +295,6 @@ export async function POST(req: NextRequest) {
       req.signal.addEventListener("abort", cancelOnClientAbort, { once: true });
     }
 
-    const { models: governedModels, snapshot } = await getGovernedModelsForUser({
-      userId,
-      userRole: userRole as "USER" | "TEAM_LEAD" | "ADMIN",
-      teamId,
-      additionalEstimatedTokens: Math.ceil(payload.text.length / 4) + 1200,
-    });
-
-    await assertUserWithinSoftTokenLimit({
-      userId,
-      additionalEstimatedTokens: Math.ceil(payload.text.length / 4) + 1200,
-      userRole,
-      teamId,
-    });
-
-    const hasImages = Boolean(payload.imageUrls && payload.imageUrls.length > 0);
-    const resolvedImageUrls = hasImages
-      ? await Promise.all(payload.imageUrls!.map(toBase64DataUri))
-      : undefined;
-
-    const prepared = await prepareOrchestrator({
-      userId,
-      ...payload,
-      turnId: effectiveTurnId,
-      skipUserInsert: Boolean(retrySource),
-      resolvedImageUrls,
-    });
-
     const normalized = normalizeAgentInputSchema(prepared.agent.inputSchema);
     const governedUi = governedOptionsToUiSummaries(governedModels);
     const routingMode = (payload.modelRoutingMode ?? "manual") as RouterMode;
@@ -304,7 +319,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (decision.blocked || !decision.selectedModelId) {
-      await finalizeAttemptFailed(assistantAttempt.id, decision.blockReason ?? "No compatible model for this request.");
+      await finalizeAttemptFailed(
+        assistantAttempt.id,
+        decision.blockReason ?? "No compatible model for this request."
+      );
       return NextResponse.json(
         { error: decision.blockReason ?? "No compatible model for this request." },
         { status: 400 }
