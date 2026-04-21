@@ -19,7 +19,7 @@ export function classifyChatError(raw: string): ClassifiedChatError {
       detail:
         t.length > 0 && t.length < 400
           ? t
-          : "OpenAI rate limit reached. Wait 1–2 minutes, send one message at a time, or use a smaller image.",
+          : "AI provider rate limit reached for the current workspace key. Wait briefly, send one request at a time, or switch to another available model.",
     };
   }
   if (

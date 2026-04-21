@@ -106,6 +106,11 @@ export function ModelSelector({
           {!imageIncompatible && !model.enabled && model.disabledReason ? (
             <p className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">{model.disabledReason}</p>
           ) : null}
+          {model.healthAdvisory?.status === "recently_rate_limited" ? (
+            <p className="mt-0.5 text-[10px] text-amber-600 dark:text-amber-400">
+              {model.healthAdvisory.message}
+            </p>
+          ) : null}
         </div>
       </button>
     );
