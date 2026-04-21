@@ -39,7 +39,7 @@ export function AgentOutputStep({
       <div>
         <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">Output Rules</h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Control the format and structure of the agent's responses.
+          Control the format and structure of the agent&apos;s responses.
         </p>
       </div>
 

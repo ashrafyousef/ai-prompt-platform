@@ -44,7 +44,7 @@ export function SchemaFieldBuilder({
       </div>
 
       {fields.length === 0 ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">No fields yet — click "Add field" to start.</p>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">No fields yet — click &quot;Add field&quot; to start.</p>
       ) : null}
 
       {fields.map((field) => (

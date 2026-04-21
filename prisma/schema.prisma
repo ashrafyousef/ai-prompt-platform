@@ -36,6 +36,14 @@ enum AgentScope {
   GLOBAL
 }
 
+enum MessageDeliveryStatus {
+  PENDING
+  STREAMING
+  FAILED
+  COMPLETED
+  CANCELLED
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -82,23 +90,39 @@ model ChatSession {
 }
 
 model Message {
-  id            String      @id @default(cuid())
-  sessionId     String
-  userId        String
-  role          MessageRole
-  content       String
-  imageUrls     Json?
-  agentConfigId String?
-  editedFromId  String?
-  regenOfId     String?
-  createdAt     DateTime    @default(now())
-  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  agentConfig   AgentConfig? @relation(fields: [agentConfigId], references: [id], onDelete: SetNull)
+  id                        String                @id @default(cuid())
+  sessionId                 String
+  userId                    String
+  role                      MessageRole
+  content                   String
+  imageUrls                 Json?
+  agentConfigId             String?
+  editedFromId              String?
+  regenOfId                 String?
+  turnId                    String?
+  deliveryStatus            MessageDeliveryStatus @default(COMPLETED)
+  retryOfAssistantMessageId String?
+  attemptIndex              Int?
+  errorCode                 String?
+  errorMessage              String?
+  provider                  String?
+  model                     String?
+  startedAt                 DateTime?
+  completedAt               DateTime?
+  failedAt                  DateTime?
+  createdAt                 DateTime              @default(now())
+  session                   ChatSession           @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user                      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  agentConfig               AgentConfig?          @relation(fields: [agentConfigId], references: [id], onDelete: SetNull)
+  retryOfAssistantMessage   Message?              @relation("MessageRetryLineage", fields: [retryOfAssistantMessageId], references: [id], onDelete: SetNull)
+  retryAttempts             Message[]             @relation("MessageRetryLineage")
 
   @@index([sessionId, createdAt])
   @@index([sessionId])
   @@index([userId, createdAt])
+  @@index([retryOfAssistantMessageId])
+  @@index([sessionId, turnId, createdAt])
+  @@index([sessionId, turnId, attemptIndex])
 }
 
 model AgentConfig {
@@ -143,14 +167,29 @@ model TokenUsage {
   id           String   @id @default(cuid())
   userId       String
   sessionId    String?
+  messageId    String?
   model        String
+  registryModelId String?
+  provider     String?
   promptTokens Int      @default(0)
   completionTokens Int  @default(0)
   totalTokens  Int      @default(0)
+  cachedInputTokens Int?
+  exactUsage   Boolean  @default(false)
+  estimationMethod String?
+  pricingSnapshot Json?
+  inputCost    Float?
+  outputCost   Float?
+  totalCost    Float?
+  currency     String?
+  serviceTier  String?
+  routerMode   String?
+  routerReasonCodes Json?
   createdAt    DateTime @default(now())
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+  @@index([messageId])
 }
 
 model SharedChat {

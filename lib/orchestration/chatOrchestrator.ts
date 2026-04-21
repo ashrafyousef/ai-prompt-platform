@@ -3,8 +3,15 @@ import { buildMessages, ChatMessage } from "@/lib/orchestration/buildMessages";
 import { getOutputMode, requiresJsonOutput } from "@/lib/orchestration/agentContract";
 import { validateStructuredOutput } from "@/lib/orchestration/validateStructuredOutput";
 import { createChatCompletion, resolveModelName } from "@/lib/openai/client";
+import { calculateCost } from "@/lib/costCalculator";
+import type { RoutedModelDecision } from "@/lib/modelRoutingTypes";
+import { defaultPricingForProvider, getPricingForRegistryModelId } from "@/lib/pricing";
+import { getModelRegistry, resolveModelById, type ModelProvider } from "@/lib/models";
+import type { NormalizedUsage } from "@/lib/usageNormalizer";
+import { completionResultToNormalized, estimateUsageFallback } from "@/lib/usageNormalizer";
 import { sanitizeUserInput } from "@/lib/security";
-import { AgentConfig, Message } from "@prisma/client";
+import { captureError } from "@/lib/sentry";
+import { AgentConfig, Message, Prisma } from "@prisma/client";
 
 type AgentContract = {
   id: string;
@@ -25,8 +32,20 @@ export async function prepareOrchestrator(params: {
   resolvedImageUrls?: string[];
   editedFromId?: string;
   regenOfId?: string;
+  turnId?: string;
+  skipUserInsert?: boolean;
 }) {
-  const { userId, sessionId, agentId, imageUrls, resolvedImageUrls, editedFromId, regenOfId } = params;
+  const {
+    userId,
+    sessionId,
+    agentId,
+    imageUrls,
+    resolvedImageUrls,
+    editedFromId,
+    regenOfId,
+    turnId,
+    skipUserInsert,
+  } = params;
   const text = sanitizeUserInput(params.text);
 
   const [session, agent] = await Promise.all([
@@ -37,18 +56,21 @@ export async function prepareOrchestrator(params: {
   if (!session) throw new Error("Session not found.");
   if (!agent) throw new Error("Agent not found.");
 
-  await db.message.create({
-    data: {
-      sessionId,
-      userId,
-      role: "user",
-      content: text,
-      imageUrls: imageUrls ?? [],
-      agentConfigId: agent.id,
-      editedFromId,
-      regenOfId,
-    },
-  });
+  if (!skipUserInsert) {
+    await db.message.create({
+      data: {
+        sessionId,
+        userId,
+        role: "user",
+        content: text,
+        imageUrls: imageUrls ?? [],
+        agentConfigId: agent.id,
+        editedFromId,
+        regenOfId,
+        turnId,
+      },
+    });
+  }
 
   const history = await db.message.findMany({
     where: { sessionId, userId },
@@ -100,7 +122,7 @@ async function summarizeConversation(history: Message[]): Promise<string> {
     .join("\n");
 
   try {
-    const summary = await createChatCompletion(
+    const { content: summary } = await createChatCompletion(
       [
         {
           role: "system",
@@ -131,6 +153,16 @@ async function summarizeConversation(history: Message[]): Promise<string> {
   return fallback;
 }
 
+export function charEstimateFromMessages(messages: ChatMessage[] | undefined, userText: string): number {
+  let n = userText.length;
+  if (!messages) return n;
+  for (const m of messages) {
+    if (typeof m.content === "string") n += m.content.length;
+    else for (const b of m.content) n += b.type === "text" ? b.text.length : 200;
+  }
+  return n;
+}
+
 export async function finalizeAssistantMessage(params: {
   userId: string;
   sessionId: string;
@@ -139,8 +171,28 @@ export async function finalizeAssistantMessage(params: {
   responseText: string;
   messages?: ChatMessage[];
   modelVersion?: string;
+  /** Registry id for pricing/usage (preferred over resolving from legacy display name). */
+  registryModelId?: string;
+  /** Primary completion usage from stream or non-stream caller. */
+  usage?: NormalizedUsage | null;
+  routerDecision?: RoutedModelDecision;
+  assistantMessageId?: string;
+  providerHint?: ModelProvider | null;
 }) {
-  const { userId, sessionId, agentId, text, responseText, messages, modelVersion } = params;
+  const {
+    userId,
+    sessionId,
+    agentId,
+    text,
+    responseText,
+    messages,
+    modelVersion,
+    registryModelId,
+    usage,
+    routerDecision,
+    assistantMessageId,
+    providerHint,
+  } = params;
   const agent = await db.agentConfig.findFirst({ where: { id: agentId } });
   if (!agent) throw new Error("Agent not found.");
   const contract = buildAgentContract(agent);
@@ -162,20 +214,27 @@ export async function finalizeAssistantMessage(params: {
     if (!initialCheck.ok) {
       let retryOutput: string | null = null;
       if (messages && messages.length > 0) {
-        retryOutput = await createChatCompletion(
-          [
-            ...messages,
+        try {
+          const { content: retry } = await createChatCompletion(
+            [
+              ...messages,
+              {
+                role: "system",
+                content:
+                  "Your previous output was invalid. Fix it to match the required schema EXACTLY. Do not add extra text.",
+              },
+            ],
             {
-              role: "system",
-              content:
-                "Your previous output was invalid. Fix it to match the required schema EXACTLY. Do not add extra text.",
-            },
-          ],
-          {
-            temperature: Math.min(agent.temperature, 0.2),
-            maxTokens: agent.maxTokens,
-          }
-        );
+              temperature: Math.min(agent.temperature, 0.2),
+              maxTokens: agent.maxTokens,
+              modelVersion,
+            }
+          );
+          retryOutput = retry;
+        } catch (e) {
+          captureError(e, { route: "finalizeAssistantMessage/structured-retry" });
+          retryOutput = null;
+        }
       }
 
       if (retryOutput) {
@@ -197,32 +256,91 @@ export async function finalizeAssistantMessage(params: {
     finalOutput = ensureMarkdownSections(finalOutput);
   }
 
-  const assistantMessage = await db.message.create({
-    data: {
-      sessionId,
-      userId,
-      role: "assistant",
-      content: finalOutput,
-      agentConfigId: agent.id,
-    },
-  });
+  const assistantMessage = assistantMessageId
+    ? await db.message.update({
+        where: { id: assistantMessageId },
+        data: {
+          content: finalOutput,
+          agentConfigId: agent.id,
+          model: registryModelId ?? modelVersion ?? null,
+          provider: providerHint ?? null,
+          deliveryStatus: "COMPLETED",
+          completedAt: new Date(),
+          failedAt: null,
+          errorCode: null,
+          errorMessage: null,
+        },
+      })
+    : await db.message.create({
+        data: {
+          sessionId,
+          userId,
+          role: "assistant",
+          content: finalOutput,
+          agentConfigId: agent.id,
+          model: registryModelId ?? modelVersion ?? null,
+          provider: providerHint ?? null,
+          deliveryStatus: "COMPLETED",
+          completedAt: new Date(),
+        },
+      });
 
-  await db.tokenUsage.create({
-    data: {
+  const regId = registryModelId ?? modelVersion ?? "openai-gpt-4o-mini";
+  const resolved = resolveModelById(regId);
+  const providerForUsage = providerHint ?? resolved?.provider ?? "openai";
+
+  const normalized: NormalizedUsage =
+    usage ??
+    estimateUsageFallback({
+      registryModelId: regId,
+      provider: providerForUsage,
+      promptCharLength: charEstimateFromMessages(messages, text),
+      completionCharLength: finalOutput.length,
+    });
+
+  const pricing = getPricingForRegistryModelId(regId) ?? defaultPricingForProvider(providerForUsage);
+  const cost = calculateCost(normalized, pricing);
+
+  try {
+    await db.tokenUsage.create({
+      data: {
+        userId,
+        sessionId,
+        messageId: assistantMessage.id,
+        model: resolveModelName(modelVersion),
+        registryModelId: regId,
+        provider: providerForUsage,
+        promptTokens: normalized.promptTokens ?? 0,
+        completionTokens: normalized.completionTokens ?? 0,
+        totalTokens: normalized.totalTokens ?? 0,
+        cachedInputTokens: normalized.cachedInputTokens ?? null,
+        exactUsage: normalized.exact,
+        estimationMethod: normalized.estimationMethod ?? null,
+        pricingSnapshot: pricing as unknown as Prisma.InputJsonValue,
+        inputCost: cost.inputCost,
+        outputCost: cost.outputCost,
+        totalCost: cost.totalCost,
+        currency: "USD",
+        routerMode: routerDecision?.mode ?? null,
+        routerReasonCodes:
+          routerDecision?.reasonCodes && routerDecision.reasonCodes.length > 0
+            ? (routerDecision.reasonCodes as unknown as Prisma.InputJsonValue)
+            : undefined,
+      },
+    });
+  } catch (e) {
+    captureError(e, { route: "finalizeAssistantMessage/tokenUsage", userId });
+  }
+
+  try {
+    await autoTitleSession({
       userId,
       sessionId,
-      model: resolveModelName(modelVersion),
-      promptTokens: Math.ceil(text.length / 4),
-      completionTokens: Math.ceil(finalOutput.length / 4),
-      totalTokens: Math.ceil((text.length + finalOutput.length) / 4),
-    },
-  });
-
-  await autoTitleSession({
-    userId,
-    sessionId,
-    seedText: text,
-  });
+      seedText: text,
+    });
+  } catch (e) {
+    captureError(e, { route: "finalizeAssistantMessage/autoTitle", userId });
+  }
 
   return assistantMessage;
 }
@@ -273,10 +391,22 @@ export async function runOrchestrator(params: {
   const { userId, sessionId, agentId, text } = params;
   const prep = await prepareOrchestrator(params);
 
-  const responseText = await createChatCompletion(prep.messages, {
+  const { content: responseText, rawUsage } = await createChatCompletion(prep.messages, {
     temperature: prep.agent.temperature,
     maxTokens: prep.agent.maxTokens,
   });
+
+  const promptChars = charEstimateFromMessages(prep.messages, text);
+  const fallbackModel = getModelRegistry().find((m) => m.enabled) ?? getModelRegistry()[0];
+  const regId = fallbackModel?.id ?? "openai-gpt-4o-mini";
+  const provider = fallbackModel?.provider ?? "openai";
+  const usageNorm = completionResultToNormalized(
+    rawUsage,
+    regId,
+    provider,
+    promptChars,
+    responseText.length
+  );
 
   return finalizeAssistantMessage({
     userId,
@@ -285,6 +415,9 @@ export async function runOrchestrator(params: {
     text,
     responseText,
     messages: prep.messages,
+    modelVersion: regId,
+    registryModelId: regId,
+    usage: usageNorm,
   });
 }
 
