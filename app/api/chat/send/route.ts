@@ -15,7 +15,7 @@ import { streamChatCompletion, type StreamUsageSink } from "@/lib/openai/client"
 import { assertGovernedModelSessionAccessible } from "@/lib/agentModelGovernance";
 import { assertUserWithinSoftTokenLimit, assertModelAccessForRole, getGovernedModelsForUser } from "@/lib/usage";
 import { resolveModelById } from "@/lib/models";
-import type { UserRole } from "@/lib/models";
+import type { ModelProvider, UserRole } from "@/lib/models";
 import { normalizeAgentInputSchema } from "@/lib/agentConfig";
 import { validateSendTimeModelPreferences } from "@/lib/chatAgentModelRules";
 import { captureError } from "@/lib/sentry";
@@ -24,6 +24,7 @@ import { effectiveRequiresStructuredOutput } from "@/lib/agentModelPolicy";
 import { governedOptionsToUiSummaries, routeModel } from "@/lib/modelRouter";
 import type { RouterMode } from "@/lib/modelRoutingTypes";
 import { classifyChatError } from "@/lib/chatErrorTaxonomy";
+import { markRecentRateLimit } from "@/lib/modelHealthHints";
 
 const MIME_MAP: Record<string, string> = {
   jpg: "image/jpeg",
@@ -51,7 +52,7 @@ function sseErrorMessageForClient(error: unknown): string {
       return "AI API rejected the request. Check OPENAI_API_KEY / GROQ_API_KEY on the server.";
     }
     if (raw.includes("429")) {
-      return "OpenAI rate limit (too many requests or images). Wait 1–2 minutes, send one message at a time, or use a smaller image.";
+      return "AI provider rate limit reached for the current workspace key. Wait briefly, send one request at a time, or switch to another available model.";
     }
     if (raw.includes("400") || raw.includes("invalid")) {
       return "The AI provider rejected this request (prompt, image, or model). Try a smaller image or different model.";
@@ -115,6 +116,9 @@ export async function POST(req: NextRequest) {
   const start = Date.now();
   let userIdForLogs = "unknown";
   let assistantAttemptId: string | null = null;
+  let requestKind: "send" | "retry" = "send";
+  let selectedModelIdForAttempt: string | null = null;
+  let selectedProviderForAttempt: ModelProvider | null = null;
   const finalizeAttemptFailed = async (id: string, cause: unknown) => {
     const clientMessage =
       typeof cause === "string" && cause.trim().length > 0
@@ -129,6 +133,21 @@ export async function POST(req: NextRequest) {
         errorCode: classified.code,
         errorMessage: classified.detail,
       },
+    });
+    if (classified.code === "rate_limit") {
+      markRecentRateLimit({
+        modelId: selectedModelIdForAttempt,
+        provider: selectedProviderForAttempt,
+      });
+    }
+    logJson("error", {
+      route: "/api/chat/send",
+      userId: userIdForLogs,
+      status: "attempt_failed",
+      requestKind,
+      assistantAttemptId: id,
+      errorCode: classified.code,
+      errorDetail: classified.detail,
     });
   };
   const finalizeAttemptCancelled = async (id: string) => {
@@ -176,6 +195,7 @@ export async function POST(req: NextRequest) {
         }
       | null = null;
     if (payload.retryOfAssistantMessageId) {
+      requestKind = "retry";
       const source = await db.message.findFirst({
         where: {
           id: payload.retryOfAssistantMessageId,
@@ -342,6 +362,8 @@ export async function POST(req: NextRequest) {
     }
 
     const selectedModel = resolveModelById(effectiveModelId);
+    selectedModelIdForAttempt = effectiveModelId;
+    selectedProviderForAttempt = selectedModel?.provider ?? null;
     if (selectedModel) {
       validateSendTimeModelPreferences({
         modelPreferences: normalized.modelPreferences,
@@ -350,6 +372,20 @@ export async function POST(req: NextRequest) {
         agentName: prepared.agent.name,
       });
     }
+
+    logJson("info", {
+      route: "/api/chat/send",
+      userId,
+      status: "model_selected",
+      requestKind,
+      sessionId: payload.sessionId,
+      agentId: payload.agentId,
+      requestedModelId: payload.modelVersion ?? null,
+      selectedModelId: effectiveModelId,
+      selectedProvider: selectedModel?.provider ?? null,
+      routingMode: decision.mode,
+      reasonCodes: decision.reasonCodes,
+    });
 
     await db.message.update({
       where: { id: assistantAttempt.id },

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { detectProvider, ROLE_LIMITS, type UserRole } from "@/lib/models";
 import { getPlatformModelGovernance, resolvePlatformModelDefaults } from "@/lib/platformModelGovernance";
+import { getRecentRateLimitAdvisory } from "@/lib/modelHealthHints";
 import { getGovernedModelsForUser } from "@/lib/usage";
 
 export async function GET() {
@@ -38,6 +39,10 @@ export async function GET() {
         disabledReason: m.disabledReason ?? null,
         contextWindow: m.contextWindow,
         visionCapable: m.capabilities.includes("vision"),
+        healthAdvisory: getRecentRateLimitAdvisory({
+          modelId: m.id,
+          provider: m.provider,
+        }),
       })),
       activeRuntimeProvider: provider,
       role,

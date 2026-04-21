@@ -255,7 +255,7 @@ export function useChatStream({
             const errorData = (await res.json()) as { error?: string };
             errorMsg =
               res.status === 429
-                ? "Rate limit exceeded. Please wait a moment and try again."
+                ? "AI provider rate limit reached for the current workspace key. Wait briefly, send one request at a time, or switch to another available model."
                 : errorData.error || errorMsg;
           } else {
             const t = (await res.text()).trim();
@@ -392,7 +392,7 @@ export function useChatStream({
               const errorData = (await res.json()) as { error?: string };
               errorMsg =
                 res.status === 429
-                  ? "Rate limit exceeded. Please wait a moment and try again."
+                  ? "AI provider rate limit reached for the current workspace key. Wait briefly, send one request at a time, or switch to another available model."
                   : errorData.error || errorMsg;
             } else {
               const t = (await res.text()).trim();

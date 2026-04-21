@@ -66,6 +66,13 @@ export type UiModelSummary = {
   disabledReason: string | null;
   contextWindow: number;
   visionCapable: boolean;
+  healthAdvisory?: {
+    status: "recently_rate_limited";
+    scope: "model" | "provider";
+    observedAt: string;
+    ttlSeconds: number;
+    message: string;
+  } | null;
 };
 
 export type UiModelsResponse = {
