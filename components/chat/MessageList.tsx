@@ -136,7 +136,7 @@ const MessageBubble = memo(function MessageBubble({
         className={`rounded-2xl p-4 text-sm leading-7 shadow-sm transition ${
           message.role === "user"
             ? "ml-auto max-w-2xl bg-violet-50 text-zinc-900 dark:bg-violet-950/40 dark:text-zinc-100"
-            : "mr-auto max-w-3xl border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+            : "mr-auto max-w-3xl border border-zinc-200/90 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
         }`}
       >
         {images && images.length > 0 ? (
@@ -157,14 +157,14 @@ const MessageBubble = memo(function MessageBubble({
         ) : null}
         {message.role === "assistant" && isAssistantFailed && failedGen ? (
           <>
-            <div className="mb-3 rounded-xl border border-amber-200/90 bg-amber-50/80 px-3 py-2.5 dark:border-amber-900/60 dark:bg-amber-950/25">
-              <p className="text-xs font-semibold text-amber-950 dark:text-amber-100">{failedGen.title}</p>
-              <p className="mt-1 text-xs leading-relaxed text-amber-900/95 dark:text-amber-100/90">{failedGen.detail}</p>
-              <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="mb-3 rounded-xl border border-amber-200/90 bg-amber-50/85 px-3.5 py-3 dark:border-amber-900/60 dark:bg-amber-950/25">
+              <p className="text-sm font-semibold leading-5 text-amber-950 dark:text-amber-100">{failedGen.title}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-amber-900/95 dark:text-amber-100/90">{failedGen.detail}</p>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 {message.turnId && onRetryTurn ? (
                   <button
                     type="button"
-                    className="rounded-full bg-zinc-900 px-3 py-1 text-[11px] font-medium text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
+                    className="rounded-full bg-zinc-900 px-3.5 py-1.5 text-[11px] font-semibold text-white shadow-sm hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-white"
                     onClick={() => onRetryTurn(message.turnId!)}
                   >
                     Retry
@@ -173,7 +173,7 @@ const MessageBubble = memo(function MessageBubble({
                 {visionAlt && onModelChange ? (
                   <button
                     type="button"
-                    className="inline-flex items-center gap-1 rounded-full border border-amber-300/80 px-2.5 py-1 text-[11px] font-medium text-amber-950 hover:bg-amber-100/80 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
+                    className="inline-flex items-center gap-1 rounded-full border border-amber-300/80 px-2.5 py-1 text-[11px] font-medium text-amber-950/95 hover:bg-amber-100/80 dark:border-amber-700 dark:text-amber-100 dark:hover:bg-amber-900/40"
                     onClick={() => onModelChange(visionAlt.id)}
                   >
                     <WandSparkles className="h-3 w-3" />
@@ -183,8 +183,10 @@ const MessageBubble = memo(function MessageBubble({
               </div>
             </div>
             {message.content.trim().length > 0 ? (
-              <div className="mt-2 border-t border-zinc-200/80 pt-3 text-xs text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-                <p className="mb-1 font-medium text-zinc-600 dark:text-zinc-300">Partial response</p>
+              <div className="mt-1 rounded-lg border border-zinc-200/80 bg-zinc-50/75 px-3 py-2.5 text-xs text-zinc-500 dark:border-zinc-700/80 dark:bg-zinc-900/30 dark:text-zinc-400">
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+                  Partial response
+                </p>
                 <ReactMarkdown
                   remarkPlugins={remarkPlugins}
                   rehypePlugins={rehypePlugins}
@@ -337,38 +339,38 @@ export function MessageList({
   if (empty) {
     if (!agentSelectionReady) {
       return (
-        <div className="flex flex-1 items-center justify-center px-6 pb-44 pt-8">
+        <div className="flex flex-1 items-center justify-center px-6 pb-40 pt-8">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assistant…</p>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-1 items-center justify-center px-6 pb-44 pt-8">
+      <div className="flex flex-1 items-center justify-center px-6 pb-40 pt-8">
         <div className="mx-auto w-full max-w-3xl">
           {activeAgent ? (
             <div className="flex flex-col items-center">
-              <span className="text-4xl">{activeAgent.icon || "🤖"}</span>
-              <h2 className="mt-3 text-center text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              <span className="text-3xl">{activeAgent.icon || "🤖"}</span>
+              <h2 className="mt-2 text-center text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
                 {activeAgent.name}
               </h2>
               {activeAgent.description ? (
-                <p className="mt-2 max-w-md text-center text-sm text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1.5 max-w-md text-center text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
                   {activeAgent.description}
                 </p>
               ) : null}
               {emptyStateModelLine ? (
-                <p className="mt-3 max-w-lg text-center text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-500">
+                <p className="mt-2.5 max-w-lg text-center text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-500">
                   {emptyStateModelLine}
                 </p>
               ) : null}
             </div>
           ) : (
             <div className="text-center">
-              <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
+              <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
                 No assistant available
               </h2>
-              <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1.5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
                 There are no published agents for your account yet. Check back after an admin publishes one.
               </p>
             </div>
@@ -381,7 +383,7 @@ export function MessageList({
               onPromptClick={(text) => onSuggestionClick?.(text)}
             />
           ) : activeAgent ? (
-            <p className="mt-6 text-center text-xs text-zinc-400 dark:text-zinc-500">
+            <p className="mt-5 text-center text-xs text-zinc-400 dark:text-zinc-500">
               {`${activeAgent.name} has no starter prompts configured yet. Type a message below to get started.`}
             </p>
           ) : null}

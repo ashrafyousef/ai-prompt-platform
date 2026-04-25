@@ -17,16 +17,16 @@ function AgentOptionCard({
     <button
       type="button"
       onClick={onSelect}
-      className={`flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
+      className={`flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
         selected
-          ? "bg-violet-50 ring-1 ring-violet-200 dark:bg-violet-950/30 dark:ring-violet-800"
-          : "hover:bg-zinc-50 active:bg-zinc-100 dark:hover:bg-zinc-800/50 dark:active:bg-zinc-800"
+          ? "bg-violet-50/80 ring-1 ring-violet-200/80 dark:bg-violet-950/25 dark:ring-violet-800"
+          : "hover:bg-zinc-50/80 active:bg-zinc-100 dark:hover:bg-zinc-800/50 dark:active:bg-zinc-800"
       }`}
     >
       <span
-        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base transition-colors ${
+        className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-sm transition-colors ${
           selected
-            ? "bg-violet-100 dark:bg-violet-900/40"
+            ? "bg-violet-100/80 dark:bg-violet-900/35"
             : "bg-zinc-100 dark:bg-zinc-800"
         }`}
       >
@@ -34,23 +34,23 @@ function AgentOptionCard({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <p className={`truncate text-sm font-medium ${selected ? "text-violet-800 dark:text-violet-200" : "text-zinc-900 dark:text-zinc-100"}`}>
+          <p className={`min-w-0 flex-1 truncate text-sm font-semibold ${selected ? "text-violet-800 dark:text-violet-200" : "text-zinc-900 dark:text-zinc-100"}`}>
             {agent.name}
           </p>
           {selected ? (
-            <span className="shrink-0 rounded-full bg-violet-200 px-1.5 py-px text-[9px] font-semibold text-violet-700 dark:bg-violet-800 dark:text-violet-200">
+            <span className="shrink-0 rounded-full bg-violet-200/75 px-1.5 py-px text-[9px] font-medium text-violet-700/95 dark:bg-violet-800 dark:text-violet-200">
               Active
             </span>
           ) : null}
         </div>
         {agent.description ? (
-          <p className="mt-0.5 line-clamp-1 text-xs text-zinc-500 dark:text-zinc-400">
+          <p className="mt-0.5 line-clamp-1 text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-400">
             {agent.description}
           </p>
         ) : null}
       </div>
       {agent.category ? (
-        <span className="mt-1 shrink-0 rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+        <span className="mt-0.5 shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-0.5 text-[10px] font-medium text-zinc-500/95 dark:bg-zinc-800 dark:text-zinc-400">
           {agent.category}
         </span>
       ) : null}
@@ -139,10 +139,10 @@ export function AgentSelector({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm shadow-sm transition hover:border-zinc-300 hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
+        className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-white px-3 py-1.5 text-sm shadow-sm transition hover:border-zinc-300 hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:border-zinc-700 dark:bg-zinc-900 dark:hover:border-zinc-600"
       >
         <span className="text-base leading-none">{active?.icon || "🤖"}</span>
-        <span className="max-w-[140px] truncate font-medium text-zinc-800 dark:text-zinc-200">
+        <span className="max-w-[136px] truncate font-medium text-zinc-800 dark:text-zinc-200">
           {active?.name || "Select Agent"}
         </span>
         <ChevronDown className={`h-3.5 w-3.5 text-zinc-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`} />
@@ -151,10 +151,10 @@ export function AgentSelector({
       {open ? (
         <div
           role="listbox"
-          className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-2xl border border-zinc-200 bg-white p-1.5 shadow-xl dark:border-zinc-700 dark:bg-zinc-900 sm:w-80"
+          className="absolute left-0 top-full z-50 mt-1.5 w-72 rounded-2xl border border-zinc-200/95 bg-white/95 p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900 sm:w-80"
         >
           {agents.length > 3 ? (
-            <div className="relative mb-1 px-1.5">
+            <div className="relative mb-1 px-1">
               <Search className="absolute left-4 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400" />
               <input
                 ref={searchRef}
@@ -162,11 +162,11 @@ export function AgentSelector({
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search agents…"
-                className="w-full rounded-lg border-0 bg-zinc-50 py-2 pl-8 pr-3 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:bg-zinc-800 dark:text-zinc-200"
+                className="w-full rounded-lg border-0 bg-zinc-50 py-1.5 pl-8 pr-3 text-xs text-zinc-800 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:bg-zinc-800 dark:text-zinc-200"
               />
             </div>
           ) : null}
-          <div className="max-h-72 overflow-auto py-0.5">
+          <div className="max-h-72 overflow-auto py-0.5 pr-0.5">
             {filtered.length > 0 ? (
               filtered.map((agent) => (
                 <AgentOptionCard
@@ -180,7 +180,7 @@ export function AgentSelector({
                 />
               ))
             ) : (
-              <div className="px-4 py-6 text-center">
+              <div className="px-4 py-5 text-center">
                 <p className="text-sm text-zinc-500 dark:text-zinc-400">
                   {search.trim() ? "No agents match your search." : "No agents available for your team yet."}
                 </p>
