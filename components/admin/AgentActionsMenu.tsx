@@ -118,7 +118,7 @@ export function AgentActionsMenu({
               className="block w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800"
               onClick={() => void patch({ status: "PUBLISHED", isEnabled: true })}
             >
-              Publish
+              Publish (show in chat)
             </button>
           ) : null}
           {canUnpublish ? (
@@ -127,7 +127,7 @@ export function AgentActionsMenu({
               className="block w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800"
               onClick={() => void patch({ status: "DRAFT", isEnabled: false })}
             >
-              Unpublish
+              Unpublish (hide from chat)
             </button>
           ) : null}
           {canArchive ? (
@@ -136,7 +136,7 @@ export function AgentActionsMenu({
               className="block w-full px-3 py-2 text-left text-amber-800 hover:bg-amber-50 dark:text-amber-200 dark:hover:bg-amber-950/40"
               onClick={() => void patch({ status: "ARCHIVED", isEnabled: false })}
             >
-              Archive
+              Archive (hide + freeze)
             </button>
           ) : (
             <button

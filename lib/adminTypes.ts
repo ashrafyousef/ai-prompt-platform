@@ -1,4 +1,7 @@
 import type { AgentScope, AgentStatus, OutputFormat } from "@prisma/client";
+import type { AgentKnowledgeItem, AgentOutputConfig } from "@/lib/agentConfig";
+import type { AgentModelPreferences } from "@/lib/agentModelPolicy";
+import type { UiStarterPrompt } from "@/lib/types";
 
 export type AdminAgentListItem = {
   id: string;
@@ -32,6 +35,24 @@ export type AdminAgentDetail = {
   createdAt: string;
   updatedAt: string;
   _count: { messages: number };
+  effectiveConfig?: {
+    knowledgeItems: AgentKnowledgeItem[];
+    outputConfig: AgentOutputConfig;
+    starterPrompts: UiStarterPrompt[];
+    modelPreferences: AgentModelPreferences;
+    requiresStructuredOutput: boolean;
+    behaviorMeta: {
+      behaviorRules: string;
+      toneGuidance: string;
+      avoidRules: string;
+      strictMode: boolean;
+      importMethod: string | null;
+    };
+    identityMeta: {
+      icon: string | null;
+      category: string | null;
+    };
+  };
 };
 
 export type AdminOverviewStats = {

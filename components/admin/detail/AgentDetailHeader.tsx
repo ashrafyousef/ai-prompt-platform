@@ -77,6 +77,17 @@ export function AgentDetailHeader({
               {agent.slug}
             </span>
           </div>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            {isDraft
+              ? "Draft agents are hidden from chat until published."
+              : isPublished
+              ? "Published agents are eligible to appear in chat based on scope."
+              : "Archived agents are hidden from chat and kept for reference."}
+            {" "}
+            {agent.scope === "TEAM"
+              ? "Team scope limits visibility to members of the assigned team."
+              : "Global scope makes the agent available across teams."}
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2 shrink-0">

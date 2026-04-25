@@ -19,9 +19,9 @@ const METHODS: Array<{
   {
     id: "guided",
     icon: Sparkles,
-    title: "Guided Extraction",
+    title: "Guided Setup",
     description:
-      "Paste an existing GPT system prompt or config and let the wizard break it into structured fields.",
+      "Use a guided starting mode, then refine each section manually in the next steps.",
   },
   {
     id: "knowledge-first",
@@ -42,10 +42,10 @@ export function ImportMethodStep({
   return (
     <div>
       <h2 className="text-lg font-semibold text-zinc-900 dark:text-zinc-50">
-        How would you like to import?
+        Choose your starting mode
       </h2>
       <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-        Choose a starting approach. You can always adjust details in later steps.
+        This sets how you start the setup process. All modes continue through the same review and publish flow.
       </p>
 
       <div className="mt-8 grid gap-4 sm:grid-cols-3">

@@ -53,6 +53,11 @@ export function AdminAgentsPage() {
   return (
     <div className="space-y-8">
       <AgentListToolbar filters={filters} onChange={setFilters} teams={teams} />
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        Visibility reminder: <span className="font-medium">Published</span> agents are eligible for chat, while
+        <span className="font-medium"> Draft</span> and <span className="font-medium">Archived</span> remain hidden.
+        Team scope limits visibility to members of the assigned team.
+      </div>
 
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-8 text-center dark:border-red-900/50 dark:bg-red-950/30">

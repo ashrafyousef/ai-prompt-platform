@@ -41,6 +41,9 @@ export function AgentList({
 
   return (
     <>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">
+        Status and scope together determine whether an agent appears in chat.
+      </p>
       <div className="hidden overflow-hidden rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 md:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-zinc-200 bg-zinc-50/80 text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/80 dark:text-zinc-400">

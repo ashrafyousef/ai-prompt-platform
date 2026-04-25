@@ -24,6 +24,9 @@ export function AgentStarterPromptsStep({
           Add quick-start suggestions that appear when users open this agent with no prior messages.
           Keep them concise and high-value.
         </p>
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+          Starter prompts are optional, but they improve first-use clarity in chat.
+        </p>
       </div>
 
       <div className="space-y-3">
