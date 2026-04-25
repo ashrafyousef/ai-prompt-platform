@@ -3,6 +3,7 @@ import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { requireAdminUserId } from "@/lib/adminAuth";
+import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
 
 /* ------------------------------------------------------------------ */
 /*  GET — full agent detail                                            */
@@ -26,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
         ...agent,
         createdAt: agent.createdAt.toISOString(),
         updatedAt: agent.updatedAt.toISOString(),
+        effectiveConfig: buildEffectiveAgentConfig(agent),
       },
     });
   } catch (error) {
@@ -85,6 +87,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         ...updated,
         createdAt: updated.createdAt.toISOString(),
         updatedAt: updated.updatedAt.toISOString(),
+        effectiveConfig: buildEffectiveAgentConfig(updated),
       },
     });
   } catch (error) {

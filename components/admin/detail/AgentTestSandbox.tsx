@@ -63,9 +63,8 @@ export function AgentTestSandbox({ agentId }: { agentId: string }) {
     );
   }
 
-  const starterPrompts = (
-    (agent.inputSchema as Record<string, unknown>)?.starterPrompts ?? []
-  ) as string[];
+  const starterPrompts = (agent.effectiveConfig?.starterPrompts ?? []).map((p) => p.prompt);
+  const effectiveOutputFormat = agent.effectiveConfig?.outputConfig.format ?? agent.outputFormat;
 
   return (
     <div className="space-y-6">
@@ -85,10 +84,12 @@ export function AgentTestSandbox({ agentId }: { agentId: string }) {
             <FlaskConical className="h-5 w-5" />
           </div>
           <div>
-            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Testing: {agent.name}</p>
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+              Testing with effective config: {agent.name}
+            </p>
             <div className="mt-0.5 flex items-center gap-2">
               <AgentStatusBadge status={agent.status} />
-              <span className="text-[11px] text-zinc-400">{agent.outputFormat} output</span>
+              <span className="text-[11px] text-zinc-400">{effectiveOutputFormat} output</span>
             </div>
           </div>
         </div>

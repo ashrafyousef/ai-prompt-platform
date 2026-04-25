@@ -27,6 +27,40 @@ export function AgentReviewStep({
   onPublish: () => void;
   onGoBack: () => void;
 }) {
+  const readinessItems = [
+    {
+      label: "Identity configured",
+      ready: draft.name.trim().length > 0,
+      detail: draft.name.trim().length > 0 ? "Name is set." : "Add an agent name.",
+    },
+    {
+      label: "Behavior configured",
+      ready: draft.systemInstructions.trim().length > 0,
+      detail:
+        draft.systemInstructions.trim().length > 0
+          ? "Core instructions are present."
+          : "Add system instructions.",
+    },
+    {
+      label: "Scope assignment is sensible",
+      ready: draft.scope === "GLOBAL" || (draft.scope === "TEAM" && draft.teamId.trim().length > 0),
+      detail:
+        draft.scope === "TEAM" && draft.teamId.trim().length === 0
+          ? "Team scope selected without a team."
+          : draft.scope === "TEAM"
+          ? "Team scope is assigned."
+          : "Global scope selected.",
+    },
+    {
+      label: "Starter prompts (optional)",
+      ready: draft.starterPrompts.length > 0,
+      detail:
+        draft.starterPrompts.length > 0
+          ? `${draft.starterPrompts.length} prompt(s) configured.`
+          : "No prompts yet — chat will use a generic empty state.",
+    },
+  ];
+
   return (
     <div className="space-y-8">
       <div>
@@ -116,6 +150,31 @@ export function AgentReviewStep({
             )}
           </Section>
         </div>
+      </div>
+
+      <div className="rounded-2xl border border-zinc-200 bg-white px-5 py-4 dark:border-zinc-700 dark:bg-zinc-900/40">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          Publish readiness (informational)
+        </h3>
+        <ul className="mt-3 space-y-2">
+          {readinessItems.map((item) => (
+            <li key={item.label} className="flex items-start justify-between gap-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium text-zinc-800 dark:text-zinc-200">{item.label}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{item.detail}</p>
+              </div>
+              <span
+                className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                  item.ready
+                    ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                    : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300"
+                }`}
+              >
+                {item.ready ? "Ready" : "Needs attention"}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
 
       {/* Actions */}

@@ -62,6 +62,9 @@ export function AgentBehaviorStep({
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           Define <strong>how</strong> the agent responds. Knowledge is about <em>what</em> the agent knows (next step).
         </p>
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+          These settings feed the effective runtime prompt interpretation shown in detail/test views.
+        </p>
       </div>
 
       <Textarea

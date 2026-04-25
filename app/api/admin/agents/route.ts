@@ -44,6 +44,48 @@ function slugify(text: string): string {
     .slice(0, 80);
 }
 
+function toKnowledgeItems(
+  knowledgeSources:
+    | Array<{ type: string; title: string; content: string }>
+    | undefined
+) {
+  const items: Array<{
+    id: string;
+    title: string;
+    sourceType: "manual_text" | "txt";
+    content: string;
+    fileRef: null;
+    summary: string;
+    tags: string[];
+    priority: number;
+    appliesTo: "all";
+    isActive: true;
+    ownerNote: string;
+    lastReviewedAt: null;
+    processingStatus: "ready";
+  }> = [];
+  (knowledgeSources ?? []).forEach((source, index) => {
+      const content = source.content?.trim() ?? "";
+      if (!content) return;
+      items.push({
+        id: `k-${index + 1}`,
+        title: source.title?.trim() || `Knowledge block ${index + 1}`,
+        sourceType: source.type === "file" ? "txt" : "manual_text",
+        content,
+        fileRef: null,
+        summary: "",
+        tags: [],
+        priority: 3,
+        appliesTo: "all",
+        isActive: true,
+        ownerNote: "",
+        lastReviewedAt: null,
+        processingStatus: "ready",
+      });
+    });
+  return items;
+}
+
 export async function POST(req: NextRequest) {
   try {
     await requireAdminUserId();
@@ -85,6 +127,51 @@ export async function POST(req: NextRequest) {
             required: body.jsonSchema.filter((f) => f.required).map((f) => f.name),
           }
         : null;
+    const knowledgeItems = toKnowledgeItems(body.knowledgeSources);
+    const starterPrompts = (body.starterPrompts ?? []).map((p) => p.trim()).filter(Boolean);
+    const outputConfig = {
+      format: outputFormat,
+      requiredSections:
+        body.outputMode === "structured-markdown"
+          ? (body.structuredSections ?? [])
+              .map((section) => section.title.trim())
+              .filter(Boolean)
+          : [],
+      responseDepth: "standard",
+      citationsPolicy: "none",
+      fallbackBehavior:
+        "Provide a best-effort response in markdown when strict formatting cannot be satisfied.",
+      template:
+        body.outputMode === "template" && body.templateText?.trim()
+          ? body.templateText.trim()
+          : null,
+      schema: outputSchema,
+    };
+    const canonicalInputSchema = {
+      version: 2,
+      starterPrompts,
+      knowledgeItems,
+      // Compatibility for older read paths still inspecting `inputSchema.knowledge`.
+      knowledge: knowledgeItems.map((item) => ({
+        type: item.sourceType,
+        title: item.title,
+        content: item.content,
+      })),
+      outputConfig,
+      meta: {
+        identity: {
+          icon: body.icon?.trim() ? body.icon.trim() : null,
+          category: body.category?.trim() ? body.category.trim() : null,
+        },
+        behavior: {
+          behaviorRules: body.behaviorRules?.trim() ?? "",
+          toneGuidance: body.toneGuidance?.trim() ?? "",
+          avoidRules: body.avoidRules?.trim() ?? "",
+          strictMode: body.strictMode ?? false,
+          importMethod: null,
+        },
+      },
+    };
 
     const isPublished = body.status === "PUBLISHED";
 
@@ -94,11 +181,7 @@ export async function POST(req: NextRequest) {
         name: body.name.trim(),
         description: body.description ?? null,
         systemPrompt,
-        inputSchema: body.knowledgeSources?.length
-          ? { knowledge: body.knowledgeSources, starterPrompts: body.starterPrompts ?? [] }
-          : body.starterPrompts?.length
-          ? { starterPrompts: body.starterPrompts }
-          : undefined,
+        inputSchema: canonicalInputSchema,
         outputFormat: outputFormat as "markdown" | "json" | "template",
         outputSchema: outputSchema ?? undefined,
         temperature: body.temperature ?? 0.4,

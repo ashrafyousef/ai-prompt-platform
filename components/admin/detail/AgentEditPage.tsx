@@ -125,11 +125,12 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
       systemPrompt: agent.systemPrompt,
       temperature: agent.temperature,
       maxTokens: agent.maxTokens,
-      outputFormat: agent.outputFormat,
+      outputFormat: agent.effectiveConfig?.outputConfig.format ?? agent.outputFormat,
       scope: agent.scope,
       teamId: agent.teamId ?? "",
       status: agent.status,
-      starterPrompts: ((agent.inputSchema as Record<string, unknown>)?.starterPrompts as string[]) ?? [],
+      starterPrompts:
+        (agent.effectiveConfig?.starterPrompts ?? []).map((prompt) => prompt.prompt) ?? [],
     };
     setForm(init);
     initialSnapshot.current = JSON.stringify(init);
@@ -213,6 +214,9 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
       />
 
       <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-50">Edit {agent.name}</h1>
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        Detail and test views show the <span className="font-medium">effective normalized configuration</span> used for runtime interpretation.
+      </div>
 
       {/* Tabs */}
       <div className="-mx-1 flex gap-0.5 overflow-x-auto border-b border-zinc-200 px-1 dark:border-zinc-800">
@@ -298,7 +302,7 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
           <div className="space-y-4">
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-900">
               <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                Knowledge sources are managed through the agent creation wizard. Inline editing will be supported in a future update.
+                Knowledge is shown here as an effective snapshot for review. Inline editing is currently managed in the create/import workflow.
               </p>
             </div>
             {(() => {

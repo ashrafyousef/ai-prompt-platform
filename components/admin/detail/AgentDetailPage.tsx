@@ -53,6 +53,9 @@ export function AgentDetailPage({ agentId }: { agentId: string }) {
       />
 
       <AgentDetailHeader agent={agent} onPatch={patchAgent} onDuplicate={duplicateAgent} />
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+        Detail summaries on this page reflect the <span className="font-medium">effective normalized configuration</span> used for runtime interpretation.
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">

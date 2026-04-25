@@ -73,6 +73,9 @@ export function AgentKnowledgeStep({
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           Provide reference material the agent should know. This is optional — you can add knowledge later.
         </p>
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+          Added sources are normalized into the effective knowledge configuration used by runtime interpretation.
+        </p>
       </div>
 
       {/* Mode switch */}

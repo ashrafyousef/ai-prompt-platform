@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireAdminUserId } from "@/lib/adminAuth";
 import { createChatCompletion } from "@/lib/openai/client";
-import { normalizeAgentInputSchema } from "@/lib/agentConfig";
+import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
 import type { AgentKnowledgeItem, AgentOutputConfig } from "@/lib/agentConfig";
 
 const testSchema = z.object({
@@ -68,13 +68,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
 
-    const normalized = normalizeAgentInputSchema(agent.inputSchema);
-    const activeKnowledge = normalized.knowledgeItems.filter((i) => i.isActive);
+    const effective = buildEffectiveAgentConfig(agent);
+    const activeKnowledge = effective.knowledgeItems.filter((i) => i.isActive);
 
     const enrichedSystemPrompt = [
       agent.systemPrompt,
-      buildKnowledgeBlock(normalized.knowledgeItems),
-      buildOutputInstructions(normalized.outputConfig),
+      buildKnowledgeBlock(effective.knowledgeItems),
+      buildOutputInstructions(effective.outputConfig),
     ].join("");
 
     const messages: Array<{ role: "system" | "user"; content: string }> = [
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const durationMs = Date.now() - startMs;
 
     let schemaValid: boolean | null = null;
-    if (normalized.outputConfig.format === "json") {
+    if (effective.outputConfig.format === "json") {
       try {
         JSON.parse(response);
         schemaValid = true;
@@ -104,16 +104,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         response,
         durationMs,
         model: "auto",
-        outputFormat: normalized.outputConfig.format,
+        outputFormat: effective.outputConfig.format,
         schemaValid,
         configSummary: {
           knowledgeCount: activeKnowledge.length,
-          knowledgeTotal: normalized.knowledgeItems.length,
-          outputFormat: normalized.outputConfig.format,
-          responseDepth: normalized.outputConfig.responseDepth,
-          citationsPolicy: normalized.outputConfig.citationsPolicy,
-          requiredSections: normalized.outputConfig.requiredSections,
-          hasTemplate: Boolean(normalized.outputConfig.template?.trim()),
+          knowledgeTotal: effective.knowledgeItems.length,
+          outputFormat: effective.outputConfig.format,
+          responseDepth: effective.outputConfig.responseDepth,
+          citationsPolicy: effective.outputConfig.citationsPolicy,
+          requiredSections: effective.outputConfig.requiredSections,
+          hasTemplate: Boolean(effective.outputConfig.template?.trim()),
         },
       },
     });

@@ -41,6 +41,9 @@ export function AgentOutputStep({
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
           Control the format and structure of the agent&apos;s responses.
         </p>
+        <p className="mt-1 text-xs text-zinc-400 dark:text-zinc-500">
+          These rules become the effective output configuration used by detail/test/runtime interpretation.
+        </p>
       </div>
 
       {/* Mode select */}
