@@ -177,7 +177,7 @@ export function ChatComposer({
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className={`relative mx-auto w-full max-w-3xl rounded-[32px] p-3 shadow-none transition-colors ${
+      className={`relative mx-auto w-full max-w-3xl rounded-[30px] p-2.5 shadow-none transition-colors ${
         dragging
           ? "bg-violet-100 ring-2 ring-violet-400 dark:bg-violet-950/40 dark:ring-violet-500"
           : "bg-zinc-100 dark:bg-[#1e1e1e]"
@@ -191,7 +191,7 @@ export function ChatComposer({
         </div>
       ) : null}
       {modeLabel ? (
-        <div className="mb-2 flex items-center justify-between rounded-2xl bg-amber-100/50 px-4 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+        <div className="mb-2 flex items-center justify-between rounded-2xl bg-amber-100/50 px-3.5 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
           <span>{modeLabel}</span>
           {onCancelMode ? (
             <button type="button" onClick={onCancelMode} className="underline hover:no-underline">
@@ -260,11 +260,11 @@ export function ChatComposer({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="mb-2 max-h-44 min-h-[48px] w-full resize-none overflow-y-hidden bg-transparent px-4 py-3 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-500 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400"
+        className="mb-1.5 max-h-44 min-h-[48px] w-full resize-none overflow-y-hidden bg-transparent px-4 py-2.5 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-500 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400"
         placeholder={placeholderText ?? "Ask Assistant..."}
         disabled={disabled}
       />
-      <div className="flex items-center justify-between px-2 pb-1">
+      <div className="flex items-end justify-between gap-2.5 px-2 pb-1">
         <input
           ref={fileInputRef}
           type="file"
@@ -284,15 +284,15 @@ export function ChatComposer({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="flex items-center justify-center rounded-full p-2.5 text-zinc-600 transition hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
+            className="flex items-center justify-center rounded-full p-2 text-zinc-600 transition hover:bg-zinc-200 dark:text-zinc-400 dark:hover:bg-zinc-800"
             title="Attach file"
             aria-label="Attach image"
           >
             <Plus className="h-5 w-5" />
           </button>
         </div>
-        
-        <div className="flex flex-wrap items-center gap-2">
+
+        <div className="flex flex-wrap items-center justify-end gap-2 pl-1">
           {onModelRoutingModeChange ? (
             <label className="flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
               <span className="sr-only">Routing</span>
@@ -302,7 +302,7 @@ export function ChatComposer({
                   onModelRoutingModeChange(e.target.value as "manual" | "auto" | "suggested")
                 }
                 disabled={disabled}
-                className="max-w-[128px] rounded-lg border border-zinc-200 bg-white px-1.5 py-1 text-[11px] text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
+                className="max-w-[124px] rounded-lg border border-zinc-200 bg-white px-1.5 py-1 text-[11px] text-zinc-800 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
               >
                 <option value="manual">Manual</option>
                 <option value="auto">Auto</option>
@@ -311,7 +311,7 @@ export function ChatComposer({
             </label>
           ) : null}
           {lastRouteMeta?.routerMode === "auto" && lastRouteMeta.routedModelId ? (
-            <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+            <span className="max-w-[10rem] truncate text-[10px] text-zinc-500 dark:text-zinc-400" title={`Routed: ${models.find((m) => m.id === lastRouteMeta.routedModelId)?.displayName ?? lastRouteMeta.routedModelId}`}>
               Routed:{" "}
               {models.find((m) => m.id === lastRouteMeta.routedModelId)?.displayName ??
                 lastRouteMeta.routedModelId}
