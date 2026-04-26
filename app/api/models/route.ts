@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authErrorStatus, requireAuthorizedUserContext } from "@/lib/auth";
 import { detectProvider, ROLE_LIMITS, type UserRole } from "@/lib/models";
 import { getPlatformModelGovernance, resolvePlatformModelDefaults } from "@/lib/platformModelGovernance";
 import { getRecentRateLimitAdvisory } from "@/lib/modelHealthHints";
@@ -8,18 +7,14 @@ import { getGovernedModelsForUser } from "@/lib/usage";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const role = (session.user.role ?? "USER") as UserRole;
+    const auth = await requireAuthorizedUserContext();
+    const role = auth.role as UserRole;
     const provider = detectProvider();
     const limits = ROLE_LIMITS[role] ?? ROLE_LIMITS.USER;
     const { models, snapshot } = await getGovernedModelsForUser({
-      userId: session.user.id,
+      userId: auth.userId,
       userRole: role,
-      teamId: session.user.teamId ?? null,
+      teamId: auth.teamId,
     });
     const { defaultModelId, fallbackModelId } = resolvePlatformModelDefaults(models);
     const platform = getPlatformModelGovernance();
@@ -61,7 +56,10 @@ export async function GET() {
         configuredFallbackModelId: platform.systemModelPolicy.fallbackModelId,
       },
     });
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: authErrorStatus(error, 500) }
+    );
   }
 }

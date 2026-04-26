@@ -7,12 +7,15 @@
  */
 import { pickFirstCompatibleGovernedModel } from "@/lib/agentModelGovernance";
 import {
+  AGENT_SELECTABLE_CAPABILITIES,
   effectiveRequiresStructuredOutput,
+  mergeAgentModelPreferences,
   missingRequiredCapabilities,
   type AgentModelPreferences,
   type AgentSelectableCapability,
   type ModelPreferenceFallbackBehavior,
 } from "@/lib/agentModelPolicy";
+import { modelMeetsAgentConstraints } from "@/lib/modelRouter";
 import { MODEL_CAPABILITY_LABELS } from "@/lib/modelUiLabels";
 import type { UiAgent, UiModelSummary } from "@/lib/types";
 
@@ -21,6 +24,54 @@ export const CHAT_EST_CHARS_PER_TOKEN = 4;
 
 export function estTokensFromChars(chars: number): number {
   return Math.ceil(Math.max(0, chars) / CHAT_EST_CHARS_PER_TOKEN);
+}
+
+/**
+ * Same threshold as `app/api/chat/send` → `routeModel` (`needsLongContextHeuristic`).
+ * Keeps client pre-send checks aligned with manual routing.
+ */
+export const CHAT_SEND_LONG_CONTEXT_CHAR_THRESHOLD = 14_000;
+
+export function chatSendNeedsLongContextHeuristic(textCharLength: number): boolean {
+  return textCharLength > CHAT_SEND_LONG_CONTEXT_CHAR_THRESHOLD;
+}
+
+/** Build prefs slice used by chat from flattened `UiAgent` (GET /api/agents). */
+export function modelPreferencesFromUiAgent(agent: UiAgent): AgentModelPreferences {
+  const caps = (agent.requiredCapabilities ?? []).filter((c): c is AgentSelectableCapability =>
+    (AGENT_SELECTABLE_CAPABILITIES as readonly string[]).includes(c)
+  );
+  return mergeAgentModelPreferences(
+    {
+      preferredModelId: agent.preferredModelId ?? null,
+      allowedModelIds: agent.allowedModelIds ?? [],
+      requiresStructuredOutput: agent.requiresStructuredOutput ?? null,
+      requiredCapabilities: caps,
+      fallbackBehavior: agent.modelPreferenceFallbackBehavior ?? "suggest_compatible",
+    },
+    {}
+  );
+}
+
+/**
+ * True if this governed model would fail `routeModel` manual selection for the same inputs
+ * (mirrors `modelMeetsAgentConstraints` + send-route heuristic flags).
+ */
+export function modelFailsManualRouterForChat(
+  model: UiModelSummary,
+  agent: UiAgent | undefined,
+  input: {
+    outputFormat: string | null | undefined;
+    textCharLength: number;
+    imageAttachmentCount: number;
+  }
+): boolean {
+  if (!agent || !model.enabled) return false;
+  const mp = modelPreferencesFromUiAgent(agent);
+  const needsVision = input.imageAttachmentCount > 0;
+  const needsStructured = effectiveRequiresStructuredOutput(mp, input.outputFormat ?? "markdown");
+  const needsLongContext = chatSendNeedsLongContextHeuristic(input.textCharLength);
+  return !modelMeetsAgentConstraints(model, mp, needsVision, needsStructured, needsLongContext);
 }
 
 export type ChatCompatibilityIssue = {
@@ -127,10 +178,10 @@ export function computeModelCompatibilityIssues(input: CompatibilityComputeInput
 
     const suggested = pickSuggestedGoverned((m) => m.capabilities.includes(cap));
     const label = MODEL_CAPABILITY_LABELS[cap] ?? cap;
-    const blocking = shouldBlockMissingRequiredCapability(cap, fallback);
+    // Match `modelMeetsAgentConstraints` (manual routing): every listed required capability must be present.
     issues.push({
       id: `agent-required-cap-${cap}`,
-      severity: blocking ? "blocking" : "warning",
+      severity: "blocking",
       message: `${activeAgent?.name ?? "This agent"} requires ${label} for this configuration.`,
       suggestedModelId: suggested?.id,
       suggestedModelName: suggested?.displayName,
@@ -175,6 +226,36 @@ export function computeModelCompatibilityIssues(input: CompatibilityComputeInput
         message: `${activeAgent.name} has a preferred model that is not available for your role, budget, or runtime.`,
       });
     }
+  }
+
+  const hasBlocking = issues.some((i) => i.severity === "blocking");
+  if (activeAgent && !hasBlocking && modelFailsManualRouterForChat(selected, activeAgent, {
+    outputFormat: activeAgent.outputFormat,
+    textCharLength,
+    imageAttachmentCount,
+  })) {
+    const suggested = pickFirstCompatibleGovernedModel(models, {
+      allowedModelIds: activeAgent.allowedModelIds,
+      predicate: (m) =>
+        !modelFailsManualRouterForChat(m, activeAgent, {
+          outputFormat: activeAgent.outputFormat,
+          textCharLength,
+          imageAttachmentCount,
+        }),
+    });
+    const longPrompt = chatSendNeedsLongContextHeuristic(textCharLength);
+    const lacksLong = !selected.capabilities.includes("long_context");
+    const detail =
+      longPrompt && lacksLong
+        ? `This message is long (over ~${CHAT_SEND_LONG_CONTEXT_CHAR_THRESHOLD.toLocaleString()} characters). Pick a model with Long context, or shorten the prompt.`
+        : "Selected model does not meet this agent’s requirements.";
+    issues.push({
+      id: "manual-router-parity",
+      severity: "blocking",
+      message: detail,
+      suggestedModelId: suggested?.id,
+      suggestedModelName: suggested?.displayName,
+    });
   }
 
   return issues;

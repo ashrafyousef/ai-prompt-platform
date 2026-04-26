@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { randomUUID } from "crypto";
-import { requireUserId } from "@/lib/auth";
+import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 const schema = z.object({
@@ -10,7 +10,7 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await requireUserId();
+    const { userId } = await requireUserIdWithWorkspace();
     const payload = schema.parse(await req.json());
 
     const session = await db.chatSession.findFirst({
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create share link." },
-      { status: 400 }
+      { status: authErrorStatus(error, 400) }
     );
   }
 }

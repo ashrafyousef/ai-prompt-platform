@@ -16,14 +16,15 @@ import {
 
 const mainNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/admin/members", label: "Members", icon: Users, exact: false },
+  { href: "/admin/teams", label: "Teams", icon: Users, exact: false },
   { href: "/admin/agents", label: "Agents", icon: Bot, exact: false },
+  { href: "/admin/knowledge", label: "Knowledge", icon: BookOpen, exact: false },
   { href: "/admin/agents/import", label: "Import Agent", icon: Upload, exact: true },
   { href: "/admin/agents/new", label: "Create Agent", icon: Plus, exact: true },
 ];
 
 const futureNav = [
-  { href: "#", label: "Knowledge", icon: BookOpen, disabled: true },
-  { href: "#", label: "Teams", icon: Users, disabled: true },
   { href: "#", label: "Analytics", icon: BarChart3, disabled: true },
 ];
 

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   try {
-    const userId = await requireUserId();
+    const { userId } = await requireUserIdWithWorkspace();
     const sessionId = req.nextUrl.searchParams.get("sessionId");
     const search = req.nextUrl.searchParams.get("search")?.trim();
 
@@ -39,14 +39,14 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to get history." },
-      { status: 401 }
+      { status: authErrorStatus(error, 401) }
     );
   }
 }
 
 export async function DELETE(req: NextRequest) {
   try {
-    const userId = await requireUserId();
+    const { userId } = await requireUserIdWithWorkspace();
     const sessionId = req.nextUrl.searchParams.get("sessionId");
     if (!sessionId) {
       return NextResponse.json({ error: "sessionId is required." }, { status: 400 });
@@ -65,7 +65,7 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete session." },
-      { status: 400 }
+      { status: authErrorStatus(error, 400) }
     );
   }
 }

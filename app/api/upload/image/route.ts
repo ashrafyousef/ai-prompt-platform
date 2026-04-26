@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
-import { requireUserId } from "@/lib/auth";
+import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await requireUserId();
+    const { userId } = await requireUserIdWithWorkspace();
     const limit = await checkRateLimit({
       userId,
       endpoint: "/api/upload/image",
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Upload failed." },
-      { status: 401 }
+      { status: authErrorStatus(error, 401) }
     );
   }
 }

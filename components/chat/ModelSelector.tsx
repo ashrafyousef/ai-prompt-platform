@@ -20,6 +20,8 @@ export function ModelSelector({
   hasImages,
   /** Compact agent-specific model expectations; keep short — shown under the control. */
   agentHint,
+  /** When set, rows that would fail manual routing for this agent + current draft are disabled. */
+  agentModelIncompatible,
 }: {
   selectedModelId: string;
   onModelChange: (id: string) => void;
@@ -29,6 +31,7 @@ export function ModelSelector({
   disabled?: boolean;
   hasImages?: boolean;
   agentHint?: string | null;
+  agentModelIncompatible?: (model: UiModelSummary) => boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -50,7 +53,8 @@ export function ModelSelector({
   function renderModelRow(model: UiModelSummary) {
     const isActive = model.id === selectedModelId;
     const imageIncompatible = hasImages && !model.visionCapable;
-    const isDisabled = !model.enabled || Boolean(imageIncompatible);
+    const agentIncompatible = Boolean(agentModelIncompatible?.(model));
+    const isDisabled = !model.enabled || Boolean(imageIncompatible) || agentIncompatible;
 
     return (
       <button
@@ -103,7 +107,12 @@ export function ModelSelector({
               Selected attachments require a Vision-capable model.
             </p>
           ) : null}
-          {!imageIncompatible && !model.enabled && model.disabledReason ? (
+          {!imageIncompatible && agentIncompatible ? (
+            <p className="mt-0.5 text-[10px] text-amber-700 dark:text-amber-400">
+              Not compatible with this assistant for your current message.
+            </p>
+          ) : null}
+          {!imageIncompatible && !agentIncompatible && !model.enabled && model.disabledReason ? (
             <p className="mt-0.5 text-[10px] text-zinc-500 dark:text-zinc-400">{model.disabledReason}</p>
           ) : null}
           {model.healthAdvisory?.status === "recently_rate_limited" ? (

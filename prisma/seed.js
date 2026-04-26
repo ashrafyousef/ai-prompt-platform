@@ -1,8 +1,28 @@
 const { PrismaClient } = require("@prisma/client");
+const bcrypt = require("bcryptjs");
 
 const prisma = new PrismaClient();
 
+function slugifyWorkspaceName(name) {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 48);
+  return base.length > 0 ? base : "workspace";
+}
+
 async function main() {
+  const wsName = process.env.ADMIN_SEED_WORKSPACE_NAME || "Default";
+  const baseSlug = slugifyWorkspaceName(wsName);
+  const workspaceSlug = `${baseSlug}-seed-root`;
+  const workspace = await prisma.workspace.upsert({
+    where: { slug: workspaceSlug },
+    update: { name: wsName },
+    create: { name: wsName, slug: workspaceSlug },
+  });
+
   const teams = [
     { slug: "product", name: "Product" },
     { slug: "marketing", name: "Marketing" },
@@ -13,8 +33,11 @@ async function main() {
   for (const t of teams) {
     const row = await prisma.team.upsert({
       where: { slug: t.slug },
-      update: { name: t.name },
-      create: t,
+      update: { name: t.name, workspaceId: workspace.id },
+      create: {
+        ...t,
+        workspaceId: workspace.id,
+      },
     });
     teamRows[t.slug] = row;
   }
@@ -31,6 +54,7 @@ async function main() {
       maxTokens: 900,
       status: "PUBLISHED",
       scope: "TEAM",
+      workspaceId: workspace.id,
       teamId: teamRows.design.id,
     },
     {
@@ -44,6 +68,7 @@ async function main() {
       maxTokens: 900,
       status: "PUBLISHED",
       scope: "GLOBAL",
+      workspaceId: workspace.id,
       teamId: null,
     },
     {
@@ -66,6 +91,7 @@ async function main() {
       maxTokens: 700,
       status: "DRAFT",
       scope: "GLOBAL",
+      workspaceId: workspace.id,
       teamId: null,
       isEnabled: false,
     },
@@ -80,6 +106,7 @@ async function main() {
       maxTokens: 1000,
       status: "PUBLISHED",
       scope: "TEAM",
+      workspaceId: workspace.id,
       teamId: teamRows.marketing.id,
     },
   ];
@@ -93,16 +120,38 @@ async function main() {
   }
 
   const demoEmail = process.env.ADMIN_SEED_EMAIL || "demo@example.com";
-  await prisma.user.upsert({
+  const seedPassword = process.env.ADMIN_SEED_PASSWORD;
+  const passwordHash = seedPassword ? await bcrypt.hash(seedPassword, 12) : null;
+
+  const demoUser = await prisma.user.upsert({
     where: { email: demoEmail },
-    update: { role: "ADMIN", teamId: teamRows.design.id },
+    update: {
+      role: "ADMIN",
+      teamId: teamRows.design.id,
+      ...(passwordHash ? { passwordHash } : {}),
+    },
     create: {
       email: demoEmail,
       name: "demo",
       role: "ADMIN",
       teamId: teamRows.design.id,
+      ...(passwordHash ? { passwordHash } : {}),
     },
   });
+
+  const existingMember = await prisma.workspaceMember.findFirst({
+    where: { userId: demoUser.id, workspaceId: workspace.id },
+  });
+  if (!existingMember) {
+    await prisma.workspaceMember.create({
+      data: {
+        userId: demoUser.id,
+        workspaceId: workspace.id,
+        role: "OWNER",
+        teamId: teamRows.design.id,
+      },
+    });
+  }
 }
 
 main()

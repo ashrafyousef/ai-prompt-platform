@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
-import { signIn, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { status } = useSession();
@@ -23,15 +24,15 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center">
+    <main className="flex min-h-screen items-center justify-center bg-zinc-50 px-4 dark:bg-zinc-950">
       <div className="text-center">
-        <p className="mb-3 text-sm text-zinc-500">Sign in is required to access chat.</p>
-        <button
-          onClick={() => signIn("credentials", { email: "demo@example.com", callbackUrl: "/chat" })}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm text-white"
+        <p className="mb-3 text-sm text-zinc-600 dark:text-zinc-400">Sign in is required to access chat.</p>
+        <Link
+          href="/sign-in?callbackUrl=%2Fchat"
+          className="inline-block rounded-md bg-zinc-900 px-4 py-2 text-sm text-white hover:bg-zinc-800 dark:bg-white dark:text-zinc-900 dark:hover:bg-zinc-200"
         >
-          Sign in as demo user
-        </button>
+          Go to sign in
+        </Link>
       </div>
     </main>
   );

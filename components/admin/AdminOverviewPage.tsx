@@ -86,6 +86,13 @@ export function AdminOverviewPage() {
               Import agent
             </Link>
             <Link
+              href="/admin/members"
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-900"
+            >
+              <List className="h-4 w-4" />
+              Manage members
+            </Link>
+            <Link
               href="/admin/agents"
               className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 px-4 py-3 text-sm font-medium text-zinc-900 transition hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-900"
             >

@@ -1,4 +1,5 @@
 import type { AgentModelPreferences } from "@/lib/agentModelPolicy";
+import type { Prisma } from "@prisma/client";
 import {
   normalizeAgentInputSchema,
   type AgentKnowledgeItem,
@@ -7,11 +8,30 @@ import {
 import { effectiveRequiresStructuredOutput } from "@/lib/agentModelPolicy";
 import { parseStarterPromptsFromAgentInputSchema } from "@/lib/chatStarterPrompts";
 import type { UiStarterPrompt } from "@/lib/types";
+import { resolveEffectiveAgentKnowledge } from "@/lib/knowledgeRepository";
 
 type AgentConfigLike = {
   inputSchema: unknown;
   outputFormat: "markdown" | "json" | "template";
   outputSchema: unknown;
+  knowledgeLinks?: Array<{
+    legacyItemId: string | null;
+    knowledge: {
+      id: string;
+      title: string;
+      sourceType: string;
+      content: string | null;
+      fileRef: Prisma.JsonValue | null;
+      summary: string;
+      tags: Prisma.JsonValue | null;
+      priority: number;
+      appliesTo: string;
+      isActive: boolean;
+      ownerNote: string;
+      lastReviewedAt: Date | null;
+      processingStatus: string;
+    };
+  }>;
 };
 
 export type EffectiveAgentConfig = {
@@ -63,7 +83,12 @@ export function buildEffectiveAgentConfig(agent: AgentConfigLike): EffectiveAgen
       };
 
   return {
-    knowledgeItems: normalized.knowledgeItems,
+    // Transitional dual-read truth (Phase 2.4):
+    // prefer relational links when present, fallback to legacy JSON knowledgeItems.
+    knowledgeItems: resolveEffectiveAgentKnowledge({
+      inputSchema: agent.inputSchema,
+      knowledgeLinks: agent.knowledgeLinks,
+    }),
     outputConfig,
     starterPrompts: parseStarterPromptsFromAgentInputSchema(
       agent.inputSchema,

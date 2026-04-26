@@ -6,7 +6,8 @@ import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { MessageList } from "@/components/chat/MessageList";
 import { ChatLayout } from "@/components/chat/ChatLayout";
 import { SavedPromptsPanel } from "@/components/chat/SavedPromptsPanel";
-import { signIn, useSession } from "next-auth/react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { useChatSession } from "@/components/chat/hooks/useChatSession";
 import { useChatStream } from "@/components/chat/hooks/useChatStream";
 import { useToast } from "@/components/ui/Toast";
@@ -244,12 +245,12 @@ export function ChatClient() {
               Session check is taking longer than expected. You can still continue.
             </p>
           ) : null}
-          <button
-            onClick={() => signIn("credentials", { email: "demo@example.com", callbackUrl: "/" })}
+          <Link
+            href="/sign-in?callbackUrl=%2Fchat"
             className="rounded-md bg-zinc-900 px-4 py-2 text-white hover:bg-zinc-700 dark:bg-white dark:text-zinc-900"
           >
-            Sign in as demo user
-          </button>
+            Sign in
+          </Link>
           <button
             onClick={() => window.location.reload()}
             className="text-xs text-zinc-500 underline hover:text-zinc-700"

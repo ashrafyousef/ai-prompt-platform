@@ -1,28 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireAdminUserId } from "@/lib/adminAuth";
+import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
 import { createChatCompletion } from "@/lib/openai/client";
 import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
-import type { AgentKnowledgeItem, AgentOutputConfig } from "@/lib/agentConfig";
+import type { AgentOutputConfig } from "@/lib/agentConfig";
+import { canManageAgentForActor } from "@/lib/agentScope";
+import { buildInjectedKnowledgeBlock, toKnowledgeInjectionTelemetry } from "@/lib/knowledgeInjection";
+import { logJson } from "@/lib/logger";
 
 const testSchema = z.object({
   prompt: z.string().min(1),
 });
-
-function buildKnowledgeBlock(items: AgentKnowledgeItem[]): string {
-  const active = items.filter((i) => i.isActive);
-  if (active.length === 0) return "";
-
-  const lines = active.map((item) => {
-    const body = item.content?.trim()
-      ? item.content.trim().slice(0, 2000)
-      : `[Uploaded file: ${item.fileRef?.fileName ?? "unknown"}]`;
-    return `### ${item.title}\nType: ${item.sourceType}\n${body}`;
-  });
-
-  return `\n\n---\nReference Knowledge:\n${lines.join("\n\n")}`;
-}
 
 function buildOutputInstructions(config: AgentOutputConfig): string {
   const parts: string[] = [];
@@ -60,20 +49,50 @@ function buildOutputInstructions(config: AgentOutputConfig): string {
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await requireAdminUserId();
+    const auth = await requireWorkspaceMemberManagerContext();
     const { prompt } = testSchema.parse(await req.json());
 
-    const agent = await db.agentConfig.findUnique({ where: { id: params.id } });
+    const agent = await db.agentConfig.findUnique({
+      where: { id: params.id },
+      include: {
+        knowledgeLinks: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            legacyItemId: true,
+            knowledge: {
+              select: {
+                id: true,
+                title: true,
+                sourceType: true,
+                content: true,
+                fileRef: true,
+                summary: true,
+                tags: true,
+                priority: true,
+                appliesTo: true,
+                isActive: true,
+                ownerNote: true,
+                lastReviewedAt: true,
+                processingStatus: true,
+              },
+            },
+          },
+        },
+      },
+    });
     if (!agent) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
+    if (!canManageAgentForActor(auth, agent)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
 
     const effective = buildEffectiveAgentConfig(agent);
-    const activeKnowledge = effective.knowledgeItems.filter((i) => i.isActive);
+    const knowledgeInjection = buildInjectedKnowledgeBlock(effective.knowledgeItems);
 
     const enrichedSystemPrompt = [
       agent.systemPrompt,
-      buildKnowledgeBlock(effective.knowledgeItems),
+      knowledgeInjection.block,
       buildOutputInstructions(effective.outputConfig),
     ].join("");
 
@@ -88,6 +107,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       maxTokens: agent.maxTokens,
     });
     const durationMs = Date.now() - startMs;
+    logJson("info", {
+      route: "/api/admin/agents/[id]/test",
+      status: "knowledge_injection",
+      agentId: agent.id,
+      knowledgeInjection: toKnowledgeInjectionTelemetry(knowledgeInjection.meta),
+    });
 
     let schemaValid: boolean | null = null;
     if (effective.outputConfig.format === "json") {
@@ -107,8 +132,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         outputFormat: effective.outputConfig.format,
         schemaValid,
         configSummary: {
-          knowledgeCount: activeKnowledge.length,
+          knowledgeCount: knowledgeInjection.meta.activeItems,
           knowledgeTotal: effective.knowledgeItems.length,
+          knowledgeInjectedItems: knowledgeInjection.meta.injectedItems,
+          knowledgeInjectedChars: knowledgeInjection.meta.injectedChars,
+          knowledgeTruncated: knowledgeInjection.meta.truncated,
           outputFormat: effective.outputConfig.format,
           responseDepth: effective.outputConfig.responseDepth,
           citationsPolicy: effective.outputConfig.citationsPolicy,

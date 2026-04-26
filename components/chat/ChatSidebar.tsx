@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Ellipsis, LogOut, Plus, Share2, Shield, Trash2, Zap } from "lucide-react";
+import { ChevronLeft, ChevronRight, Ellipsis, LogOut, Plus, Share2, Shield, Trash2, User, Zap } from "lucide-react";
 import { UiSession } from "@/lib/types";
 import { signOut, useSession } from "next-auth/react";
 import useSWR from "swr";
@@ -187,8 +187,8 @@ export function ChatSidebar({
                     key={session.id}
                     className={`group relative w-full rounded-md px-3 py-2 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
                       activeSessionId === session.id
-                        ? "bg-zinc-200 dark:bg-zinc-700"
-                        : "bg-zinc-100/80 hover:bg-zinc-200/70 dark:bg-zinc-800/80 dark:hover:bg-zinc-700/70"
+                        ? "bg-zinc-200 ring-1 ring-zinc-300 dark:bg-zinc-700 dark:ring-zinc-600"
+                        : "bg-zinc-100/70 hover:bg-zinc-200/80 dark:bg-zinc-800/70 dark:hover:bg-zinc-700/60"
                     }`}
                   >
                     {editingSessionId === session.id ? (
@@ -288,6 +288,14 @@ export function ChatSidebar({
         </button>
         {profileOpen ? (
           <div className="absolute bottom-11 left-0 right-0 z-20 rounded-md border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            <Link
+              href="/profile"
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              onClick={() => setProfileOpen(false)}
+            >
+              <User className="h-3.5 w-3.5" />
+              Profile
+            </Link>
             {session?.user?.role === "ADMIN" ? (
               <Link
                 href="/admin"

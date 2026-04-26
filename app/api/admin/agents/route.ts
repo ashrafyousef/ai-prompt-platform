@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import type { AgentScope, AgentStatus, Prisma } from "@prisma/client";
+import { AgentScope, type AgentStatus, type Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireAdminUserId } from "@/lib/adminAuth";
+import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import { assertCanAssignScopeForActor } from "@/lib/agentScope";
+import { replaceAgentKnowledgeFromInputSchema } from "@/lib/knowledgeRepository";
 
 /* ------------------------------------------------------------------ */
 /*  POST — create new agent from wizard                                */
@@ -88,8 +90,24 @@ function toKnowledgeItems(
 
 export async function POST(req: NextRequest) {
   try {
-    await requireAdminUserId();
+    const auth = await requireWorkspaceMemberManagerContext();
     const body = createSchema.parse(await req.json());
+    if (body.teamId) {
+      const team = await db.team.findUnique({
+        where: { id: body.teamId },
+        select: { id: true, workspaceId: true, isArchived: true },
+      });
+      if (!team || team.workspaceId !== auth.workspaceId || team.isArchived) {
+        return NextResponse.json({ error: "Team not found." }, { status: 400 });
+      }
+    }
+
+    const scoped = assertCanAssignScopeForActor(
+      auth,
+      (body.scope ?? "GLOBAL") as AgentScope,
+      body.teamId ?? null
+    );
+
 
     let slug = slugify(body.name);
     let n = 2;
@@ -175,23 +193,35 @@ export async function POST(req: NextRequest) {
 
     const isPublished = body.status === "PUBLISHED";
 
-    const created = await db.agentConfig.create({
-      data: {
-        slug,
-        name: body.name.trim(),
-        description: body.description ?? null,
-        systemPrompt,
-        inputSchema: canonicalInputSchema,
-        outputFormat: outputFormat as "markdown" | "json" | "template",
-        outputSchema: outputSchema ?? undefined,
-        temperature: body.temperature ?? 0.4,
-        maxTokens: body.maxTokens ?? 800,
-        isEnabled: isPublished,
-        status: (body.status ?? "DRAFT") as AgentStatus,
-        scope: (body.scope ?? "GLOBAL") as AgentScope,
-        teamId: body.teamId ?? null,
-      },
-      select: { id: true, name: true, slug: true, status: true },
+    const created = await db.$transaction(async (tx) => {
+      const next = await tx.agentConfig.create({
+        data: {
+          workspaceId: auth.workspaceId,
+          slug,
+          name: body.name.trim(),
+          description: body.description ?? null,
+          systemPrompt,
+          inputSchema: canonicalInputSchema,
+          outputFormat: outputFormat as "markdown" | "json" | "template",
+          outputSchema: outputSchema ?? undefined,
+          temperature: body.temperature ?? 0.4,
+          maxTokens: body.maxTokens ?? 800,
+          isEnabled: isPublished,
+          status: (body.status ?? "DRAFT") as AgentStatus,
+          scope: scoped.scope,
+          teamId: scoped.teamId,
+        },
+        select: { id: true, name: true, slug: true, status: true, workspaceId: true, teamId: true, inputSchema: true },
+      });
+
+      await replaceAgentKnowledgeFromInputSchema(tx, {
+        agentId: next.id,
+        workspaceId: next.workspaceId,
+        teamId: next.teamId ?? null,
+        inputSchema: next.inputSchema as Prisma.JsonValue | null,
+      });
+
+      return { id: next.id, name: next.name, slug: next.slug, status: next.status };
     });
 
     return NextResponse.json({ agent: created }, { status: 201 });
@@ -209,7 +239,7 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
-    await requireAdminUserId();
+    const auth = await requireWorkspaceMemberManagerContext();
     const { searchParams } = req.nextUrl;
     const q = searchParams.get("q")?.trim() ?? "";
     const status = searchParams.get("status");
@@ -217,13 +247,30 @@ export async function GET(req: NextRequest) {
     const teamId = searchParams.get("teamId");
     const sort = searchParams.get("sort") ?? "updatedAt_desc";
 
-    const where: Prisma.AgentConfigWhereInput = {};
-    if (q.length > 0) {
+    const where: Prisma.AgentConfigWhereInput = {
+      workspaceId: auth.workspaceId,
+    };
+
+    const scopedToTeam =
+      auth.workspaceRole === "ADMIN" && auth.platformRole !== "ADMIN";
+    if (scopedToTeam) {
       where.OR = [
+        { scope: AgentScope.GLOBAL },
+        ...(auth.teamId ? [{ scope: AgentScope.TEAM, teamId: auth.teamId }] : []),
+      ];
+    }
+    if (q.length > 0) {
+      const searchOr: Prisma.AgentConfigWhereInput[] = [
         { name: { contains: q, mode: "insensitive" } },
         { description: { contains: q, mode: "insensitive" } },
         { slug: { contains: q, mode: "insensitive" } },
       ];
+      if (where.OR && Array.isArray(where.OR)) {
+        where.AND = [{ OR: where.OR }, { OR: searchOr }];
+        delete where.OR;
+      } else {
+        where.OR = searchOr;
+      }
     }
     if (status && status !== "ALL") {
       where.status = status as AgentStatus;
