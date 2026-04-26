@@ -89,6 +89,11 @@ export function AgentReviewStep({
                 </span>
               ) : null}
             </div>
+            <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+              {draft.scope === "TEAM"
+                ? `Visibility is limited to the assigned team${draft.teamId ? "." : " (select a team before publishing)."}`
+                : "Visibility is workspace-wide across teams."}
+            </p>
           </Section>
         </div>
 

@@ -123,12 +123,21 @@ export function AgentIdentityStep({
           <select
             id="wiz-scope"
             value={draft.scope}
-            onChange={(e) => updateDraft({ scope: e.target.value as "TEAM" | "GLOBAL" })}
+            onChange={(e) => {
+              const nextScope = e.target.value as "TEAM" | "GLOBAL";
+              updateDraft({
+                scope: nextScope,
+                teamId: nextScope === "GLOBAL" ? "" : draft.teamId,
+              });
+            }}
             className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           >
             <option value="GLOBAL">Global</option>
             <option value="TEAM">Team</option>
           </select>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Global appears across the workspace. Team scope limits visibility to one assigned team.
+          </p>
         </div>
         <div>
           <label htmlFor="wiz-team" className="mb-1.5 block text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -138,6 +147,7 @@ export function AgentIdentityStep({
             id="wiz-team"
             value={draft.teamId}
             onChange={(e) => updateDraft({ teamId: e.target.value })}
+            disabled={draft.scope !== "TEAM"}
             className="w-full rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
           >
             <option value="">— None —</option>
@@ -147,6 +157,9 @@ export function AgentIdentityStep({
               </option>
             ))}
           </select>
+          <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+            Required only for Team scope.
+          </p>
         </div>
       </div>
 

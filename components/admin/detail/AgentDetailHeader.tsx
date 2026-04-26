@@ -54,6 +54,7 @@ export function AgentDetailHeader({
   const isPublished = agent.status === "PUBLISHED";
   const isArchived = agent.status === "ARCHIVED";
   const isDraft = agent.status === "DRAFT";
+  const knowledgeCount = agent.effectiveConfig?.knowledgeItems?.length ?? 0;
 
   return (
     <>
@@ -85,9 +86,20 @@ export function AgentDetailHeader({
               : "Archived agents are hidden from chat and kept for reference."}
             {" "}
             {agent.scope === "TEAM"
-              ? "Team scope limits visibility to members of the assigned team."
+              ? `Team scope limits visibility to members of ${agent.team?.name ?? "the assigned team"}.`
               : "Global scope makes the agent available across teams."}
           </p>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Duplicated agents keep the same scope and team assignment by default.
+          </p>
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            Knowledge remains attached to the agent; scope and team settings determine who can access that context in chat.
+          </p>
+          {knowledgeCount > 0 ? (
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              This agent currently includes {knowledgeCount} knowledge source{knowledgeCount === 1 ? "" : "s"}.
+            </p>
+          ) : null}
         </div>
 
         <div className="flex flex-wrap gap-2 shrink-0">
@@ -103,7 +115,15 @@ export function AgentDetailHeader({
 
           {isDraft ? (
             <button
-              onClick={() => void act("pub", { status: "PUBLISHED" }, "Agent published")}
+              onClick={() => {
+                const confirmed = window.confirm(
+                  `Publish "${agent.name}" for ${
+                    agent.scope === "TEAM" ? agent.team?.name ?? "the assigned team" : "workspace-wide"
+                  } chat visibility?`
+                );
+                if (!confirmed) return;
+                void act("pub", { status: "PUBLISHED" }, "Agent published");
+              }}
               disabled={!!busy}
               className="inline-flex items-center gap-1.5 rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:opacity-50"
             >
@@ -114,7 +134,13 @@ export function AgentDetailHeader({
 
           {isArchived ? (
             <button
-              onClick={() => void act("restore", { status: "DRAFT" }, "Agent restored to draft")}
+              onClick={() => {
+                const confirmed = window.confirm(
+                  `Restore "${agent.name}" to draft? It will remain hidden until published again.`
+                );
+                if (!confirmed) return;
+                void act("restore", { status: "DRAFT" }, "Agent restored to draft");
+              }}
               disabled={!!busy}
               className={btnOutline}
             >
@@ -137,7 +163,7 @@ export function AgentDetailHeader({
 
           <button onClick={handleDuplicate} disabled={!!busy} className={btnOutline}>
             {busy === "dup" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Copy className="h-3.5 w-3.5" />}
-            Duplicate
+            Duplicate (keep scope)
           </button>
         </div>
       </div>
@@ -155,7 +181,9 @@ export function AgentDetailHeader({
             <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
               {confirm === "archive"
                 ? "Archived agents are hidden from all users. You can restore it later from this page."
-                : "This agent will revert to draft status and won't be available to users until republished."}
+                : `This agent will revert to draft status and won't be available to ${
+                    agent.scope === "TEAM" ? agent.team?.name ?? "its assigned team" : "workspace users"
+                  } until republished.`}
             </p>
             <div className="mt-6 flex justify-end gap-3">
               <button
