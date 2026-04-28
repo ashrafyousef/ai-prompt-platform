@@ -3,10 +3,22 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  const token = await getToken({
+  const secureCookie = request.nextUrl.protocol === "https:";
+  let token = await getToken({
     req: request,
     secret: process.env.NEXTAUTH_SECRET,
+    secureCookie,
   });
+
+  // Edge/runtime fallback: explicitly read secure session-token cookie when auto-detection misses it.
+  if (!token && secureCookie) {
+    token = await getToken({
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: true,
+      cookieName: "__Secure-next-auth.session-token",
+    });
+  }
 
   const { pathname } = request.nextUrl;
   const isProtected =
@@ -25,6 +37,11 @@ export async function middleware(request: NextRequest) {
   if (isProtected && token && !token.workspaceId) {
     const noWorkspace = new URL("/no-workspace", request.url);
     return NextResponse.redirect(noWorkspace);
+  }
+
+  if (pathname.startsWith("/admin") && token?.role !== "ADMIN") {
+    const unauthorized = new URL("/unauthorized", request.url);
+    return NextResponse.redirect(unauthorized);
   }
 
   return NextResponse.next();

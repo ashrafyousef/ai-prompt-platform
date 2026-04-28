@@ -66,27 +66,20 @@ function SignInForm() {
     setError(null);
     setLoading(true);
     try {
-      console.log("[sign-in] submitting credentials", {
-        email: email.trim().toLowerCase(),
-        callbackUrl,
-      });
       const result = await signIn("credentials", {
         email: email.trim().toLowerCase(),
         password,
         redirect: false,
         callbackUrl,
       });
-      console.log("[sign-in] signIn result", result);
       if (result?.error) {
         setError("Invalid email or password.");
         return;
       }
       const targetUrl =
         normalizeResultUrl(result?.url) ?? normalizeCallbackUrl(callbackUrl) ?? "/chat";
-      console.log("[sign-in] navigating", { targetUrl });
       window.location.assign(targetUrl);
-    } catch (error) {
-      console.log("[sign-in] caught error", error);
+    } catch {
       // Handle known NextAuth redirect:false URL parsing edge case defensively.
       window.location.assign(normalizeCallbackUrl(callbackUrl) || "/chat");
     } finally {
