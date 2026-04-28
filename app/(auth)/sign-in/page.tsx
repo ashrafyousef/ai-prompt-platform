@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState, Suspense } from "react";
@@ -47,7 +47,6 @@ function SignUpLink() {
 }
 
 function SignInForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = normalizeCallbackUrl(searchParams.get("callbackUrl"));
   const signInError = searchParams.get("error");
@@ -79,10 +78,10 @@ function SignInForm() {
       }
       const targetUrl =
         normalizeResultUrl(result?.url) ?? normalizeCallbackUrl(callbackUrl) ?? "/chat";
-      router.replace(targetUrl);
+      window.location.assign(targetUrl);
     } catch {
       // Handle known NextAuth redirect:false URL parsing edge case defensively.
-      router.replace(normalizeCallbackUrl(callbackUrl) || "/chat");
+      window.location.assign(normalizeCallbackUrl(callbackUrl) || "/chat");
     } finally {
       setLoading(false);
     }
