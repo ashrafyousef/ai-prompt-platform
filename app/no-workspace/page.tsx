@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "@/lib/auth";
 import { resolveWorkspaceAccessForUser } from "@/lib/workspaceAccess";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 
 export default async function NoWorkspacePage() {
   const session = await getServerSession(authOptions);
@@ -24,12 +25,12 @@ export default async function NoWorkspacePage() {
           account to a workspace before using chat or admin areas.
         </p>
         <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Link
-            href="/api/auth/signout"
+          <SignOutButton
+            callbackUrl="/sign-in"
             className="inline-flex rounded-full border border-zinc-300 px-5 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-100 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900"
           >
             Sign out
-          </Link>
+          </SignOutButton>
           <Link
             href="/chat"
             className="inline-flex rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white dark:bg-zinc-100 dark:text-zinc-900"

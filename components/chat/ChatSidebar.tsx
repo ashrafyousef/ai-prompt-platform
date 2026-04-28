@@ -121,11 +121,11 @@ export function ChatSidebar({
 
   return (
     <aside
-      className={`flex h-screen flex-col border-r border-zinc-200/70 bg-white/80 p-3 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
+      className={`flex h-screen flex-col border-r border-zinc-200/70 bg-white/85 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
         collapsed ? "w-16" : "w-72"
       }`}
     >
-      <div className="mb-3 flex flex-col gap-2">
+      <div className="mb-2.5 flex flex-col gap-2">
         {collapsed ? (
           <>
             <button
@@ -148,7 +148,7 @@ export function ChatSidebar({
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={onNewChat}
-              className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
               title="New Chat"
             >
               New Chat
@@ -169,27 +169,27 @@ export function ChatSidebar({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search chats..."
-          className="mb-3 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-400"
+          className="mb-2.5 w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-900 placeholder:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 dark:placeholder:text-zinc-400"
         />
       ) : null}
 
-      <div className="flex-1 space-y-4 overflow-auto">
+      <div className="flex-1 space-y-3.5 overflow-auto pr-0.5">
         {Object.entries(groupedSessions).map(([group, items]) =>
           items.length === 0 ? null : (
             <div key={group}>
               {!collapsed ? (
-                <h3 className="mb-2 px-1 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                <h3 className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
                   {group}
                 </h3>
               ) : null}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {items.map((session) => (
                   <div
                     key={session.id}
-                    className={`group relative w-full rounded-md px-3 py-2 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
+                    className={`group relative w-full rounded-lg px-2.5 py-2 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
                       activeSessionId === session.id
-                        ? "bg-zinc-200 ring-1 ring-zinc-300 dark:bg-zinc-700 dark:ring-zinc-600"
-                        : "bg-zinc-100/70 hover:bg-zinc-200/80 dark:bg-zinc-800/70 dark:hover:bg-zinc-700/60"
+                        ? "bg-zinc-200/90 ring-1 ring-zinc-300/80 dark:bg-zinc-700/90 dark:ring-zinc-600"
+                        : "bg-zinc-100/60 hover:bg-zinc-200/65 dark:bg-zinc-800/70 dark:hover:bg-zinc-700/70"
                     }`}
                   >
                     {editingSessionId === session.id ? (
@@ -204,14 +204,16 @@ export function ChatSidebar({
                     ) : (
                       <div className="flex items-center justify-between gap-2">
                         <button
-                          className={`${collapsed ? "w-6 truncate text-center" : "truncate pr-2"} text-left`}
+                          className={`${
+                            collapsed ? "w-6 truncate text-center" : "flex-1 truncate pr-1.5"
+                          } text-left ${activeSessionId === session.id ? "font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-700 dark:text-zinc-200"}`}
                           onClick={() => onSelect(session.id)}
                           title={session.title}
                         >
                           {collapsed ? session.title.slice(0, 1).toUpperCase() : session.title}
                         </button>
                         <button
-                          className={`rounded p-1 text-zinc-600 hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
+                          className={`rounded p-1 text-zinc-500 transition hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
                             activeSessionId === session.id || menuSessionId === session.id
                               ? "opacity-100"
                               : "opacity-0 group-hover:opacity-100"
@@ -272,15 +274,15 @@ export function ChatSidebar({
         )}
       </div>
 
-      <div ref={profileRef} className="relative mt-3">
+      <div ref={profileRef} className="relative mt-2.5 border-t border-zinc-200/80 pt-2.5 dark:border-zinc-700/80">
         {!collapsed && usageData ? (
-          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-zinc-100 px-3 py-1.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-zinc-100/80 px-3 py-1.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
             <Zap className="h-3 w-3 text-amber-500" />
             <span>{(usageData.totalTokens ?? 0).toLocaleString()} tokens used</span>
           </div>
         ) : null}
         <button
-          className="flex w-full items-center justify-between rounded-md bg-zinc-100 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          className="flex w-full items-center justify-between rounded-md bg-zinc-100/85 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           onClick={() => setProfileOpen((prev) => !prev)}
           aria-label="Profile menu"
         >
