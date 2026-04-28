@@ -11,6 +11,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "node prisma/seed.js",
+    "admin:bootstrap-local": "node scripts/bootstrap-local-admin.js",
     "knowledge:backfill": "node scripts/backfill-knowledge-relations.js",
     "knowledge:backfill:dry-run": "node scripts/backfill-knowledge-relations.js --dry-run"
   },

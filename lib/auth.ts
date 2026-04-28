@@ -8,6 +8,10 @@ async function loadMembershipForSession(userId: string) {
   return resolveWorkspaceAccessForUser(userId);
 }
 
+function isSafeRelativePath(path: string): boolean {
+  return path.startsWith("/") && !path.startsWith("//");
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   session: { strategy: "jwt" },
@@ -97,6 +101,23 @@ export const authOptions: NextAuthOptions = {
           wr === "OWNER" || wr === "ADMIN" || wr === "MEMBER" ? wr : null;
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      if (isSafeRelativePath(url)) {
+        return url;
+      }
+
+      try {
+        const target = new URL(url);
+        const base = new URL(baseUrl);
+        if (target.origin === base.origin) {
+          return `${target.pathname}${target.search}${target.hash}`;
+        }
+      } catch {
+        // Fall through to safe local path.
+      }
+
+      return "/chat";
     },
   },
   pages: {

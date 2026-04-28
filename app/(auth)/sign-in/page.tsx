@@ -5,6 +5,13 @@ import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState, Suspense } from "react";
 
+function normalizeCallbackUrl(raw: string | null): string {
+  // Keep auth redirects same-origin by accepting only absolute-path callbacks.
+  if (!raw || !raw.startsWith("/")) return "/chat";
+  if (raw.startsWith("//")) return "/chat";
+  return raw;
+}
+
 function SignUpLink() {
   const [allow, setAllow] = useState<boolean | null>(null);
 
@@ -29,35 +36,28 @@ function SignUpLink() {
 
 function SignInForm() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/chat";
+  const callbackUrl = normalizeCallbackUrl(searchParams.get("callbackUrl"));
+  const signInError = searchParams.get("error");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => {
+    if (signInError) {
+      setError("Invalid email or password.");
+    }
+  }, [signInError]);
+
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    try {
-      const res = await signIn("credentials", {
-        email: email.trim().toLowerCase(),
-        password,
-        redirect: false,
-        callbackUrl,
-      });
-      if (res?.error) {
-        setError("Invalid email or password.");
-        return;
-      }
-      if (res?.url) {
-        window.location.href = res.url;
-      } else {
-        window.location.href = callbackUrl;
-      }
-    } finally {
-      setLoading(false);
-    }
+    await signIn("credentials", {
+      email: email.trim().toLowerCase(),
+      password,
+      callbackUrl,
+    });
   }
 
   return (
