@@ -25,6 +25,13 @@ enum UserRole {
   ADMIN
 }
 
+// Workspace-scoped role (auth); complements legacy User.role.
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
 enum AgentStatus {
   DRAFT
   PUBLISHED
@@ -48,6 +55,7 @@ model User {
   id           String        @id @default(cuid())
   email        String        @unique
   name         String?
+  passwordHash String? // bcrypt; null until password set
   role         UserRole      @default(USER)
   teamId       String?
   createdAt    DateTime      @default(now())
@@ -57,21 +65,104 @@ model User {
   savedPrompts SavedPrompt[]
   tokenUsages  TokenUsage[]
   team         Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  workspaceMembers WorkspaceMember[]
+  passwordResetTokens PasswordResetToken[]
+  sentWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationInvitedBy")
 
   @@index([role])
   @@index([teamId])
 }
 
-model Team {
-  id        String        @id @default(cuid())
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+  @@index([usedAt])
+}
+
+model Workspace {
+  id        String            @id @default(cuid())
   name      String
-  slug      String        @unique
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
+  slug      String            @unique
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  members   WorkspaceMember[]
+  invitations WorkspaceInvitation[]
+  teams     Team[]
   agents    AgentConfig[]
-  members   User[]
+  knowledgeItems KnowledgeItem[]
 
   @@index([slug])
+}
+
+model WorkspaceInvitation {
+  id          String        @id @default(cuid())
+  workspaceId String
+  email       String
+  role        WorkspaceRole @default(MEMBER)
+  teamId      String?
+  tokenHash   String        @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  revokedAt   DateTime?
+  invitedById String
+  createdAt   DateTime      @default(now())
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team        Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  invitedBy   User          @relation("WorkspaceInvitationInvitedBy", fields: [invitedById], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, createdAt])
+  @@index([email])
+  @@index([expiresAt])
+  @@index([acceptedAt])
+  @@index([revokedAt])
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        WorkspaceRole @default(MEMBER)
+  teamId      String?
+  isActive    Boolean       @default(true)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  team        Team?         @relation(fields: [teamId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([isActive])
+  @@index([teamId])
+}
+
+model Team {
+  id        String        @id @default(cuid())
+  workspaceId String?
+  name      String
+  slug      String        @unique
+  isArchived Boolean      @default(false)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  workspace Workspace?    @relation(fields: [workspaceId], references: [id], onDelete: SetNull)
+  agents    AgentConfig[]
+  members   User[]
+  invitations WorkspaceInvitation[]
+  workspaceMembers WorkspaceMember[]
+  knowledgeItems KnowledgeItem[]
+
+  @@index([slug])
+  @@index([workspaceId])
+  @@index([isArchived])
 }
 
 model ChatSession {
@@ -127,6 +218,7 @@ model Message {
 
 model AgentConfig {
   id           String       @id @default(cuid())
+  workspaceId  String
   slug         String       @unique
   name         String
   description  String?
@@ -140,14 +232,60 @@ model AgentConfig {
   status       AgentStatus  @default(PUBLISHED)
   scope        AgentScope   @default(GLOBAL)
   teamId       String?
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   team         Team?        @relation(fields: [teamId], references: [id], onDelete: SetNull)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
   messages     Message[]
+  knowledgeLinks AgentKnowledge[]
 
+  @@index([workspaceId])
   @@index([teamId])
   @@index([status])
   @@index([scope])
+}
+
+model KnowledgeItem {
+  id          String   @id @default(cuid())
+  workspaceId String
+  teamId      String?
+  title       String
+  sourceType  String
+  content     String?
+  fileRef     Json?
+  summary     String   @default("")
+  tags        Json?
+  priority    Int      @default(3)
+  appliesTo   String   @default("all")
+  isActive    Boolean  @default(true)
+  ownerNote   String   @default("")
+  lastReviewedAt DateTime?
+  processingStatus String @default("ready")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  team        Team?     @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  agentLinks  AgentKnowledge[]
+
+  @@index([workspaceId])
+  @@index([teamId])
+  @@index([isActive])
+}
+
+model AgentKnowledge {
+  id           String       @id @default(cuid())
+  agentId      String
+  knowledgeId  String
+  legacyItemId String?
+  sortOrder    Int          @default(0)
+  createdAt    DateTime     @default(now())
+  agent        AgentConfig  @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  knowledge    KnowledgeItem @relation(fields: [knowledgeId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, knowledgeId])
+  @@index([agentId])
+  @@index([knowledgeId])
+  @@index([legacyItemId])
 }
 
 model SavedPrompt {

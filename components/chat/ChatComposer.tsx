@@ -7,7 +7,9 @@ import { ModelSelector } from "@/components/chat/ModelSelector";
 import useSWR from "swr";
 import type { UiAgent, UiModelsResponse } from "@/lib/types";
 import { compactModelSelectorHint } from "@/lib/chatAgentModelGuidance";
+import { modelFailsManualRouterForChat } from "@/lib/chatAgentModelRules";
 import { computeChatModelCompatibilityIssues } from "@/lib/chatModelCompatibility";
+import type { UiModelSummary } from "@/lib/types";
 import type { ChatRouteMeta } from "@/components/chat/hooks/useChatStream";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]);
@@ -115,6 +117,16 @@ export function ChatComposer({
     if (compatibilityIssues.length > 0) return null;
     return compactModelSelectorHint(activeAgent, models);
   }, [compatibilityIssues, activeAgent, models]);
+
+  const agentModelIncompatible = useMemo(() => {
+    if (!activeAgent) return undefined;
+    return (m: UiModelSummary) =>
+      modelFailsManualRouterForChat(m, activeAgent, {
+        outputFormat: activeAgent.outputFormat,
+        textCharLength: text.length,
+        imageAttachmentCount: imageFiles.length,
+      });
+  }, [activeAgent, text.length, imageFiles.length]);
 
   useEffect(() => {
     if (!models.length) return;
@@ -332,6 +344,7 @@ export function ChatComposer({
             disabled={disabled}
             hasImages={imageFiles.length > 0}
             agentHint={modelSelectorHint}
+            agentModelIncompatible={agentModelIncompatible}
           />
 
           {disabled && onCancelStream ? (

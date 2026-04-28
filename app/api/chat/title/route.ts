@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 
 const schema = z.object({
   sessionId: z.string().min(1),
@@ -10,7 +10,7 @@ const schema = z.object({
 
 export async function PATCH(req: NextRequest) {
   try {
-    const userId = await requireUserId();
+    const { userId } = await requireUserIdWithWorkspace();
     const body = schema.parse(await req.json());
 
     const session = await db.chatSession.findFirst({
@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to update title." },
-      { status: 400 }
+      { status: authErrorStatus(error, 400) }
     );
   }
 }

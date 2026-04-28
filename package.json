@@ -7,14 +7,19 @@
     "build": "prisma generate && node scripts/run-migrate-deploy.js && next build",
     "start": "next start",
     "lint": "next lint",
+    "test:knowledge-injection": "vitest run tests/knowledgeInjection.test.ts tests/adminAgentTestRoute.knowledgeInjection.test.ts tests/chatSendRoute.knowledgeInjection.test.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:seed": "node prisma/seed.js"
+    "prisma:seed": "node prisma/seed.js",
+    "admin:bootstrap-local": "node scripts/bootstrap-local-admin.js",
+    "knowledge:backfill": "node scripts/backfill-knowledge-relations.js",
+    "knowledge:backfill:dry-run": "node scripts/backfill-knowledge-relations.js --dry-run"
   },
   "dependencies": {
     "@prisma/client": "^5.17.0",
     "@upstash/redis": "^1.37.0",
     "ajv": "^8.18.0",
+    "bcryptjs": "^3.0.3",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.45",
     "lucide-react": "^1.7.0",
@@ -36,6 +41,7 @@
     "seed": "node prisma/seed.js"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -44,6 +50,7 @@
     "eslint-config-next": "^13.5.6",
     "postcss": "^8",
     "tailwindcss": "^3",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^0.34.6"
   }
 }

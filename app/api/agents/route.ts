@@ -1,30 +1,23 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { authOptions } from "@/lib/auth";
+import { authErrorStatus, requireAuthorizedUserContext } from "@/lib/auth";
 import { normalizeAgentInputSchema } from "@/lib/agentConfig";
 import { effectiveRequiresStructuredOutput } from "@/lib/agentModelPolicy";
 import { DEFAULT_AGENT_SLUG } from "@/lib/chatDefaultAgent";
 import { parseStarterPromptsFromAgentInputSchema } from "@/lib/chatStarterPrompts";
 import { getSystemChatConfig } from "@/lib/systemConfig";
+import { canViewAgentForActor } from "@/lib/agentScope";
+import { resolveEffectiveAgentKnowledge } from "@/lib/knowledgeRepository";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const userTeamId = session.user.teamId ?? null;
+    const auth = await requireAuthorizedUserContext();
 
     const where: Prisma.AgentConfigWhereInput = {
+      workspaceId: auth.workspaceId,
       status: "PUBLISHED",
       isEnabled: true,
-      OR: [
-        { scope: "GLOBAL" },
-        ...(userTeamId ? [{ scope: "TEAM" as const, teamId: userTeamId }] : []),
-      ],
     };
 
     const rows = await db.agentConfig.findMany({
@@ -38,14 +31,53 @@ export async function GET() {
         systemPrompt: true,
         inputSchema: true,
         scope: true,
+        teamId: true,
+        knowledgeLinks: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            legacyItemId: true,
+            knowledge: {
+              select: {
+                id: true,
+                title: true,
+                sourceType: true,
+                content: true,
+                fileRef: true,
+                summary: true,
+                tags: true,
+                priority: true,
+                appliesTo: true,
+                isActive: true,
+                ownerNote: true,
+                lastReviewedAt: true,
+                processingStatus: true,
+              },
+            },
+          },
+        },
       },
     });
 
     const configuredDefaultId = getSystemChatConfig().defaultAgentId;
 
     const agents = rows
+      .filter((a) =>
+        canViewAgentForActor(
+          {
+            workspaceId: auth.workspaceId,
+            workspaceRole: auth.workspaceRole,
+            platformRole: auth.role,
+            teamId: auth.teamId,
+          },
+          { workspaceId: auth.workspaceId, scope: a.scope, teamId: a.teamId ?? null }
+        )
+      )
       .map((a) => {
         const schema = normalizeAgentInputSchema(a.inputSchema);
+        const effectiveKnowledge = resolveEffectiveAgentKnowledge({
+          inputSchema: a.inputSchema,
+          knowledgeLinks: a.knowledgeLinks,
+        });
         const prefs = schema.modelPreferences;
         const slugLower = a.slug.toLowerCase();
         const isWorkspaceDefault = configuredDefaultId
@@ -65,7 +97,7 @@ export async function GET() {
             schema.meta.identity.category
           ),
           systemPromptSnippet: a.systemPrompt?.slice(0, 200) ?? null,
-          knowledgeCount: schema.knowledgeItems.length,
+          knowledgeCount: effectiveKnowledge.length,
           outputFormat: schema.outputConfig.format,
           responseDepth: schema.outputConfig.responseDepth,
           preferredModelId: prefs.preferredModelId,
@@ -89,7 +121,7 @@ export async function GET() {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to load agents." },
-      { status: 500 }
+      { status: authErrorStatus(error, 500) }
     );
   }
 }

@@ -143,13 +143,48 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
   }, [form, initialized]);
 
   const set = useCallback((k: string, v: unknown) => setForm((p) => ({ ...p, [k]: v })), []);
+  const effectiveKnowledgeCount = agent?.effectiveConfig?.knowledgeItems?.length ?? 0;
+  const originalScope = agent?.scope ?? "GLOBAL";
+  const originalTeamId = agent?.teamId ?? "";
+  const originalTeamName = agent?.team?.name ?? "previous team";
+  const selectedScope = (form.scope as string) ?? originalScope;
+  const selectedTeamId = (form.teamId as string) ?? originalTeamId;
+  const selectedTeamName = teams.find((team) => team.id === selectedTeamId)?.name ?? "selected team";
+  const scopeChanged = selectedScope !== originalScope;
+  const teamChangedWithinTeamScope =
+    selectedScope === "TEAM" &&
+    originalScope === "TEAM" &&
+    Boolean(selectedTeamId) &&
+    selectedTeamId !== originalTeamId;
+  const accessImpactNotes: string[] = [];
+  if (scopeChanged && originalScope === "TEAM" && selectedScope === "GLOBAL") {
+    accessImpactNotes.push(
+      "Changing to Workspace-wide expands chat visibility from one team to the whole workspace."
+    );
+  }
+  if (scopeChanged && originalScope === "GLOBAL" && selectedScope === "TEAM") {
+    accessImpactNotes.push("Changing to Team-scoped limits chat visibility to the selected team only.");
+  }
+  if (teamChangedWithinTeamScope) {
+    accessImpactNotes.push(`Team assignment changed from ${originalTeamName} to ${selectedTeamName}.`);
+  }
+  if (effectiveKnowledgeCount > 0 && (scopeChanged || teamChangedWithinTeamScope)) {
+    accessImpactNotes.push(
+      "Knowledge content stays attached to this agent; changing scope/team changes who can access that knowledge context through the agent."
+    );
+  }
 
   const nameError = initialized && !(form.name as string)?.trim() ? "Name is required." : undefined;
   const promptError = initialized && tab === "Behavior" && !(form.systemPrompt as string)?.trim()
     ? "System prompt cannot be empty." : undefined;
+  const teamScopeError =
+    initialized && tab === "Access" && form.scope === "TEAM" && !(form.teamId as string)?.trim()
+      ? "Team is required when scope is Team."
+      : undefined;
 
   async function handleSave() {
     if (nameError) { toast(nameError, "error"); return; }
+    if (teamScopeError) { toast(teamScopeError, "error"); return; }
     setSaving(true);
     try {
       const body: Record<string, unknown> = {};
@@ -400,6 +435,20 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
 
         {tab === "Access" ? (
           <div className="space-y-6">
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              Scope controls who can discover this agent in chat: <span className="font-medium">Workspace-wide</span>
+              {" "}appears across teams, while <span className="font-medium">Team-scoped</span> is limited to one team.
+            </div>
+            {accessImpactNotes.length > 0 ? (
+              <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200">
+                <p className="font-medium">Scope impact before save:</p>
+                <ul className="mt-1 list-disc space-y-1 pl-4">
+                  {accessImpactNotes.map((note) => (
+                    <li key={note}>{note}</li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <Field label="Status" hint="Published agents are available to users. Draft agents are hidden.">
               <select
                 value={(form.status as string) ?? "DRAFT"}
@@ -414,7 +463,13 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
             <Field label="Scope" hint="Team-scoped agents are only visible to members of the assigned team.">
               <select
                 value={(form.scope as string) ?? "GLOBAL"}
-                onChange={(e) => set("scope", e.target.value)}
+                onChange={(e) => {
+                  const nextScope = e.target.value;
+                  set("scope", nextScope);
+                  if (nextScope === "GLOBAL") {
+                    set("teamId", "");
+                  }
+                }}
                 className={inputCls}
               >
                 <option value="GLOBAL">Global</option>
@@ -422,7 +477,7 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
               </select>
             </Field>
             {form.scope === "TEAM" ? (
-              <Field label="Team" required>
+              <Field label="Team" required error={teamScopeError}>
                 <select
                   value={(form.teamId as string) ?? ""}
                   onChange={(e) => set("teamId", e.target.value)}
@@ -434,6 +489,15 @@ export function AgentEditPage({ agentId }: { agentId: string }) {
                   ))}
                 </select>
               </Field>
+            ) : null}
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Duplicate keeps the current scope/team unless you change it before saving.
+            </p>
+            {effectiveKnowledgeCount > 0 ? (
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                This agent currently has {effectiveKnowledgeCount} knowledge source{effectiveKnowledgeCount === 1 ? "" : "s"}.
+                Scope and team updates do not remove knowledge, but they do change who can use it through this agent.
+              </p>
             ) : null}
           </div>
         ) : null}

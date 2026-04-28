@@ -397,7 +397,7 @@ export function MessageList({
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex h-full flex-col gap-4 overflow-auto px-6 pb-44 pt-6 text-zinc-900 dark:text-zinc-100"
+        className="flex h-full flex-col gap-4 overflow-auto px-6 pb-64 pt-6 text-zinc-900 dark:text-zinc-100"
       >
         {loading && messages.length === 0
           ? [1, 2, 3].map((skeleton) => (
@@ -419,7 +419,7 @@ export function MessageList({
       </div>
       {showScrollButton ? (
         <button
-          className="absolute bottom-48 right-8 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          className="absolute bottom-64 right-8 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           onClick={() => containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" })}
           aria-label="Scroll to bottom"
         >

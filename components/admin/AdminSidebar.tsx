@@ -16,14 +16,15 @@ import {
 
 const mainNav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard, exact: true },
+  { href: "/admin/members", label: "Members", icon: Users, exact: false },
+  { href: "/admin/teams", label: "Teams", icon: Users, exact: false },
   { href: "/admin/agents", label: "Agents", icon: Bot, exact: false },
+  { href: "/admin/knowledge", label: "Knowledge", icon: BookOpen, exact: false },
   { href: "/admin/agents/import", label: "Import Agent", icon: Upload, exact: true },
   { href: "/admin/agents/new", label: "Create Agent", icon: Plus, exact: true },
 ];
 
 const futureNav = [
-  { href: "#", label: "Knowledge", icon: BookOpen, disabled: true },
-  { href: "#", label: "Teams", icon: Users, disabled: true },
   { href: "#", label: "Analytics", icon: BarChart3, disabled: true },
 ];
 
@@ -122,12 +123,20 @@ export function AdminSidebar({
         ))}
       </nav>
       <div className="border-t border-zinc-200/80 p-4 dark:border-zinc-800">
-        <Link
-          href="/chat"
-          className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          ← Back to chat
-        </Link>
+        <div className="flex flex-col gap-2">
+          <Link
+            href="/profile"
+            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            My profile
+          </Link>
+          <Link
+            href="/chat"
+            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            ← Back to chat
+          </Link>
+        </div>
       </div>
     </>
   );

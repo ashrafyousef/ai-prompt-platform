@@ -12,6 +12,10 @@ import { completionResultToNormalized, estimateUsageFallback } from "@/lib/usage
 import { sanitizeUserInput } from "@/lib/security";
 import { captureError } from "@/lib/sentry";
 import { AgentConfig, Message, Prisma } from "@prisma/client";
+import { resolveWorkspaceAccessForUser } from "@/lib/workspaceAccess";
+import { canViewAgentForActor } from "@/lib/agentScope";
+import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
+import type { KnowledgeInjectionMeta } from "@/lib/knowledgeInjection";
 
 type AgentContract = {
   id: string;
@@ -48,13 +52,57 @@ export async function prepareOrchestrator(params: {
   } = params;
   const text = sanitizeUserInput(params.text);
 
-  const [session, agent] = await Promise.all([
+  const [workspaceAccess, session, agent] = await Promise.all([
+    resolveWorkspaceAccessForUser(userId),
     db.chatSession.findFirst({ where: { id: sessionId, userId } }),
-    db.agentConfig.findFirst({ where: { id: agentId, isEnabled: true } }),
+    db.agentConfig.findFirst({
+      where: { id: agentId, isEnabled: true },
+      include: {
+        knowledgeLinks: {
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+          select: {
+            legacyItemId: true,
+            knowledge: {
+              select: {
+                id: true,
+                title: true,
+                sourceType: true,
+                content: true,
+                fileRef: true,
+                summary: true,
+                tags: true,
+                priority: true,
+                appliesTo: true,
+                isActive: true,
+                ownerNote: true,
+                lastReviewedAt: true,
+                processingStatus: true,
+              },
+            },
+          },
+        },
+      },
+    }),
   ]);
 
   if (!session) throw new Error("Session not found.");
   if (!agent) throw new Error("Agent not found.");
+  if (!workspaceAccess.workspaceId || !workspaceAccess.workspaceRole) {
+    throw new Error("Unauthorized");
+  }
+  if (
+    !canViewAgentForActor(
+      {
+        workspaceId: workspaceAccess.workspaceId,
+        workspaceRole: workspaceAccess.workspaceRole,
+        platformRole: null,
+        teamId: workspaceAccess.teamId,
+      },
+      agent
+    )
+  ) {
+    throw new Error("Forbidden");
+  }
 
   if (!skipUserInsert) {
     await db.message.create({
@@ -97,15 +145,21 @@ export async function prepareOrchestrator(params: {
     triggerSummarizationAsync();
   }
 
+  const effective = buildEffectiveAgentConfig(agent);
+  let knowledgeInjection: KnowledgeInjectionMeta | null = null;
   const messages = buildMessages({
     agent,
     history,
     userInput: text,
     imageUrls: resolvedImageUrls ?? imageUrls,
     contextSummary,
+    knowledgeItems: effective.knowledgeItems,
+    onKnowledgeInjectionMeta: (meta) => {
+      knowledgeInjection = meta;
+    },
   });
 
-  return { agent, messages, sessionId, userId, text };
+  return { agent, messages, sessionId, userId, text, knowledgeInjection };
 }
 
 async function summarizeConversation(history: Message[]): Promise<string> {
@@ -364,6 +418,35 @@ async function autoTitleSession(params: {
 
   const nextTitle = buildTitleFromPrompt(seedText);
   if (!nextTitle) return;
+
+  await db.chatSession.update({
+    where: { id: sessionId },
+    data: { title: nextTitle },
+  });
+}
+
+export async function applyFirstTurnTitleFallback(params: {
+  userId: string;
+  sessionId: string;
+  seedText: string;
+}) {
+  const { userId, sessionId, seedText } = params;
+  const normalizedSeed = seedText.replace(/\s+/g, " ").trim();
+  if (!normalizedSeed) return;
+
+  const session = await db.chatSession.findFirst({
+    where: { id: sessionId, userId },
+    select: { id: true, title: true },
+  });
+  if (!session || session.title !== "New Chat") return;
+
+  const userMessageCount = await db.message.count({
+    where: { sessionId, userId, role: "user" },
+  });
+  if (userMessageCount !== 1) return;
+
+  const nextTitle = buildTitleFromPrompt(normalizedSeed);
+  if (!nextTitle || nextTitle === "New Chat") return;
 
   await db.chatSession.update({
     where: { id: sessionId },

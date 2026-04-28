@@ -61,6 +61,11 @@ export function AgentActionsMenu({
   const canPublish = agent.status !== "PUBLISHED";
   const canUnpublish = agent.status === "PUBLISHED";
   const canArchive = agent.status !== "ARCHIVED";
+  const audienceLabel = agent.scope === "TEAM" ? agent.team?.name ?? "assigned team" : "workspace";
+
+  function confirmHighImpactAction(message: string) {
+    return window.confirm(message);
+  }
 
   return (
     <div className="relative inline-block text-left" ref={ref}>
@@ -107,34 +112,63 @@ export function AgentActionsMenu({
             type="button"
             role="menuitem"
             className="block w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800"
-            onClick={() => void duplicate()}
+            onClick={() => {
+              const confirmed = confirmHighImpactAction(
+                `Duplicate "${agent.name}" with the same ${agent.scope === "TEAM" ? "team-scoped" : "workspace-wide"} visibility settings?`
+              );
+              if (!confirmed) return;
+              void duplicate();
+            }}
           >
-            Duplicate
+            Duplicate (keep scope)
           </button>
           <div className="my-1 border-t border-zinc-100 dark:border-zinc-800" />
           {canPublish ? (
             <button
               type="button"
               className="block w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              onClick={() => void patch({ status: "PUBLISHED", isEnabled: true })}
+              onClick={() => {
+                const confirmed = confirmHighImpactAction(
+                  `Publish "${agent.name}" for ${audienceLabel} chat visibility?`
+                );
+                if (!confirmed) return;
+                void patch({ status: "PUBLISHED", isEnabled: true });
+              }}
+              title={
+                agent.scope === "TEAM"
+                  ? `Make visible to ${agent.team?.name ?? "the assigned team"} in chat`
+                  : "Make visible workspace-wide in chat"
+              }
             >
-              Publish (show in chat)
+              Publish ({agent.scope === "TEAM" ? "team chat visibility" : "workspace chat visibility"})
             </button>
           ) : null}
           {canUnpublish ? (
             <button
               type="button"
               className="block w-full px-3 py-2 text-left hover:bg-zinc-50 dark:hover:bg-zinc-800"
-              onClick={() => void patch({ status: "DRAFT", isEnabled: false })}
+              onClick={() => {
+                const confirmed = confirmHighImpactAction(
+                  `Unpublish "${agent.name}" and hide it from ${audienceLabel} chat?`
+                );
+                if (!confirmed) return;
+                void patch({ status: "DRAFT", isEnabled: false });
+              }}
             >
-              Unpublish (hide from chat)
+              Unpublish (hide from {agent.scope === "TEAM" ? "team chat" : "workspace chat"})
             </button>
           ) : null}
           {canArchive ? (
             <button
               type="button"
               className="block w-full px-3 py-2 text-left text-amber-800 hover:bg-amber-50 dark:text-amber-200 dark:hover:bg-amber-950/40"
-              onClick={() => void patch({ status: "ARCHIVED", isEnabled: false })}
+              onClick={() => {
+                const confirmed = confirmHighImpactAction(
+                  `Archive "${agent.name}"? It will be hidden from chat until restored.`
+                );
+                if (!confirmed) return;
+                void patch({ status: "ARCHIVED", isEnabled: false });
+              }}
             >
               Archive (hide + freeze)
             </button>
@@ -148,6 +182,9 @@ export function AgentActionsMenu({
               Archive
             </button>
           )}
+          <div className="my-1 border-t border-zinc-100 px-3 py-2 text-[11px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+            Visibility context: {agent.scope === "TEAM" ? `team-scoped (${audienceLabel})` : "workspace-wide"}.
+          </div>
         </div>
       ) : null}
     </div>

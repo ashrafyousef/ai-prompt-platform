@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 
 export async function POST() {
   try {
-    const userId = await requireUserId();
+    const { userId } = await requireUserIdWithWorkspace();
     const session = await db.chatSession.create({
       data: { userId, title: "New Chat" },
     });
@@ -12,7 +12,7 @@ export async function POST() {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to create chat." },
-      { status: 401 }
+      { status: authErrorStatus(error, 401) }
     );
   }
 }

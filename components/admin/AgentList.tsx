@@ -71,7 +71,9 @@ export function AgentList({
                 <td className="px-4 py-3 align-middle">
                   <AgentScopeBadge scope={a.scope} />
                 </td>
-                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">{a.team?.name ?? "—"}</td>
+                <td className="px-4 py-3 text-zinc-600 dark:text-zinc-300">
+                  {a.scope === "TEAM" ? a.team?.name ?? "Unassigned team" : "All teams"}
+                </td>
                 <td className="px-4 py-3 text-xs text-zinc-500 dark:text-zinc-400">{formatDate(a.updatedAt)}</td>
                 <td className="px-4 py-3 text-right align-middle">
                   <AgentActionsMenu agent={a} onChanged={onRefresh} />
@@ -102,7 +104,10 @@ export function AgentList({
               <AgentScopeBadge scope={a.scope} />
             </div>
             <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
-              Team: <span className="text-zinc-700 dark:text-zinc-300">{a.team?.name ?? "—"}</span>
+              Team:{" "}
+              <span className="text-zinc-700 dark:text-zinc-300">
+                {a.scope === "TEAM" ? a.team?.name ?? "Unassigned team" : "All teams"}
+              </span>
               {" · "}
               Updated {formatDate(a.updatedAt)}
             </p>

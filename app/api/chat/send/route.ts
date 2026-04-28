@@ -6,17 +6,18 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+  applyFirstTurnTitleFallback,
   charEstimateFromMessages,
   finalizeAssistantMessage,
   prepareOrchestrator,
 } from "@/lib/orchestration/chatOrchestrator";
+import { chatSendNeedsLongContextHeuristic } from "@/lib/chatAgentModelRules";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { streamChatCompletion, type StreamUsageSink } from "@/lib/openai/client";
 import { assertGovernedModelSessionAccessible } from "@/lib/agentModelGovernance";
 import { assertUserWithinSoftTokenLimit, assertModelAccessForRole, getGovernedModelsForUser } from "@/lib/usage";
 import { resolveModelById } from "@/lib/models";
 import type { ModelProvider, UserRole } from "@/lib/models";
-import { normalizeAgentInputSchema } from "@/lib/agentConfig";
 import { validateSendTimeModelPreferences } from "@/lib/chatAgentModelRules";
 import { captureError } from "@/lib/sentry";
 import { logJson } from "@/lib/logger";
@@ -25,6 +26,8 @@ import { governedOptionsToUiSummaries, routeModel } from "@/lib/modelRouter";
 import type { RouterMode } from "@/lib/modelRoutingTypes";
 import { classifyChatError } from "@/lib/chatErrorTaxonomy";
 import { markRecentRateLimit } from "@/lib/modelHealthHints";
+import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
+import { toKnowledgeInjectionTelemetry } from "@/lib/knowledgeInjection";
 
 const MIME_MAP: Record<string, string> = {
   jpg: "image/jpeg",
@@ -119,6 +122,16 @@ export async function POST(req: NextRequest) {
   let requestKind: "send" | "retry" = "send";
   let selectedModelIdForAttempt: string | null = null;
   let selectedProviderForAttempt: ModelProvider | null = null;
+  let titleFallbackContext: { sessionId: string; seedText: string } | null = null;
+  const maybeApplyFirstTurnTitleFallback = async () => {
+    if (!titleFallbackContext) return;
+    if (requestKind !== "send") return;
+    await applyFirstTurnTitleFallback({
+      userId: userIdForLogs,
+      sessionId: titleFallbackContext.sessionId,
+      seedText: titleFallbackContext.seedText,
+    });
+  };
   const finalizeAttemptFailed = async (id: string, cause: unknown) => {
     const clientMessage =
       typeof cause === "string" && cause.trim().length > 0
@@ -186,6 +199,10 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = sendSchema.parse(await req.json());
+    titleFallbackContext = {
+      sessionId: payload.sessionId,
+      seedText: payload.text,
+    };
 
     let retrySource:
       | {
@@ -315,24 +332,24 @@ export async function POST(req: NextRequest) {
       req.signal.addEventListener("abort", cancelOnClientAbort, { once: true });
     }
 
-    const normalized = normalizeAgentInputSchema(prepared.agent.inputSchema);
+    const effective = buildEffectiveAgentConfig(prepared.agent);
     const governedUi = governedOptionsToUiSummaries(governedModels);
     const routingMode = (payload.modelRoutingMode ?? "manual") as RouterMode;
     const budgetPressure = snapshot.user.status === "warning" ? "warning" : "ok";
-    const needsLongContextHeuristic = payload.text.length > 14_000;
+    const needsLongContextHeuristic = chatSendNeedsLongContextHeuristic(payload.text.length);
 
     const decision = routeModel({
       routingMode,
       userSelectedModelId: payload.modelVersion?.trim() || null,
       governedModels: governedUi,
-      modelPreferences: normalized.modelPreferences,
+      modelPreferences: effective.modelPreferences,
       outputFormat: prepared.agent.outputFormat,
       userRole: userRole as UserRole,
       budgetPressure,
       textLength: payload.text.length,
       needsVision: hasImages,
       needsStructuredOutput: effectiveRequiresStructuredOutput(
-        normalized.modelPreferences,
+        effective.modelPreferences,
         prepared.agent.outputFormat
       ),
       needsLongContextHeuristic,
@@ -343,6 +360,7 @@ export async function POST(req: NextRequest) {
         assistantAttempt.id,
         decision.blockReason ?? "No compatible model for this request."
       );
+      await maybeApplyFirstTurnTitleFallback();
       return NextResponse.json(
         { error: decision.blockReason ?? "No compatible model for this request." },
         { status: 400 }
@@ -366,7 +384,7 @@ export async function POST(req: NextRequest) {
     selectedProviderForAttempt = selectedModel?.provider ?? null;
     if (selectedModel) {
       validateSendTimeModelPreferences({
-        modelPreferences: normalized.modelPreferences,
+        modelPreferences: effective.modelPreferences,
         outputFormat: prepared.agent.outputFormat,
         selectedModel,
         agentName: prepared.agent.name,
@@ -385,6 +403,15 @@ export async function POST(req: NextRequest) {
       selectedProvider: selectedModel?.provider ?? null,
       routingMode: decision.mode,
       reasonCodes: decision.reasonCodes,
+    });
+    logJson("info", {
+      route: "/api/chat/send",
+      userId,
+      status: "knowledge_injection",
+      requestKind,
+      sessionId: payload.sessionId,
+      agentId: payload.agentId,
+      knowledgeInjection: toKnowledgeInjectionTelemetry(prepared.knowledgeInjection),
     });
 
     await db.message.update({
@@ -479,6 +506,7 @@ export async function POST(req: NextRequest) {
           }
           const clientMessage = sseErrorMessageForClient(error);
           await finalizeAttemptFailed(assistantAttempt.id, error);
+          await maybeApplyFirstTurnTitleFallback();
           finalized = true;
           captureError(error, { route: "/api/chat/send", userId });
           logJson("error", {
@@ -526,6 +554,7 @@ export async function POST(req: NextRequest) {
         await finalizeAttemptCancelled(assistantAttemptId);
       } else {
         await finalizeAttemptFailed(assistantAttemptId, error);
+        await maybeApplyFirstTurnTitleFallback();
       }
     }
     captureError(error, { route: "/api/chat/send", userId: userIdForLogs });

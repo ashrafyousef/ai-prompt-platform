@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireUserId } from "@/lib/auth";
+import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 
 const schema = z.object({
   title: z.string().min(1),
@@ -11,7 +11,7 @@ const schema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = await requireUserId();
+    const { userId } = await requireUserIdWithWorkspace();
     const body = schema.parse(await req.json());
     const saved = await db.savedPrompt.create({
       data: { userId, ...body },
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to save prompt." },
-      { status: 400 }
+      { status: authErrorStatus(error, 400) }
     );
   }
 }

@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Ellipsis, LogOut, Plus, Share2, Shield, Trash2, Zap } from "lucide-react";
+import { ChevronLeft, ChevronRight, Ellipsis, LogOut, Plus, Share2, Shield, Trash2, User, Zap } from "lucide-react";
+import { SignOutButton } from "@/components/auth/SignOutButton";
 import { UiSession } from "@/lib/types";
-import { signOut, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import useSWR from "swr";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -290,6 +291,14 @@ export function ChatSidebar({
         </button>
         {profileOpen ? (
           <div className="absolute bottom-11 left-0 right-0 z-20 rounded-md border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
+            <Link
+              href="/profile"
+              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              onClick={() => setProfileOpen(false)}
+            >
+              <User className="h-3.5 w-3.5" />
+              Profile
+            </Link>
             {session?.user?.role === "ADMIN" ? (
               <Link
                 href="/admin"
@@ -300,13 +309,13 @@ export function ChatSidebar({
                 Admin
               </Link>
             ) : null}
-            <button
+            <SignOutButton
+              callbackUrl="/sign-in"
               className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              onClick={() => signOut({ callbackUrl: "/" })}
             >
               <LogOut className="h-3.5 w-3.5" />
               Sign out
-            </button>
+            </SignOutButton>
           </div>
         ) : null}
       </div>

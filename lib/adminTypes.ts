@@ -61,6 +61,45 @@ export type AdminOverviewStats = {
     published: number;
     draft: number;
     archived: number;
+    workspaceWide: number;
+    teamScoped: number;
+    members: number;
+    activeMembers: number;
+    teams: number;
+    archivedTeams: number;
+    knowledgeTotal: number;
+    knowledgeActive: number;
+    knowledgeInactive: number;
+  };
+  recommendations: Array<{
+    id: string;
+    label: string;
+    href: string;
+  }>;
+  attention: {
+    draftAgents: Array<{
+      id: string;
+      name: string;
+      teamName: string | null;
+      updatedAt: string;
+    }>;
+    archivedAgents: Array<{
+      id: string;
+      name: string;
+      teamName: string | null;
+      updatedAt: string;
+    }>;
+    teamsWithoutAgents: Array<{
+      id: string;
+      name: string;
+      isArchived: boolean;
+    }>;
+    inactiveKnowledgeByAgent: Array<{
+      agentId: string;
+      agentName: string;
+      teamName: string | null;
+      inactiveCount: number;
+    }>;
   };
   byTeam: Array<{ teamId: string | null; teamName: string; count: number }>;
   recent: Array<{

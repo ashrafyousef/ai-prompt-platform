@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { db } from "@/lib/db";
-import { authOptions } from "@/lib/auth";
+import { authErrorStatus, requireAuthorizedUserContext } from "@/lib/auth";
 import { getUsageGovernanceSnapshot } from "@/lib/usage";
 import { countExactUsageRequests } from "@/lib/tokenUsageCompat";
 import { ROLE_LIMITS, type UserRole } from "@/lib/models";
 
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const userId = session.user.id;
-    const userRole = (session.user.role ?? "USER") as UserRole;
-    const teamId = session.user.teamId ?? null;
+    const auth = await requireAuthorizedUserContext();
+    const userId = auth.userId;
+    const userRole = auth.role as UserRole;
+    const teamId = auth.teamId;
 
     const [allTime, exactCount, governance] = await Promise.all([
       db.tokenUsage.aggregate({
@@ -44,7 +40,10 @@ export async function GET() {
       role: userRole,
       allowedCostTiers: roleLimits.allowedCostTiers,
     });
-  } catch {
-    return NextResponse.json({ error: "Internal server error" }, { status: 400 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Internal server error" },
+      { status: authErrorStatus(error, 400) }
+    );
   }
 }
