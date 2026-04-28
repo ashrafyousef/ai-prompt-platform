@@ -1,6 +1,6 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { FormEvent, useEffect, useState, Suspense } from "react";
@@ -10,6 +10,18 @@ function normalizeCallbackUrl(raw: string | null): string {
   if (!raw || !raw.startsWith("/")) return "/chat";
   if (raw.startsWith("//")) return "/chat";
   return raw;
+}
+
+function normalizeResultUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw;
+  try {
+    const parsed = new URL(raw, window.location.origin);
+    if (parsed.origin !== window.location.origin) return null;
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return null;
+  }
 }
 
 function SignUpLink() {
@@ -35,6 +47,7 @@ function SignUpLink() {
 }
 
 function SignInForm() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = normalizeCallbackUrl(searchParams.get("callbackUrl"));
   const signInError = searchParams.get("error");
@@ -53,11 +66,26 @@ function SignInForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    await signIn("credentials", {
-      email: email.trim().toLowerCase(),
-      password,
-      callbackUrl,
-    });
+    try {
+      const result = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+      if (result?.error) {
+        setError("Invalid email or password.");
+        return;
+      }
+      const targetUrl =
+        normalizeResultUrl(result?.url) ?? normalizeCallbackUrl(callbackUrl) ?? "/chat";
+      router.replace(targetUrl);
+    } catch {
+      // Handle known NextAuth redirect:false URL parsing edge case defensively.
+      router.replace(normalizeCallbackUrl(callbackUrl) || "/chat");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
