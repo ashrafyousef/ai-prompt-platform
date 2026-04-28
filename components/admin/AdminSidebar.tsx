@@ -123,12 +123,20 @@ export function AdminSidebar({
         ))}
       </nav>
       <div className="border-t border-zinc-200/80 p-4 dark:border-zinc-800">
-        <Link
-          href="/chat"
-          className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
-        >
-          ← Back to chat
-        </Link>
+        <div className="flex flex-col gap-2">
+          <Link
+            href="/profile"
+            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            My profile
+          </Link>
+          <Link
+            href="/chat"
+            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            ← Back to chat
+          </Link>
+        </div>
       </div>
     </>
   );
