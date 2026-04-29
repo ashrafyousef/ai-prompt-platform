@@ -15,6 +15,7 @@ export function AgentStarterPrompts({
     .filter((prompt) => prompt.isActive !== false)
     .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
   if (!prompts || prompts.length === 0) return null;
+  const visiblePrompts = prompts.slice(0, 4);
 
   return (
     <div className="mt-6" data-agent-id={agent.id}>
@@ -30,18 +31,17 @@ export function AgentStarterPrompts({
         </p>
       </div>
       <div className="grid gap-2 sm:grid-cols-2">
-        {prompts.slice(0, 4).map((prompt, index) => (
+        {visiblePrompts.map((prompt, index) => (
           <button
             key={`${agent.id}-${prompt.id}-${index}`}
             type="button"
             onClick={() => onPromptClick(prompt.prompt)}
-            className="group rounded-xl border border-zinc-200/90 bg-white/75 p-3.5 text-left text-sm text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm active:scale-[0.99] dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:border-violet-500 dark:hover:bg-violet-900/10"
+            className={`group rounded-xl border border-zinc-200/90 bg-white/75 p-3.5 text-left text-sm text-zinc-700 transition hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm active:scale-[0.99] dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:border-violet-500 dark:hover:bg-violet-900/10 ${
+              index >= 2 ? "hidden sm:block" : ""
+            }`}
           >
-            <p className="mb-1 text-[10px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-              {prompt.label}
-            </p>
-            <span className="line-clamp-2 text-[13px] leading-relaxed">
-              {prompt.prompt.length > 120 ? prompt.prompt.slice(0, 117) + "..." : prompt.prompt}
+            <span className="line-clamp-3 text-[13px] leading-relaxed">
+              {prompt.prompt.length > 140 ? `${prompt.prompt.slice(0, 137)}...` : prompt.prompt}
             </span>
           </button>
         ))}
