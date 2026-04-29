@@ -339,14 +339,14 @@ export function MessageList({
   if (empty) {
     if (!agentSelectionReady) {
       return (
-        <div className="flex flex-1 items-center justify-center px-6 pb-40 pt-8">
+        <div className="flex flex-1 items-center justify-center px-6 pb-56 pt-8 md:pb-40">
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assistant…</p>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-1 items-center justify-center px-6 pb-40 pt-8">
+      <div className="flex flex-1 items-center justify-center px-6 pb-56 pt-8 md:pb-40">
         <div className="mx-auto w-full max-w-3xl">
           {activeAgent ? (
             <div className="flex flex-col items-center">
@@ -397,7 +397,7 @@ export function MessageList({
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex h-full flex-col gap-4 overflow-auto px-6 pb-64 pt-6 text-zinc-900 dark:text-zinc-100"
+        className="flex h-full flex-col gap-4 overflow-auto px-4 pb-[max(18rem,calc(12rem+env(safe-area-inset-bottom)))] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6 md:pb-64"
       >
         {loading && messages.length === 0
           ? [1, 2, 3].map((skeleton) => (
@@ -419,7 +419,7 @@ export function MessageList({
       </div>
       {showScrollButton ? (
         <button
-          className="absolute bottom-64 right-8 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          className="absolute bottom-[17rem] right-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 sm:right-8 md:bottom-64"
           onClick={() => containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" })}
           aria-label="Scroll to bottom"
         >

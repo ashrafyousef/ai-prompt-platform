@@ -315,7 +315,7 @@ export function ChatClient() {
             selectedModelId={selectedModelId}
             onModelChange={setSelectedModelId}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-4">
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4">
             <div className="pointer-events-auto px-4">
               <ChatComposer
                 onSend={handleSend}

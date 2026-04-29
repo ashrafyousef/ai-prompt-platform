@@ -306,7 +306,121 @@ export default function AdminMembersPage() {
         ) : null}
       </section>
 
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <section className="space-y-3 md:hidden">
+        <h3 className="px-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Members</h3>
+        {sortedMembers.map((member) => {
+          const draft = drafts[member.id];
+          const editable = canEditMember(member);
+          return (
+            <article
+              key={`mobile-member-${member.id}`}
+              className="rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <div className="mb-2">
+                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{member.name || "Unnamed user"}</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">{member.email}</p>
+              </div>
+              <div className="grid gap-2">
+                <label className="grid gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span>Role</span>
+                  <select
+                    value={draft?.role ?? member.role}
+                    disabled={!editable || !canEditRole(member)}
+                    onChange={(e) =>
+                      setDrafts((prev) => ({
+                        ...prev,
+                        [member.id]: {
+                          ...(prev[member.id] ?? {
+                            role: member.role,
+                            isActive: member.isActive,
+                            teamId: member.teamId,
+                          }),
+                          role: e.target.value as Member["role"],
+                        },
+                      }))
+                    }
+                    className="rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    <option value="OWNER">OWNER</option>
+                    <option value="ADMIN">ADMIN</option>
+                    <option value="MEMBER">MEMBER</option>
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span>Status</span>
+                  <select
+                    value={(draft?.isActive ?? member.isActive) ? "active" : "inactive"}
+                    disabled={!editable}
+                    onChange={(e) =>
+                      setDrafts((prev) => ({
+                        ...prev,
+                        [member.id]: {
+                          ...(prev[member.id] ?? {
+                            role: member.role,
+                            isActive: member.isActive,
+                            teamId: member.teamId,
+                          }),
+                          isActive: e.target.value === "active",
+                        },
+                      }))
+                    }
+                    className="rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </label>
+                <label className="grid gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                  <span>Team</span>
+                  <select
+                    value={draft?.teamId ?? member.teamId ?? ""}
+                    disabled={!editable}
+                    onChange={(e) =>
+                      setDrafts((prev) => ({
+                        ...prev,
+                        [member.id]: {
+                          ...(prev[member.id] ?? {
+                            role: member.role,
+                            isActive: member.isActive,
+                            teamId: member.teamId,
+                          }),
+                          teamId: e.target.value || null,
+                        },
+                      }))
+                    }
+                    className="rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                  >
+                    <option value="">No team</option>
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id}>
+                        {team.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Joined{" "}
+                  {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+                    new Date(member.joinedAt)
+                  )}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void saveMember(member)}
+                  disabled={!editable || savingMemberId === member.id}
+                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                >
+                  {savingMemberId === member.id ? "Saving..." : "Save"}
+                </button>
+              </div>
+            </article>
+          );
+        })}
+      </section>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 md:block">
         <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
           <thead className="bg-zinc-50 dark:bg-zinc-900">
             <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -425,7 +539,56 @@ export default function AdminMembersPage() {
           </tbody>
         </table>
       </div>
-      <section className="overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <section className="space-y-3 md:hidden">
+        <h3 className="px-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Invitations</h3>
+        {invitations.length === 0 ? (
+          <article className="rounded-2xl border border-zinc-200/80 bg-white p-3 text-sm text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+            No invitations yet.
+          </article>
+        ) : (
+          invitations.map((inv) => {
+            const status = inv.revokedAt
+              ? "Revoked"
+              : inv.acceptedAt
+                ? "Accepted"
+                : new Date(inv.expiresAt).getTime() <= Date.now()
+                  ? "Expired"
+                  : "Pending";
+            const canRevoke = status === "Pending";
+            return (
+              <article
+                key={`mobile-invite-${inv.id}`}
+                className="rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{inv.email}</p>
+                <div className="mt-2 grid grid-cols-2 gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  <p>Role: {inv.role}</p>
+                  <p>Team: {inv.teamName ?? "None"}</p>
+                  <p>Status: {status}</p>
+                  <p>
+                    Expires{" "}
+                    {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
+                      new Date(inv.expiresAt)
+                    )}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    disabled={!canRevoke}
+                    onClick={() => void revokeInvite(inv.id)}
+                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-700"
+                  >
+                    Revoke
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </section>
+
+      <section className="hidden overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 md:block">
         <div className="border-b border-zinc-200 px-4 py-3 text-sm font-semibold text-zinc-900 dark:border-zinc-800 dark:text-zinc-100">
           Invitations
         </div>
