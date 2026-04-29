@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, Ellipsis, LogOut, Plus, Share2, Shield, Trash2, User, Zap } from "lucide-react";
-import { SignOutButton } from "@/components/auth/SignOutButton";
+import { ChevronLeft, ChevronRight, Ellipsis, Plus, Share2, Trash2, Zap } from "lucide-react";
+import { AccountMenu } from "@/components/chat/AccountMenu";
 import { UiSession } from "@/lib/types";
 import { useSession } from "next-auth/react";
 import useSWR from "swr";
@@ -40,7 +40,6 @@ export function ChatSidebar({
   const [menuSessionId, setMenuSessionId] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const [profileOpen, setProfileOpen] = useState(false);
-  const profileRef = useRef<HTMLDivElement | null>(null);
   const [search, setSearch] = useState("");
   const { data: session } = useSession();
   const { data: usageData } = useSWR("/api/usage", fetcher, { refreshInterval: 30000 });
@@ -72,12 +71,12 @@ export function ChatSidebar({
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setMenuSessionId(null);
       }
-      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
-        setProfileOpen(false);
-      }
     }
     function onDocumentKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") setMenuSessionId(null);
+      if (event.key === "Escape") {
+        setMenuSessionId(null);
+        setProfileOpen(false);
+      }
     }
     document.addEventListener("mousedown", onDocumentClick);
     document.addEventListener("keydown", onDocumentKeyDown);
@@ -274,50 +273,22 @@ export function ChatSidebar({
         )}
       </div>
 
-      <div ref={profileRef} className="relative mt-2.5 border-t border-zinc-200/80 pt-2.5 dark:border-zinc-700/80">
+      <div className="relative mt-2.5 border-t border-zinc-200/80 pt-2.5 dark:border-zinc-700/80">
         {!collapsed && usageData ? (
           <div className="mb-2 flex items-center gap-1.5 rounded-md bg-zinc-100/80 px-3 py-1.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
             <Zap className="h-3 w-3 text-amber-500" />
             <span>{(usageData.totalTokens ?? 0).toLocaleString()} tokens used</span>
           </div>
         ) : null}
-        <button
-          className="flex w-full items-center justify-between rounded-md bg-zinc-100/85 px-3 py-2 text-xs text-zinc-700 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
-          onClick={() => setProfileOpen((prev) => !prev)}
-          aria-label="Profile menu"
-        >
-          {collapsed ? "•••" : (session?.user?.name ?? session?.user?.email ?? "Profile & Settings")}
-          {!collapsed ? <Ellipsis className="h-4 w-4" /> : null}
-        </button>
-        {profileOpen ? (
-          <div className="absolute bottom-11 left-0 right-0 z-20 rounded-md border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-900">
-            <Link
-              href="/profile"
-              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              onClick={() => setProfileOpen(false)}
-            >
-              <User className="h-3.5 w-3.5" />
-              Profile
-            </Link>
-            {session?.user?.role === "ADMIN" ? (
-              <Link
-                href="/admin"
-                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-                onClick={() => setProfileOpen(false)}
-              >
-                <Shield className="h-3.5 w-3.5" />
-                Admin
-              </Link>
-            ) : null}
-            <SignOutButton
-              callbackUrl="/sign-in"
-              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-800"
-            >
-              <LogOut className="h-3.5 w-3.5" />
-              Sign out
-            </SignOutButton>
-          </div>
-        ) : null}
+        <AccountMenu
+          open={profileOpen}
+          collapsed={collapsed}
+          userName={session?.user?.name}
+          userEmail={session?.user?.email}
+          isAdmin={session?.user?.role === "ADMIN"}
+          onToggle={() => setProfileOpen((prev) => !prev)}
+          onClose={() => setProfileOpen(false)}
+        />
       </div>
     </aside>
   );
