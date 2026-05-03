@@ -39,7 +39,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(noWorkspace);
   }
 
-  if (pathname.startsWith("/admin") && token?.role !== "ADMIN") {
+  // Align with server admin gates: workspace OWNER/ADMIN may access /admin, not only User.role=ADMIN.
+  const workspaceRole = token?.workspaceRole as string | undefined;
+  const isWorkspaceAdmin =
+    workspaceRole === "OWNER" || workspaceRole === "ADMIN";
+  const isPlatformAdmin = token?.role === "ADMIN";
+  if (pathname.startsWith("/admin") && !isWorkspaceAdmin && !isPlatformAdmin) {
     const unauthorized = new URL("/unauthorized", request.url);
     return NextResponse.redirect(unauthorized);
   }
