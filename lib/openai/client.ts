@@ -20,6 +20,46 @@ const LEGACY_MODEL_MAP: Record<string, string> = {
   "v2.0": "groq-llama-70b",
 };
 
+/**
+ * OpenAI GPT-5 family chat/completions expects `max_completion_tokens` instead of `max_tokens`.
+ * Pass either the API `model` string (e.g. `gpt-5.4-mini`) or a registry id (e.g. `openai-gpt-5.4`).
+ */
+export function usesMaxCompletionTokens(modelNameOrRegistryId: string | null | undefined): boolean {
+  if (!modelNameOrRegistryId) return false;
+  const id = modelNameOrRegistryId.trim().toLowerCase();
+  return id.startsWith("gpt-5") || id.startsWith("openai-gpt-5");
+}
+
+function tokenLimitBodyForProvider(
+  provider: ModelProvider,
+  apiModelId: string,
+  registryModelId: string | null,
+  maxTokens: number
+): Record<string, unknown> {
+  if (provider === "groq") {
+    return { max_tokens: maxTokens };
+  }
+  if (provider !== "openai") {
+    return { max_tokens: maxTokens };
+  }
+  if (usesMaxCompletionTokens(registryModelId) || usesMaxCompletionTokens(apiModelId)) {
+    return { max_completion_tokens: maxTokens };
+  }
+  return { max_tokens: maxTokens };
+}
+
+function logIfOpenAiMaxTokensRejected(status: number, errorBody: string, context: string): void {
+  if (
+    status === 400 &&
+    errorBody.includes("max_tokens") &&
+    errorBody.includes("max_completion_tokens")
+  ) {
+    console.error(
+      `[openai:${context}] Chat completions rejected max_tokens for this model; use max_completion_tokens (GPT-5 family). See usesMaxCompletionTokens() in lib/openai/client.ts.`
+    );
+  }
+}
+
 export type ResolvedProvider = {
   apiUrl: string;
   apiKey: string;
@@ -165,17 +205,19 @@ export async function createChatCompletion(
   }
 
   const model = options.model ?? resolved.defaultModel;
+  const maxTokens = options.maxTokens ?? 900;
 
   const response = await postChatCompletions(resolved, {
     model,
     messages,
     temperature: options.temperature ?? 0.4,
-    max_tokens: options.maxTokens ?? 900,
+    ...tokenLimitBodyForProvider(resolved.provider, model, resolved.registryModelId, maxTokens),
     stream: false,
   });
 
   if (!response.ok) {
     const text = await response.text();
+    logIfOpenAiMaxTokensRejected(response.status, text, "createChatCompletion");
     throw new Error(`LLM request failed: ${response.status} ${text}`);
   }
 
@@ -204,11 +246,12 @@ export async function* streamChatCompletion(
 
   const model = options.model ?? resolved.defaultModel;
   const isOpenAi = resolved.apiUrl === OPENAI_API_URL;
+  const maxTokens = options.maxTokens ?? 900;
   const body: Record<string, unknown> = {
     model,
     messages,
     temperature: options.temperature ?? 0.4,
-    max_tokens: options.maxTokens ?? 900,
+    ...tokenLimitBodyForProvider(resolved.provider, model, resolved.registryModelId, maxTokens),
     stream: true,
   };
   if (isOpenAi) {
@@ -219,6 +262,7 @@ export async function* streamChatCompletion(
 
   if (!response.ok) {
     const text = await response.text();
+    logIfOpenAiMaxTokensRejected(response.status, text, "streamChatCompletion");
     throw new Error(`LLM request failed: ${response.status} ${text}`);
   }
 
