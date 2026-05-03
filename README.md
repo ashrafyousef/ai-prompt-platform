@@ -1,6 +1,6 @@
-# AI Prompt Platform
+# AI Workspace
 
-Monolithic Next.js + PostgreSQL platform for controlled prompt engineering with:
+Monolithic Next.js + PostgreSQL app for team AI workflows with:
 
 - chat sessions and history
 - configurable AI agents

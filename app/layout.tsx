@@ -6,8 +6,9 @@ import { Providers } from './providers'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'AI Prompt Platform',
-  description: 'Controlled prompt engineering platform with configurable agents.',
+  title: 'AI Workspace',
+  description:
+    'AI Workspace helps teams use configurable agents, shared knowledge, and structured prompts in a controlled workspace.',
 }
 
 export default function RootLayout({
