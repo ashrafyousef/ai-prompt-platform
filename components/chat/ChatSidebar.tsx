@@ -285,7 +285,11 @@ export function ChatSidebar({
           collapsed={collapsed}
           userName={session?.user?.name}
           userEmail={session?.user?.email}
-          isAdmin={session?.user?.role === "ADMIN"}
+          isAdmin={
+            session?.user?.role === "ADMIN" ||
+            session?.user?.workspaceRole === "OWNER" ||
+            session?.user?.workspaceRole === "ADMIN"
+          }
           onToggle={() => setProfileOpen((prev) => !prev)}
           onClose={() => setProfileOpen(false)}
         />

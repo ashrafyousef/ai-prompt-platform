@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authErrorStatus, requireAuthorizedUserContext } from "@/lib/auth";
-import { detectProvider, ROLE_LIMITS, type UserRole } from "@/lib/models";
+import { detectProvider, ROLE_LIMITS } from "@/lib/models";
 import { getPlatformModelGovernance, resolvePlatformModelDefaults } from "@/lib/platformModelGovernance";
 import { getRecentRateLimitAdvisory } from "@/lib/modelHealthHints";
 import { getGovernedModelsForUser } from "@/lib/usage";
@@ -8,7 +8,7 @@ import { getGovernedModelsForUser } from "@/lib/usage";
 export async function GET() {
   try {
     const auth = await requireAuthorizedUserContext();
-    const role = auth.role as UserRole;
+    const role = auth.modelGovernanceRole;
     const provider = detectProvider();
     const limits = ROLE_LIMITS[role] ?? ROLE_LIMITS.USER;
     const { models, snapshot } = await getGovernedModelsForUser({

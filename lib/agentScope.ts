@@ -16,7 +16,13 @@ export function canViewAgentForActor(
   agent: Pick<AgentConfig, "workspaceId" | "scope" | "teamId">
 ): boolean {
   if (agent.workspaceId !== actor.workspaceId) return false;
-  if (actor.workspaceRole === "OWNER" || actor.platformRole === "ADMIN") return true;
+  if (
+    actor.workspaceRole === "OWNER" ||
+    actor.workspaceRole === "ADMIN" ||
+    actor.platformRole === "ADMIN"
+  ) {
+    return true;
+  }
   if (isWorkspaceWideAgentScope(agent.scope)) return true;
   return Boolean(actor.teamId && agent.teamId === actor.teamId);
 }

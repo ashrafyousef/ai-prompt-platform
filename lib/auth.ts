@@ -2,6 +2,7 @@ import { getServerSession, NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
+import type { UserRole } from "@/lib/models";
 import { resolveWorkspaceAccessForUser } from "@/lib/workspaceAccess";
 
 async function loadMembershipForSession(userId: string) {
@@ -133,6 +134,22 @@ export async function requireUserId(): Promise<string> {
   return session.user.id;
 }
 
+/**
+ * Role used for model registry / cost-tier governance and token soft limits.
+ * Workspace OWNER and workspace ADMIN get ADMIN-tier model access; platform ADMIN stays ADMIN;
+ * platform TEAM_LEAD stays TEAM_LEAD; otherwise USER.
+ */
+export function resolveModelGovernanceRole(params: {
+  platformRole: "USER" | "TEAM_LEAD" | "ADMIN";
+  workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | null | undefined;
+}): UserRole {
+  if (params.platformRole === "ADMIN") return "ADMIN";
+  const wr = params.workspaceRole;
+  if (wr === "OWNER" || wr === "ADMIN") return "ADMIN";
+  if (params.platformRole === "TEAM_LEAD") return "TEAM_LEAD";
+  return "USER";
+}
+
 export async function requireUserIdWithWorkspace(): Promise<{
   userId: string;
   workspaceId: string;
@@ -158,6 +175,8 @@ export async function requireUserIdWithWorkspace(): Promise<{
 export type AuthorizedUserContext = {
   userId: string;
   role: "USER" | "TEAM_LEAD" | "ADMIN";
+  /** Same as {@link resolveModelGovernanceRole} for this user + active workspace membership. */
+  modelGovernanceRole: UserRole;
   teamId: string | null;
   workspaceId: string;
   workspaceRole: "OWNER" | "ADMIN" | "MEMBER";
@@ -194,6 +213,10 @@ export async function requireAuthorizedUserContext(): Promise<AuthorizedUserCont
   return {
     userId: session.user.id,
     role: user.role,
+    modelGovernanceRole: resolveModelGovernanceRole({
+      platformRole: user.role,
+      workspaceRole: workspaceAccess.workspaceRole,
+    }),
     teamId: workspaceAccess.teamId ?? user.teamId,
     workspaceId: workspaceAccess.workspaceId,
     workspaceRole: workspaceAccess.workspaceRole,

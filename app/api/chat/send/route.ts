@@ -3,7 +3,7 @@ import { z } from "zod";
 import { readFile } from "fs/promises";
 import path from "path";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { authOptions, resolveModelGovernanceRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   applyFirstTurnTitleFallback,
@@ -182,7 +182,10 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
-    const userRole = session.user.role ?? "USER";
+    const userRole = resolveModelGovernanceRole({
+      platformRole: (session.user.role ?? "USER") as "USER" | "TEAM_LEAD" | "ADMIN",
+      workspaceRole: session.user.workspaceRole,
+    });
     const teamId = session.user.teamId ?? null;
     userIdForLogs = userId;
     const limit = await checkRateLimit({

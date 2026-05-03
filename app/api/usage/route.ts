@@ -9,7 +9,7 @@ export async function GET() {
   try {
     const auth = await requireAuthorizedUserContext();
     const userId = auth.userId;
-    const userRole = auth.role as UserRole;
+    const userRole = auth.modelGovernanceRole;
     const teamId = auth.teamId;
 
     const [allTime, exactCount, governance] = await Promise.all([
