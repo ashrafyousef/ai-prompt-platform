@@ -1,6 +1,17 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  Children,
+  isValidElement,
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import useSWR from "swr";
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
@@ -46,6 +57,23 @@ const rehypePlugins = [rehypeKatex, rehypeHighlight];
 
 const modelsFetcher = (url: string) => fetch(url).then((r) => r.json());
 
+type MarkdownChildProps = {
+  className?: string;
+  children?: ReactNode;
+};
+
+function codeLabelFromClassName(className?: string) {
+  const match = /(?:^|\s)language-([^\s]+)/.exec(className ?? "");
+  return match?.[1] ?? "code";
+}
+
+function textFromNode(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(textFromNode).join("");
+  if (isValidElement<MarkdownChildProps>(node)) return textFromNode(node.props.children);
+  return "";
+}
+
 const MessageBubble = memo(function MessageBubble({
   message,
   onRegenerate,
@@ -87,34 +115,147 @@ const MessageBubble = memo(function MessageBubble({
     [toast]
   );
 
-  const codeComponents = useMemo(() => ({
-    code(props: { className?: string; children?: React.ReactNode }) {
-      const { className, children } = props;
-      const isInline = !className;
-      const label = className?.replace("language-", "") ?? "code";
-      if (isInline) {
-        return (
-          <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200">
-            {children}
-          </code>
-        );
-      }
+  const markdownComponents = useMemo(() => ({
+    h1(props: { children?: ReactNode }) {
       return (
-        <div className="my-3 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
-          <div className="flex items-center justify-between bg-zinc-900 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-300">
-            <span>{label}</span>
+        <h1 className="mb-3 mt-4 min-w-0 max-w-full break-words text-xl font-semibold leading-tight [overflow-wrap:anywhere]">
+          {props.children}
+        </h1>
+      );
+    },
+    h2(props: { children?: ReactNode }) {
+      return (
+        <h2 className="mb-2.5 mt-4 min-w-0 max-w-full break-words text-lg font-semibold leading-tight [overflow-wrap:anywhere]">
+          {props.children}
+        </h2>
+      );
+    },
+    h3(props: { children?: ReactNode }) {
+      return (
+        <h3 className="mb-2 mt-3.5 min-w-0 max-w-full break-words text-base font-semibold leading-snug [overflow-wrap:anywhere]">
+          {props.children}
+        </h3>
+      );
+    },
+    h4(props: { children?: ReactNode }) {
+      return (
+        <h4 className="mb-2 mt-3 min-w-0 max-w-full break-words text-sm font-semibold leading-snug [overflow-wrap:anywhere]">
+          {props.children}
+        </h4>
+      );
+    },
+    h5(props: { children?: ReactNode }) {
+      return (
+        <h5 className="mb-2 mt-3 min-w-0 max-w-full break-words text-sm font-semibold leading-snug [overflow-wrap:anywhere]">
+          {props.children}
+        </h5>
+      );
+    },
+    h6(props: { children?: ReactNode }) {
+      return (
+        <h6 className="mb-2 mt-3 min-w-0 max-w-full break-words text-xs font-semibold uppercase leading-snug tracking-wide [overflow-wrap:anywhere]">
+          {props.children}
+        </h6>
+      );
+    },
+    p(props: { children?: ReactNode }) {
+      return (
+        <p className="my-2 min-w-0 max-w-full break-words leading-7 [overflow-wrap:anywhere]">
+          {props.children}
+        </p>
+      );
+    },
+    ul(props: { children?: ReactNode }) {
+      return <ul className="my-2 min-w-0 max-w-full list-disc space-y-1 pl-5">{props.children}</ul>;
+    },
+    ol(props: { children?: ReactNode }) {
+      return <ol className="my-2 min-w-0 max-w-full list-decimal space-y-1 pl-5">{props.children}</ol>;
+    },
+    li(props: { children?: ReactNode }) {
+      return (
+        <li className="min-w-0 max-w-full break-words pl-1 leading-7 [overflow-wrap:anywhere]">
+          {props.children}
+        </li>
+      );
+    },
+    a(props: { href?: string; children?: ReactNode }) {
+      return (
+        <a
+          href={props.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-words text-violet-700 underline decoration-violet-300 underline-offset-2 [overflow-wrap:anywhere] hover:text-violet-800 dark:text-violet-300 dark:decoration-violet-700 dark:hover:text-violet-200"
+        >
+          {props.children}
+        </a>
+      );
+    },
+    blockquote(props: { children?: ReactNode }) {
+      return (
+        <blockquote className="my-3 min-w-0 max-w-full border-l-2 border-zinc-300 pl-3 text-zinc-600 dark:border-zinc-600 dark:text-zinc-300">
+          {props.children}
+        </blockquote>
+      );
+    },
+    table(props: { children?: ReactNode }) {
+      return (
+        <div className="my-3 max-w-full overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+          <table className="min-w-max border-collapse text-left text-xs">{props.children}</table>
+        </div>
+      );
+    },
+    th(props: { children?: ReactNode }) {
+      return (
+        <th className="border-b border-zinc-200 bg-zinc-50 px-3 py-2 font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+          {props.children}
+        </th>
+      );
+    },
+    td(props: { children?: ReactNode }) {
+      return (
+        <td className="border-b border-zinc-100 px-3 py-2 align-top text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
+          {props.children}
+        </td>
+      );
+    },
+    hr() {
+      return <hr className="my-4 border-zinc-200 dark:border-zinc-700" />;
+    },
+    pre(props: { children?: ReactNode }) {
+      const child = Children.toArray(props.children).find((item) => isValidElement<MarkdownChildProps>(item));
+      const codeProps = isValidElement<MarkdownChildProps>(child) ? child.props : {};
+      const codeChildren = codeProps.children ?? props.children;
+      const label = codeLabelFromClassName(codeProps.className);
+      const copyText = textFromNode(codeChildren);
+
+      return (
+        <div className="my-3 max-w-full overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+          <div className="flex min-w-0 items-center justify-between gap-2 bg-zinc-900 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-300">
+            <span className="min-w-0 truncate">{label}</span>
             <button
-              className="rounded px-2 py-0.5 text-zinc-300 hover:bg-zinc-700 hover:text-white"
-              onClick={() => { navigator.clipboard.writeText(String(children)); toast("Code copied"); }}
+              className="shrink-0 rounded px-2 py-0.5 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+              onClick={() => { navigator.clipboard.writeText(copyText); toast("Code copied"); }}
             >
               Copy
             </button>
           </div>
-          <pre className="overflow-x-auto bg-zinc-950 px-4 py-3 text-xs text-zinc-100">
-            <code>{children}</code>
+          <pre className="max-w-full overflow-x-auto bg-zinc-950 px-4 py-3 text-xs leading-5 text-zinc-100">
+            <code className={`block min-w-max whitespace-pre ${codeProps.className ?? ""}`}>{codeChildren}</code>
           </pre>
         </div>
       );
+    },
+    code(props: { className?: string; children?: ReactNode }) {
+      const { className, children } = props;
+      const isInline = !className;
+      if (isInline) {
+        return (
+          <code className="rounded bg-zinc-100 px-1.5 py-0.5 font-mono text-xs text-zinc-800 break-words [overflow-wrap:anywhere] dark:bg-zinc-700 dark:text-zinc-200">
+            {children}
+          </code>
+        );
+      }
+      return <code className={className}>{children}</code>;
     },
   }), [toast]);
 
@@ -132,9 +273,9 @@ const MessageBubble = memo(function MessageBubble({
   const failedGen = gen?.status === "failed" ? gen : null;
 
   return (
-    <div className="group">
+    <div className="group min-w-0 max-w-full">
       <div
-        className={`rounded-2xl p-4 text-sm leading-7 shadow-sm transition ${
+        className={`min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 shadow-sm transition ${
           message.role === "user"
             ? "ml-auto max-w-2xl bg-violet-50 text-zinc-900 dark:bg-violet-950/40 dark:text-zinc-100"
             : "mr-auto max-w-3xl border border-zinc-200/90 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
@@ -191,7 +332,7 @@ const MessageBubble = memo(function MessageBubble({
                 <ReactMarkdown
                   remarkPlugins={remarkPlugins}
                   rehypePlugins={rehypePlugins}
-                  components={codeComponents as never}
+                  components={markdownComponents as never}
                 >
                   {message.content}
                 </ReactMarkdown>
@@ -210,7 +351,7 @@ const MessageBubble = memo(function MessageBubble({
             <ReactMarkdown
               remarkPlugins={remarkPlugins}
               rehypePlugins={rehypePlugins}
-              components={codeComponents as never}
+              components={markdownComponents as never}
             >
               {message.content || (isAssistantStreaming ? "\u00a0" : "")}
             </ReactMarkdown>
