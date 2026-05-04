@@ -189,7 +189,7 @@ export function ChatComposer({
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className={`relative mx-auto w-full max-w-3xl rounded-[30px] p-2.5 shadow-none transition-colors ${
+      className={`relative mx-auto w-full min-w-0 max-w-full overflow-hidden rounded-[30px] p-2.5 shadow-none transition-colors md:max-w-3xl ${
         dragging
           ? "bg-violet-100 ring-2 ring-violet-400 dark:bg-violet-950/40 dark:ring-violet-500"
           : "bg-zinc-100 dark:bg-[#1e1e1e]"
@@ -274,11 +274,11 @@ export function ChatComposer({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="mb-1.5 max-h-44 min-h-[48px] w-full resize-none overflow-y-hidden bg-transparent px-4 py-2.5 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-500 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400"
+        className="mb-1.5 max-h-44 min-h-[48px] w-full min-w-0 max-w-full resize-none overflow-y-hidden bg-transparent px-4 py-2.5 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-500 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400"
         placeholder={placeholderText ?? "Ask Assistant..."}
         disabled={disabled}
       />
-      <div className="flex items-end justify-between gap-2.5 px-1 pb-1 sm:px-2">
+      <div className="flex min-w-0 max-w-full items-end justify-between gap-2.5 px-1 pb-1 sm:px-2">
         <input
           ref={fileInputRef}
           type="file"

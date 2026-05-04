@@ -54,7 +54,7 @@ export function ChatLayout({
   );
 
   return (
-    <main className="flex h-[100dvh] overflow-hidden bg-gradient-to-b from-zinc-50 to-zinc-100 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
+    <main className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-gradient-to-b from-zinc-50 to-zinc-100 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
       <div className="hidden md:block">{sidebar}</div>
 
       {mobileSidebarOpen ? (
@@ -77,9 +77,9 @@ export function ChatLayout({
         </>
       ) : null}
 
-      <section className="relative flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
-          <div className="flex items-center gap-3">
+      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
+          <div className="flex min-w-0 items-center gap-3">
             <button
               className="rounded-md p-2 text-zinc-600 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
               onClick={onToggleMobileSidebar}
@@ -116,7 +116,7 @@ export function ChatLayout({
             </button>
           </div>
         </div>
-        <div className="flex min-h-0 flex-1">
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {children}
           {drawerOpen ? (
             <aside className="hidden w-72 shrink-0 border-l border-zinc-200/70 bg-white/70 text-xs text-zinc-600 backdrop-blur lg:block dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300">

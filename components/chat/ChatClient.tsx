@@ -319,8 +319,8 @@ export function ChatClient() {
       mobileSidebarOpen={mobileSidebarOpen}
       onToggleMobileSidebar={() => setMobileSidebarOpen((prev) => !prev)}
     >
-      <div className="flex w-full h-full min-h-0 relative">
-        <div className="flex flex-1 flex-col h-full min-h-0 relative">
+      <div className="relative flex h-full min-h-0 w-full min-w-0 max-w-full overflow-hidden">
+        <div className="relative flex h-full min-h-0 min-w-0 max-w-full flex-1 flex-col overflow-hidden">
           <MessageList
             messages={messages}
             onRegenerate={regenerate}
@@ -339,9 +339,9 @@ export function ChatClient() {
           />
           <div
             ref={composerDockRef}
-            className="pointer-events-none absolute inset-x-0 bottom-0 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4"
+            className="pointer-events-none absolute inset-x-0 bottom-0 max-w-full overflow-hidden pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4"
           >
-            <div className="pointer-events-auto px-3 sm:px-4">
+            <div className="pointer-events-auto w-full min-w-0 max-w-full px-3 sm:px-4">
               <ChatComposer
                 onSend={handleSend}
                 disabled={loading}

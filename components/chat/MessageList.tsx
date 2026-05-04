@@ -271,18 +271,20 @@ const MessageBubble = memo(function MessageBubble({
   }, [isAssistantFailed, gen, models, selectedModelId]);
 
   const failedGen = gen?.status === "failed" ? gen : null;
+  const alignment = message.role === "user" ? "justify-end" : "justify-start";
 
   return (
-    <div className="group min-w-0 max-w-full">
-      <div
-        className={`min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 shadow-sm transition ${
-          message.role === "user"
-            ? "ml-auto max-w-2xl bg-violet-50 text-zinc-900 dark:bg-violet-950/40 dark:text-zinc-100"
-            : "mr-auto max-w-3xl border border-zinc-200/90 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
-        }`}
-      >
+    <div className="group w-full min-w-0 max-w-full">
+      <div className={`flex w-full min-w-0 max-w-full ${alignment}`}>
+        <div
+          className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 shadow-sm transition ${
+            message.role === "user"
+              ? "bg-violet-50 text-zinc-900 dark:bg-violet-950/40 dark:text-zinc-100 md:max-w-2xl"
+              : "border border-zinc-200/90 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 md:max-w-3xl"
+          }`}
+        >
         {images && images.length > 0 ? (
-          <div className="mb-3 flex flex-wrap gap-2">
+          <div className="mb-3 flex min-w-0 max-w-full flex-wrap gap-2">
             {images.map((url, i) => (
               <a key={i} href={url} target="_blank" rel="noopener noreferrer">
                 <Image
@@ -291,7 +293,7 @@ const MessageBubble = memo(function MessageBubble({
                   width={200}
                   height={128}
                   unoptimized
-                  className="h-32 w-auto max-w-[200px] cursor-pointer rounded-xl border border-zinc-200 object-cover transition hover:opacity-90 dark:border-zinc-700"
+                  className="h-32 w-auto max-w-full cursor-pointer rounded-xl border border-zinc-200 object-cover transition hover:opacity-90 dark:border-zinc-700 sm:max-w-[200px]"
                 />
               </a>
             ))}
@@ -325,7 +327,7 @@ const MessageBubble = memo(function MessageBubble({
               </div>
             </div>
             {message.content.trim().length > 0 ? (
-              <div className="mt-1 rounded-lg border border-zinc-200/80 bg-zinc-50/75 px-3 py-2.5 text-xs text-zinc-500 dark:border-zinc-700/80 dark:bg-zinc-900/30 dark:text-zinc-400">
+              <div className="mt-1 min-w-0 max-w-full overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-50/75 px-3 py-2.5 text-xs text-zinc-500 dark:border-zinc-700/80 dark:bg-zinc-900/30 dark:text-zinc-400">
                 <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
                   Partial response
                 </p>
@@ -347,7 +349,7 @@ const MessageBubble = memo(function MessageBubble({
             </span>
           </p>
         ) : (
-          <>
+          <div className="min-w-0 max-w-full break-words [overflow-wrap:anywhere]">
             <ReactMarkdown
               remarkPlugins={remarkPlugins}
               rehypePlugins={rehypePlugins}
@@ -358,11 +360,12 @@ const MessageBubble = memo(function MessageBubble({
             {isAssistantStreaming && message.content.trim().length > 0 ? (
               <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-violet-500 align-middle" aria-hidden />
             ) : null}
-          </>
+          </div>
         )}
+        </div>
       </div>
       <div
-        className={`mt-2 flex items-center gap-1 text-zinc-500 transition-opacity dark:text-zinc-400 ${
+        className={`mt-2 flex w-full min-w-0 max-w-full items-center gap-1 text-zinc-500 transition-opacity dark:text-zinc-400 ${
           message.role === "user"
             ? "justify-end opacity-100 md:opacity-0 md:group-hover:opacity-100"
             : "justify-start opacity-100 md:opacity-0 md:group-hover:opacity-100"
@@ -491,7 +494,7 @@ export function MessageList({
       return (
         <div
           style={composerInsetStyle}
-          className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-8 md:items-center md:px-6 md:pb-40"
+          className="flex min-h-0 min-w-0 max-w-full flex-1 items-start justify-center overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-8 md:items-center md:px-6 md:pb-40"
         >
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assistant…</p>
         </div>
@@ -501,9 +504,9 @@ export function MessageList({
     return (
       <div
         style={composerInsetStyle}
-        className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-6 sm:px-6 md:items-center md:pb-40 md:pt-8"
+        className="flex min-h-0 min-w-0 max-w-full flex-1 items-start justify-center overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-6 sm:px-6 md:items-center md:pb-40 md:pt-8"
       >
-        <div className="mx-auto w-full max-w-3xl">
+        <div className="mx-auto w-full min-w-0 max-w-full md:max-w-3xl">
           {activeAgent ? (
             <div className="flex flex-col items-center">
               <span className="text-3xl">{activeAgent.icon || "🤖"}</span>
@@ -549,11 +552,11 @@ export function MessageList({
   }
 
   return (
-    <div style={composerInsetStyle} className="relative min-h-0 flex-1">
+    <div style={composerInsetStyle} className="relative min-h-0 min-w-0 max-w-full flex-1 overflow-hidden">
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex h-full flex-col gap-4 overflow-auto px-4 pb-[calc(var(--composer-bottom-inset)+1rem)] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6 md:pb-64"
+        className="flex h-full w-full min-w-0 max-w-full flex-col gap-4 overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1rem)] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6 md:pb-64"
       >
         {loading && messages.length === 0
           ? [1, 2, 3].map((skeleton) => (
