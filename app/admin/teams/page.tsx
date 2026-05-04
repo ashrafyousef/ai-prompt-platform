@@ -44,6 +44,7 @@ export default function AdminTeamsPage() {
 
   const activeTeams = useMemo(() => teams.filter((t) => !t.isArchived), [teams]);
   const archivedTeams = useMemo(() => teams.filter((t) => t.isArchived), [teams]);
+  const orderedTeams = useMemo(() => [...activeTeams, ...archivedTeams], [activeTeams, archivedTeams]);
 
   async function onCreateTeam(e: FormEvent) {
     e.preventDefault();
@@ -130,7 +131,65 @@ export default function AdminTeamsPage() {
         </form>
       </section>
 
-      <section className="overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <section className="space-y-3 md:hidden">
+        <h3 className="px-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Workspace teams</h3>
+        {orderedTeams.length === 0 ? (
+          <article className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-sm text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+            No teams yet.
+          </article>
+        ) : (
+          orderedTeams.map((team) => (
+            <article
+              key={`mobile-team-${team.id}`}
+              className="rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+            >
+              <label className="grid gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+                <span>Team name</span>
+                <input
+                  value={draftName[team.id] ?? team.name}
+                  onChange={(e) => setDraftName((prev) => ({ ...prev, [team.id]: e.target.value }))}
+                  disabled={team.isArchived}
+                  className="min-w-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm font-medium text-zinc-900 disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+              </label>
+              <div className="mt-3 grid gap-2 text-xs text-zinc-500 dark:text-zinc-400 min-[430px]:grid-cols-2">
+                <p className="min-w-0">
+                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Slug:</span>{" "}
+                  <span className="break-all">{team.slug}</span>
+                </p>
+                <p>
+                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Members:</span>{" "}
+                  {team.memberCount}
+                </p>
+                <p>
+                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Status:</span>{" "}
+                  {team.isArchived ? "Archived" : "Active"}
+                </p>
+              </div>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void saveTeam(team.id, { name: (draftName[team.id] ?? team.name).trim() })}
+                  disabled={savingId === team.id || team.isArchived}
+                  className="rounded-md border border-zinc-300 px-3 py-1.5 text-xs font-medium disabled:opacity-60 dark:border-zinc-700"
+                >
+                  Save name
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void saveTeam(team.id, { isArchived: !team.isArchived })}
+                  disabled={savingId === team.id}
+                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                >
+                  {team.isArchived ? "Restore" : "Archive"}
+                </button>
+              </div>
+            </article>
+          ))
+        )}
+      </section>
+
+      <section className="hidden overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 md:block">
         <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
           <thead className="bg-zinc-50 dark:bg-zinc-900">
             <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -142,7 +201,7 @@ export default function AdminTeamsPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-zinc-100 text-sm dark:divide-zinc-900">
-            {[...activeTeams, ...archivedTeams].map((team) => (
+            {orderedTeams.map((team) => (
               <tr key={team.id}>
                 <td className="px-4 py-3">
                   <input

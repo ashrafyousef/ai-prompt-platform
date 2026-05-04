@@ -203,10 +203,10 @@ export function ChatComposer({
         </div>
       ) : null}
       {modeLabel ? (
-        <div className="mb-2 flex items-center justify-between rounded-2xl bg-amber-100/50 px-3.5 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
-          <span>{modeLabel}</span>
+        <div className="mb-2 flex items-center justify-between gap-2 rounded-2xl bg-amber-100/50 px-3.5 py-2 text-xs text-amber-900 dark:bg-amber-900/20 dark:text-amber-200">
+          <span className="min-w-0 leading-relaxed">{modeLabel}</span>
           {onCancelMode ? (
-            <button type="button" onClick={onCancelMode} className="underline hover:no-underline">
+            <button type="button" onClick={onCancelMode} className="shrink-0 underline hover:no-underline">
               Cancel
             </button>
           ) : null}
@@ -217,13 +217,13 @@ export function ChatComposer({
           {compatibilityIssues.map((issue) => (
             <div
               key={issue.id}
-              className={`flex items-start justify-between gap-2 rounded-xl px-3 py-2 text-xs ${
+              className={`flex flex-wrap items-start justify-between gap-2 rounded-xl px-3 py-2 text-xs sm:flex-nowrap ${
                 issue.severity === "blocking"
                   ? "bg-red-100/70 text-red-800 dark:bg-red-900/30 dark:text-red-200"
                   : "bg-amber-100/70 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
               }`}
             >
-              <div className="flex min-w-0 items-start gap-1.5">
+              <div className="flex min-w-0 flex-1 items-start gap-1.5">
                 <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                 <p className="leading-relaxed">{issue.message}</p>
               </div>
@@ -231,11 +231,13 @@ export function ChatComposer({
                 <button
                   type="button"
                   onClick={() => onModelChange(issue.suggestedModelId!)}
-                  className="shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-medium transition hover:opacity-80"
+                  className="max-w-full shrink-0 rounded-full border border-current px-2 py-0.5 text-[10px] font-medium transition hover:opacity-80"
                 >
-                  <span className="inline-flex items-center gap-1">
+                  <span className="inline-flex min-w-0 items-center gap-1">
                     <WandSparkles className="h-3 w-3" />
-                    Switch{issue.suggestedModelName ? ` to ${issue.suggestedModelName}` : ""}
+                    <span className="truncate">
+                      Switch{issue.suggestedModelName ? ` to ${issue.suggestedModelName}` : ""}
+                    </span>
                   </span>
                 </button>
               ) : null}
@@ -276,7 +278,7 @@ export function ChatComposer({
         placeholder={placeholderText ?? "Ask Assistant..."}
         disabled={disabled}
       />
-      <div className="flex items-end justify-between gap-2.5 px-2 pb-1">
+      <div className="flex items-end justify-between gap-2.5 px-1 pb-1 sm:px-2">
         <input
           ref={fileInputRef}
           type="file"
@@ -304,7 +306,7 @@ export function ChatComposer({
           </button>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 pl-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 pl-1">
           {onModelRoutingModeChange ? (
             <label className="flex items-center gap-1 text-[11px] text-zinc-500 dark:text-zinc-400">
               <span className="sr-only">Routing</span>

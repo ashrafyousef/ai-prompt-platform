@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Ellipsis, LogOut, Shield, User } from "lucide-react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 
@@ -96,6 +97,11 @@ export function AccountMenu({
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const desktopPanelRef = useRef<HTMLDivElement | null>(null);
   const [desktopPosition, setDesktopPosition] = useState<{ left: number; top: number } | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -137,6 +143,21 @@ export function AccountMenu({
     };
   }, [open, collapsed]);
 
+  const mobileSheet = (
+    <div className="lg:hidden">
+      <button
+        type="button"
+        className="fixed inset-0 z-[90] bg-black/45"
+        onClick={onClose}
+        aria-label="Close account menu"
+      />
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[100] max-h-[min(70dvh,520px)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-3xl border border-zinc-700/80 bg-zinc-900/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl">
+        <AccountIdentity userName={userName} userEmail={userEmail} />
+        <AccountActions isAdmin={isAdmin} onClose={onClose} />
+      </div>
+    </div>
+  );
+
   return (
     <>
       <button
@@ -166,18 +187,7 @@ export function AccountMenu({
             <AccountActions isAdmin={isAdmin} onClose={onClose} />
           </div>
 
-          <div className="fixed inset-0 z-40 lg:hidden">
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/45"
-              onClick={onClose}
-              aria-label="Close account menu"
-            />
-            <div className="absolute bottom-3 left-1/2 w-[calc(100vw-24px)] max-w-[560px] -translate-x-1/2 rounded-3xl border border-zinc-700/80 bg-zinc-900/95 p-4 shadow-2xl">
-              <AccountIdentity userName={userName} userEmail={userEmail} />
-              <AccountActions isAdmin={isAdmin} onClose={onClose} />
-            </div>
-          </div>
+          {mounted ? createPortal(mobileSheet, document.body) : null}
         </>
       ) : null}
     </>

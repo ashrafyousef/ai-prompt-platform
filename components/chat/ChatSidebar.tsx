@@ -120,11 +120,11 @@ export function ChatSidebar({
 
   return (
     <aside
-      className={`flex h-screen flex-col border-r border-zinc-200/70 bg-white/85 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
-        collapsed ? "w-16" : "w-72"
+      className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/70 bg-white/85 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
+        collapsed ? "w-16" : "w-[min(100vw,360px)] md:w-72"
       }`}
     >
-      <div className="mb-2.5 flex flex-col gap-2">
+      <div className="mb-2.5 flex flex-col gap-2 pr-12 md:pr-0">
         {collapsed ? (
           <>
             <button
@@ -136,7 +136,7 @@ export function ChatSidebar({
             </button>
             <button
               onClick={onToggleCollapse}
-              className="flex w-full items-center justify-center rounded-md bg-zinc-200 p-2 text-zinc-700 transition hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600"
+              className="hidden w-full items-center justify-center rounded-md bg-zinc-200 p-2 text-zinc-700 transition hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600 md:flex"
               aria-label="Expand sidebar"
               title="Expand sidebar"
             >
@@ -154,7 +154,7 @@ export function ChatSidebar({
             </button>
             <button
               onClick={onToggleCollapse}
-              className="flex-shrink-0 rounded-md bg-zinc-200 p-2 text-zinc-700 transition hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600"
+              className="hidden flex-shrink-0 rounded-md bg-zinc-200 p-2 text-zinc-700 transition hover:bg-zinc-300 dark:bg-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-600 md:block"
               aria-label="Collapse sidebar"
               title="Collapse sidebar"
             >

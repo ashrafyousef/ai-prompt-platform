@@ -87,7 +87,63 @@ export default function AdminKnowledgePage() {
           {error}
         </div>
       ) : null}
-      <div className="overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+      <section className="space-y-3 md:hidden">
+        <h3 className="px-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Knowledge items</h3>
+        {rows.length === 0 ? (
+          <article className="rounded-2xl border border-zinc-200/80 bg-white p-4 text-sm text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+            No knowledge items available in your current scope.
+          </article>
+        ) : (
+          rows.map((row) => {
+            const key = `${row.agentId}:${row.knowledgeId}`;
+            const scopeLabel =
+              row.agentScope === "TEAM" ? `${row.agentScope} (${row.teamName ?? "No team"})` : row.agentScope;
+            return (
+              <article
+                key={`mobile-knowledge-${key}`}
+                className="rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
+              >
+                <div>
+                  <p className="break-words text-sm font-medium text-zinc-900 dark:text-zinc-100">{row.title}</p>
+                  <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
+                    {row.hasContent ? "Text/File present" : "No content"}
+                  </p>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs text-zinc-500 dark:text-zinc-400 min-[430px]:grid-cols-2">
+                  <p className="min-w-0">
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">Agent:</span>{" "}
+                    <span className="break-words">{row.agentName}</span>
+                  </p>
+                  <p>
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">Scope:</span>{" "}
+                    {scopeLabel}
+                  </p>
+                  <p>
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">Type:</span>{" "}
+                    {row.sourceType}
+                  </p>
+                  <p>
+                    <span className="font-medium text-zinc-700 dark:text-zinc-300">Status:</span>{" "}
+                    {row.isActive ? "Active" : "Inactive"} / {row.processingStatus}
+                  </p>
+                </div>
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => void toggle(row)}
+                    disabled={savingKey === key}
+                    className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    {savingKey === key ? "Saving..." : row.isActive ? "Deactivate" : "Activate"}
+                  </button>
+                </div>
+              </article>
+            );
+          })
+        )}
+      </section>
+
+      <div className="hidden overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 md:block">
         <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
           <thead className="bg-zinc-50 dark:bg-zinc-900">
             <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">

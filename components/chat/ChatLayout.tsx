@@ -1,5 +1,5 @@
 import { ReactNode, useMemo } from "react";
-import { PanelRightClose, PanelRightOpen, Bookmark, Menu } from "lucide-react";
+import { PanelRightClose, PanelRightOpen, Bookmark, Menu, X } from "lucide-react";
 import { UiAgent, UiSession } from "@/lib/types";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { AgentSelector } from "@/components/chat/AgentSelector";
@@ -54,7 +54,7 @@ export function ChatLayout({
   );
 
   return (
-    <main className="flex h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
+    <main className="flex h-[100dvh] overflow-hidden bg-gradient-to-b from-zinc-50 to-zinc-100 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
       <div className="hidden md:block">{sidebar}</div>
 
       {mobileSidebarOpen ? (
@@ -63,7 +63,15 @@ export function ChatLayout({
             className="fixed inset-0 z-40 bg-black/40 md:hidden"
             onClick={onToggleMobileSidebar}
           />
-          <div className="fixed inset-y-0 left-0 z-50 md:hidden">
+          <div className="fixed inset-y-0 left-0 z-50 w-[min(100vw,360px)] max-w-full overflow-hidden md:hidden [&>aside]:w-full">
+            <button
+              type="button"
+              className="absolute right-3 top-3 z-10 rounded-md bg-zinc-100 p-2 text-zinc-600 shadow-sm hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              onClick={onToggleMobileSidebar}
+              aria-label="Close sidebar"
+            >
+              <X className="h-4 w-4" />
+            </button>
             {sidebar}
           </div>
         </>

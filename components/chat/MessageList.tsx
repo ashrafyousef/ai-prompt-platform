@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import useSWR from "swr";
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
@@ -28,6 +28,7 @@ type Props = {
   activeAgent?: UiAgent;
   selectedModelId?: string;
   onModelChange?: (id: string) => void;
+  composerBottomInset?: number;
 };
 
 type MessageBubbleProps = {
@@ -296,6 +297,7 @@ export function MessageList({
   activeAgent,
   selectedModelId,
   onModelChange,
+  composerBottomInset = 260,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
@@ -330,23 +332,36 @@ export function MessageList({
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
-  const modelsForBubbles = modelsData?.models ?? [];
+  const modelsForBubbles = useMemo(() => modelsData?.models ?? [], [modelsData?.models]);
   const emptyStateModelLine = useMemo(
     () => compactAgentModelSummaryLine(activeAgent, modelsForBubbles),
     [activeAgent, modelsForBubbles]
+  );
+  const composerInsetStyle = useMemo(
+    () =>
+      ({
+        "--composer-bottom-inset": `${Math.max(160, composerBottomInset)}px`,
+      } as CSSProperties),
+    [composerBottomInset]
   );
 
   if (empty) {
     if (!agentSelectionReady) {
       return (
-        <div className="flex flex-1 items-center justify-center px-6 pb-56 pt-8 md:pb-40">
+        <div
+          style={composerInsetStyle}
+          className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-8 md:items-center md:px-6 md:pb-40"
+        >
           <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assistant…</p>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-1 items-center justify-center px-6 pb-56 pt-8 md:pb-40">
+      <div
+        style={composerInsetStyle}
+        className="flex min-h-0 flex-1 items-start justify-center overflow-y-auto px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-6 sm:px-6 md:items-center md:pb-40 md:pt-8"
+      >
         <div className="mx-auto w-full max-w-3xl">
           {activeAgent ? (
             <div className="flex flex-col items-center">
@@ -393,33 +408,33 @@ export function MessageList({
   }
 
   return (
-    <div className="relative flex-1 min-h-0">
+    <div style={composerInsetStyle} className="relative min-h-0 flex-1">
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex h-full flex-col gap-4 overflow-auto px-4 pb-[max(18rem,calc(12rem+env(safe-area-inset-bottom)))] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6 md:pb-64"
+        className="flex h-full flex-col gap-4 overflow-auto px-4 pb-[calc(var(--composer-bottom-inset)+1rem)] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6 md:pb-64"
       >
         {loading && messages.length === 0
           ? [1, 2, 3].map((skeleton) => (
               <div key={skeleton} className="h-20 w-full animate-pulse rounded-xl bg-zinc-200/60 dark:bg-zinc-700/60" />
             ))
           : null}
-      {messages.map((message) => (
-        <MessageBubble
-          key={message.id}
-          message={message}
-          onRegenerate={stableOnRegenerate}
-          onEdit={stableOnEdit}
-          onRetryTurn={onRetryTurn}
-          selectedModelId={selectedModelId}
-          onModelChange={onModelChange}
-          models={modelsForBubbles}
-        />
-      ))}
+        {messages.map((message) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onRegenerate={stableOnRegenerate}
+            onEdit={stableOnEdit}
+            onRetryTurn={onRetryTurn}
+            selectedModelId={selectedModelId}
+            onModelChange={onModelChange}
+            models={modelsForBubbles}
+          />
+        ))}
       </div>
       {showScrollButton ? (
         <button
-          className="absolute bottom-[17rem] right-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 sm:right-8 md:bottom-64"
+          className="absolute bottom-[calc(var(--composer-bottom-inset)+0.75rem)] right-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 sm:right-8 md:bottom-64"
           onClick={() => containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" })}
           aria-label="Scroll to bottom"
         >

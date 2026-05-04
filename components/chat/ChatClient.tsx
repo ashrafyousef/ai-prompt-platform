@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { MessageList } from "@/components/chat/MessageList";
@@ -47,6 +47,8 @@ export function ChatClient() {
   const [selectedModelId, setSelectedModelId] = useState("");
   const [modelRoutingMode, setModelRoutingMode] = useState<"manual" | "auto" | "suggested">("manual");
   const [authLoadingTimedOut, setAuthLoadingTimedOut] = useState(false);
+  const [composerBottomInset, setComposerBottomInset] = useState(260);
+  const composerDockRef = useRef<HTMLDivElement | null>(null);
 
   const { toast } = useToast();
 
@@ -168,6 +170,25 @@ export function ChatClient() {
     }
     const timer = setTimeout(() => setAuthLoadingTimedOut(true), 3500);
     return () => clearTimeout(timer);
+  }, [status]);
+
+  useEffect(() => {
+    const node = composerDockRef.current;
+    if (!node) return;
+
+    const updateInset = () => {
+      setComposerBottomInset(Math.max(160, Math.ceil(node.getBoundingClientRect().height)));
+    };
+
+    updateInset();
+    const observer =
+      typeof ResizeObserver !== "undefined" ? new ResizeObserver(updateInset) : null;
+    observer?.observe(node);
+    window.addEventListener("resize", updateInset);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", updateInset);
+    };
   }, [status]);
 
   const handleSelectSession = async (sessionId: string) => {
@@ -314,9 +335,13 @@ export function ChatClient() {
             activeAgent={activeAgent}
             selectedModelId={selectedModelId}
             onModelChange={setSelectedModelId}
+            composerBottomInset={composerBottomInset}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4">
-            <div className="pointer-events-auto px-4">
+          <div
+            ref={composerDockRef}
+            className="pointer-events-none absolute inset-x-0 bottom-0 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4"
+          >
+            <div className="pointer-events-auto px-3 sm:px-4">
               <ChatComposer
                 onSend={handleSend}
                 disabled={loading}

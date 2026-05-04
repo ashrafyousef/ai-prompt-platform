@@ -12,7 +12,7 @@ export function AgentStarterPrompts({
 }) {
   if (!agent) return null;
   const prompts = agent.starterPrompts
-    .filter((prompt) => prompt.isActive !== false)
+    .filter((prompt) => prompt.isActive !== false && prompt.prompt.trim().length > 0)
     .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER));
   if (!prompts || prompts.length === 0) return null;
   const visiblePrompts = prompts.slice(0, 4);
@@ -41,7 +41,9 @@ export function AgentStarterPrompts({
             }`}
           >
             <span className="line-clamp-3 text-[13px] leading-relaxed">
-              {prompt.prompt.length > 140 ? `${prompt.prompt.slice(0, 137)}...` : prompt.prompt}
+              {prompt.prompt.trim().length > 140
+                ? `${prompt.prompt.trim().slice(0, 137)}...`
+                : prompt.prompt.trim()}
             </span>
           </button>
         ))}

@@ -157,7 +157,7 @@ export function ModelSelector({
     .join(" · ");
 
   return (
-    <div ref={ref} className="relative flex flex-col items-end gap-0.5">
+    <div ref={ref} className="relative flex min-w-0 max-w-full flex-col items-end gap-0.5">
       <button
         type="button"
         onClick={() => setOpen((p) => !p)}
