@@ -88,21 +88,21 @@ export function ModelSelector({
             >
               {model.displayName}
             </span>
-            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-500/95 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
               {PROVIDER_DISPLAY[model.provider]}
             </span>
-            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-500/95 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
               {COST_TIER_DISPLAY[model.costTier]}
             </span>
           </div>
-          <p className="mt-0.5 line-clamp-2 min-w-0 break-words text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
+          <p className="mt-0.5 line-clamp-2 min-w-0 break-words text-[11px] leading-snug text-zinc-600 dark:text-zinc-400">
             {model.shortDescription}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {model.capabilities.filter((c): c is UiModelCapability => MODEL_CAPABILITY_CHIP_SET.has(c)).map((capability) => (
               <span
                 key={`${model.id}-${capability}`}
-                className="max-w-full break-words rounded-full bg-zinc-100/85 px-1.5 py-px text-[9px] font-medium text-zinc-500/85 dark:bg-zinc-800 dark:text-zinc-400"
+                className="max-w-full break-words rounded-full bg-zinc-100/85 px-1.5 py-px text-[9px] font-medium text-zinc-600/90 dark:bg-zinc-800 dark:text-zinc-400"
               >
                 {MODEL_CAPABILITY_LABELS[capability]}
               </span>
@@ -182,7 +182,7 @@ export function ModelSelector({
         aria-label="Choose a model"
         className={className}
       >
-        <div className="mb-1 px-2 pb-1 pt-1 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+        <div className="mb-1 px-2 pb-1 pt-1 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
           Curated models
         </div>
         {budgetStatus === "warning" ? (
@@ -202,7 +202,7 @@ export function ModelSelector({
         </div>
         {moreModels.length > 0 ? (
           <>
-            <div className="mb-1 mt-2 px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+            <div className="mb-1 mt-2 px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
               More models
             </div>
             <div className="space-y-0.5">
@@ -225,7 +225,7 @@ export function ModelSelector({
         aria-label="Close model selector"
       />
       {renderModelList(
-        "fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[80] max-h-[min(72dvh,32rem)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-2xl border border-zinc-200/95 bg-white/95 p-1.5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900",
+        "fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[80] max-h-[min(72dvh,32rem)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-1.5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900",
         mobilePanelRef
       )}
     </div>
@@ -237,18 +237,18 @@ export function ModelSelector({
         type="button"
         onClick={() => setOpen((p) => !p)}
         disabled={disabled}
-        className="flex max-w-[min(100%,18rem)] items-center gap-1.5 rounded-full bg-transparent py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-600 transition hover:bg-zinc-200 focus:outline-none disabled:opacity-50 dark:text-zinc-400 dark:hover:bg-zinc-800"
+        className="flex max-w-[min(100%,18rem)] items-center gap-1.5 rounded-full border border-zinc-200/90 bg-white/80 py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none disabled:opacity-50 dark:border-transparent dark:bg-transparent dark:text-zinc-400 dark:hover:bg-zinc-800"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={`Model: ${selected.displayName}`}
       >
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-500" />
         <span className="min-w-0 flex-1 truncate">{selected.displayName}</span>
-        <span className="hidden shrink-0 rounded-full bg-zinc-200/85 px-1.5 py-px text-[10px] font-medium text-zinc-600 dark:bg-zinc-700 dark:text-zinc-300 sm:inline">
+        <span className="hidden shrink-0 rounded-full bg-zinc-100 px-1.5 py-px text-[10px] font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 sm:inline">
           {PROVIDER_DISPLAY[selected.provider]}
         </span>
         <span
-          className="hidden max-w-[5.5rem] truncate text-[10px] text-zinc-500 dark:text-zinc-400 lg:inline"
+          className="hidden max-w-[5.5rem] truncate text-[10px] text-zinc-600 dark:text-zinc-400 lg:inline"
           title={capabilityHint}
         >
           {capabilityHint}
@@ -256,7 +256,7 @@ export function ModelSelector({
         <ChevronDown className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
       {agentHint ? (
-        <p className="max-w-[min(100%,15rem)] text-right text-[10px] leading-snug text-zinc-500 dark:text-zinc-500" title={agentHint}>
+        <p className="max-w-[min(100%,15rem)] text-right text-[10px] leading-snug text-zinc-600 dark:text-zinc-500" title={agentHint}>
           {agentHint}
         </p>
       ) : null}
@@ -264,7 +264,7 @@ export function ModelSelector({
       {open ? (
         <>
           {renderModelList(
-            "absolute bottom-full right-0 z-50 mb-2 hidden max-h-[min(70vh,28rem)] w-[min(100vw-1.5rem,22rem)] overflow-y-auto rounded-xl border border-zinc-200/95 bg-white/95 p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900 md:block",
+            "absolute bottom-full right-0 z-50 mb-2 hidden max-h-[min(70vh,28rem)] w-[min(100vw-1.5rem,22rem)] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900 md:block",
             desktopPanelRef
           )}
           {mounted ? createPortal(mobileSheet, document.body) : null}

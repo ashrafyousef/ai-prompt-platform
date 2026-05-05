@@ -54,7 +54,7 @@ export function ChatLayout({
   );
 
   return (
-    <main className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-gradient-to-b from-zinc-50 to-zinc-100 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
+    <main className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-gradient-to-b from-zinc-100 via-zinc-100 to-zinc-200/50 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
       <div className="hidden md:block">{sidebar}</div>
 
       {mobileSidebarOpen ? (
@@ -66,7 +66,7 @@ export function ChatLayout({
           <div className="fixed inset-y-0 left-0 z-50 w-[min(100vw,360px)] max-w-full overflow-hidden md:hidden [&>aside]:w-full">
             <button
               type="button"
-              className="absolute right-3 top-3 z-10 rounded-md bg-zinc-100 p-2 text-zinc-600 shadow-sm hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+              className="absolute right-3 top-3 z-10 rounded-md bg-zinc-200 p-2 text-zinc-700 shadow-sm hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
               onClick={onToggleMobileSidebar}
               aria-label="Close sidebar"
             >
@@ -78,10 +78,10 @@ export function ChatLayout({
       ) : null}
 
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/70 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
+        <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/80 bg-white/90 px-4 py-2.5 shadow-[0_1px_0_rgba(24,24,27,0.03)] backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              className="rounded-md p-2 text-zinc-600 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="rounded-md p-2 text-zinc-700 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
               onClick={onToggleMobileSidebar}
               aria-label="Open sidebar"
             >
@@ -108,7 +108,7 @@ export function ChatLayout({
               <Bookmark className="h-4 w-4" />
             </button>
             <button
-              className="rounded-md p-2 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              className="rounded-md p-2 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               onClick={onToggleDrawer}
               aria-label="Toggle context drawer"
             >
@@ -119,7 +119,7 @@ export function ChatLayout({
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
           {children}
           {drawerOpen ? (
-            <aside className="hidden w-72 shrink-0 border-l border-zinc-200/70 bg-white/70 text-xs text-zinc-600 backdrop-blur lg:block dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300">
+            <aside className="hidden w-72 shrink-0 border-l border-zinc-200/80 bg-white/85 text-xs text-zinc-700 backdrop-blur lg:block dark:border-zinc-700 dark:bg-zinc-900/70 dark:text-zinc-300">
               <AgentContextDrawer
                 agent={activeAgent}
                 session={activeSession}

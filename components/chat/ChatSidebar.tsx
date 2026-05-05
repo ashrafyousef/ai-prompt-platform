@@ -120,7 +120,7 @@ export function ChatSidebar({
 
   return (
     <aside
-      className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/70 bg-white/85 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
+      className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/80 bg-white/90 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
         collapsed ? "w-16" : "w-[min(100vw,360px)] md:w-72"
       }`}
     >
@@ -177,7 +177,7 @@ export function ChatSidebar({
           items.length === 0 ? null : (
             <div key={group}>
               {!collapsed ? (
-                <h3 className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+                <h3 className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
                   {group}
                 </h3>
               ) : null}
@@ -188,7 +188,7 @@ export function ChatSidebar({
                     className={`group relative w-full rounded-lg px-2.5 py-2 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
                       activeSessionId === session.id
                         ? "bg-zinc-200/90 ring-1 ring-zinc-300/80 dark:bg-zinc-700/90 dark:ring-zinc-600"
-                        : "bg-zinc-100/60 hover:bg-zinc-200/65 dark:bg-zinc-800/70 dark:hover:bg-zinc-700/70"
+                        : "bg-zinc-50/85 ring-1 ring-zinc-200/80 hover:bg-zinc-100 dark:bg-zinc-800/70 dark:hover:bg-zinc-700/70"
                     }`}
                   >
                     {editingSessionId === session.id ? (
@@ -205,14 +205,14 @@ export function ChatSidebar({
                         <button
                           className={`${
                             collapsed ? "w-6 truncate text-center" : "flex-1 truncate pr-1.5"
-                          } text-left ${activeSessionId === session.id ? "font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-700 dark:text-zinc-200"}`}
+                          } text-left ${activeSessionId === session.id ? "font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-800 dark:text-zinc-200"}`}
                           onClick={() => onSelect(session.id)}
                           title={session.title}
                         >
                           {collapsed ? session.title.slice(0, 1).toUpperCase() : session.title}
                         </button>
                         <button
-                          className={`rounded p-1 text-zinc-500 transition hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
+                          className={`rounded p-1 text-zinc-600 transition hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
                             activeSessionId === session.id || menuSessionId === session.id
                               ? "opacity-100"
                               : "opacity-0 group-hover:opacity-100"
@@ -227,10 +227,10 @@ export function ChatSidebar({
                         {menuSessionId === session.id ? (
                           <div
                             ref={menuRef}
-                            className="absolute right-2 top-10 z-20 min-w-[160px] rounded-md border border-zinc-200 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+                            className="absolute right-2 top-10 z-20 min-w-[160px] rounded-md border border-zinc-300 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
                           >
                             <button
-                              className="block w-full rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                              className="block w-full rounded px-3 py-2 text-left text-xs text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
                               onClick={() => {
                                 setMenuSessionId(null);
                                 setEditingSessionId(session.id);
@@ -240,7 +240,7 @@ export function ChatSidebar({
                               Rename
                             </button>
                             <button
-                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
                               onClick={async () => {
                                 setMenuSessionId(null);
                                 await onShare(session.id);
@@ -275,7 +275,7 @@ export function ChatSidebar({
 
       <div className="relative mt-2.5 border-t border-zinc-200/80 pt-2.5 dark:border-zinc-700/80">
         {!collapsed && usageData ? (
-          <div className="mb-2 flex items-center gap-1.5 rounded-md bg-zinc-100/80 px-3 py-1.5 text-xs text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
+          <div className="mb-2 flex items-center gap-1.5 rounded-md border border-zinc-200/80 bg-zinc-50/90 px-3 py-1.5 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
             <Zap className="h-3 w-3 text-amber-500" />
             <span>{(usageData.totalTokens ?? 0).toLocaleString()} tokens used</span>
           </div>

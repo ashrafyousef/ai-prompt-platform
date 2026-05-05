@@ -192,28 +192,28 @@ const MessageBubble = memo(function MessageBubble({
     },
     blockquote(props: { children?: ReactNode }) {
       return (
-        <blockquote className="my-3 min-w-0 max-w-full border-l-2 border-zinc-300 pl-3 text-zinc-600 dark:border-zinc-600 dark:text-zinc-300">
+        <blockquote className="my-3 min-w-0 max-w-full border-l-2 border-zinc-400 pl-3 text-zinc-700 dark:border-zinc-600 dark:text-zinc-300">
           {props.children}
         </blockquote>
       );
     },
     table(props: { children?: ReactNode }) {
       return (
-        <div className="my-3 max-w-full overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
+          <div className="my-3 max-w-full overflow-x-auto rounded-lg border border-zinc-300 dark:border-zinc-700">
           <table className="min-w-max border-collapse text-left text-xs">{props.children}</table>
         </div>
       );
     },
     th(props: { children?: ReactNode }) {
       return (
-        <th className="border-b border-zinc-200 bg-zinc-50 px-3 py-2 font-semibold text-zinc-700 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
+        <th className="border-b border-zinc-300 bg-zinc-100 px-3 py-2 font-semibold text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-200">
           {props.children}
         </th>
       );
     },
     td(props: { children?: ReactNode }) {
       return (
-        <td className="border-b border-zinc-100 px-3 py-2 align-top text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
+        <td className="border-b border-zinc-200 px-3 py-2 align-top text-zinc-700 dark:border-zinc-700 dark:text-zinc-300">
           {props.children}
         </td>
       );
@@ -279,7 +279,7 @@ const MessageBubble = memo(function MessageBubble({
         <div
           className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 shadow-sm transition ${
             message.role === "user"
-              ? "bg-violet-50 text-zinc-900 dark:bg-violet-950/40 dark:text-zinc-100 md:max-w-2xl"
+              ? "bg-violet-50/85 text-zinc-900 ring-1 ring-violet-200/60 dark:bg-violet-950/40 dark:text-zinc-100 md:max-w-2xl"
               : "border border-zinc-200/90 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 md:max-w-3xl"
           }`}
         >
@@ -327,8 +327,8 @@ const MessageBubble = memo(function MessageBubble({
               </div>
             </div>
             {message.content.trim().length > 0 ? (
-              <div className="mt-1 min-w-0 max-w-full overflow-hidden rounded-lg border border-zinc-200/80 bg-zinc-50/75 px-3 py-2.5 text-xs text-zinc-500 dark:border-zinc-700/80 dark:bg-zinc-900/30 dark:text-zinc-400">
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-600 dark:text-zinc-300">
+              <div className="mt-1 min-w-0 max-w-full overflow-hidden rounded-lg border border-zinc-300/80 bg-zinc-50/90 px-3 py-2.5 text-xs text-zinc-600 dark:border-zinc-700/80 dark:bg-zinc-900/30 dark:text-zinc-400">
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-zinc-700 dark:text-zinc-300">
                   Partial response
                 </p>
                 <ReactMarkdown
@@ -365,7 +365,7 @@ const MessageBubble = memo(function MessageBubble({
         </div>
       </div>
       <div
-        className={`mt-2 flex w-full min-w-0 max-w-full items-center gap-1 text-zinc-500 transition-opacity dark:text-zinc-400 ${
+        className={`mt-2 flex w-full min-w-0 max-w-full items-center gap-1 text-zinc-600 transition-opacity dark:text-zinc-400 ${
           message.role === "user"
             ? "justify-end opacity-100 md:opacity-0 md:group-hover:opacity-100"
             : "justify-start opacity-100 md:opacity-0 md:group-hover:opacity-100"
@@ -496,7 +496,7 @@ export function MessageList({
           style={composerInsetStyle}
           className="flex min-h-0 min-w-0 max-w-full flex-1 items-start justify-center overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-8 md:items-center md:px-6 md:pb-40"
         >
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading assistant…</p>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading assistant…</p>
         </div>
       );
     }
@@ -514,12 +514,12 @@ export function MessageList({
                 {activeAgent.name}
               </h2>
               {activeAgent.description ? (
-                <p className="mt-1.5 max-w-md text-center text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+                <p className="mt-1.5 max-w-md text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                   {activeAgent.description}
                 </p>
               ) : null}
               {emptyStateModelLine ? (
-                <p className="mt-2.5 max-w-lg text-center text-[11px] leading-relaxed text-zinc-500 dark:text-zinc-500">
+                <p className="mt-2.5 max-w-lg text-center text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-500">
                   {emptyStateModelLine}
                 </p>
               ) : null}
@@ -529,7 +529,7 @@ export function MessageList({
               <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
                 No assistant available
               </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-zinc-500 dark:text-zinc-400">
+              <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                 There are no published agents for your account yet. Check back after an admin publishes one.
               </p>
             </div>
@@ -542,7 +542,7 @@ export function MessageList({
               onPromptClick={(text) => onSuggestionClick?.(text)}
             />
           ) : activeAgent ? (
-            <p className="mt-5 text-center text-xs text-zinc-400 dark:text-zinc-500">
+            <p className="mt-5 text-center text-xs text-zinc-500 dark:text-zinc-500">
               {`${activeAgent.name} has no starter prompts configured yet. Type a message below to get started.`}
             </p>
           ) : null}

@@ -32,7 +32,7 @@ function AccountIdentity({
 }) {
   const initials = getInitials(userName, userEmail);
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-zinc-200/80 bg-zinc-50/90 p-3 dark:border-zinc-700 dark:bg-zinc-800/80">
+    <div className="flex items-center gap-3 rounded-xl border border-zinc-300/80 bg-zinc-50/95 p-3 dark:border-zinc-700 dark:bg-zinc-800/80">
       <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-900 text-sm font-semibold text-white dark:bg-zinc-100 dark:text-zinc-900">
         {initials}
       </div>
@@ -40,7 +40,7 @@ function AccountIdentity({
         <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">
           {userName || "Account"}
         </p>
-        <p className="truncate text-xs text-zinc-500 dark:text-zinc-400">{userEmail || "Signed in user"}</p>
+        <p className="truncate text-xs text-zinc-600 dark:text-zinc-400">{userEmail || "Signed in user"}</p>
       </div>
     </div>
   );
@@ -57,7 +57,7 @@ function AccountActions({
     <div className="mt-3 space-y-1.5">
       <Link
         href="/profile"
-        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
         onClick={onClose}
       >
         <User className="h-4 w-4" />
@@ -66,14 +66,14 @@ function AccountActions({
       {isAdmin ? (
         <Link
           href="/admin"
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-700 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
           onClick={onClose}
         >
           <Shield className="h-4 w-4" />
           Admin
         </Link>
       ) : null}
-      <div className="my-1.5 h-px bg-zinc-200 dark:bg-zinc-700" />
+      <div className="my-1.5 h-px bg-zinc-300 dark:bg-zinc-700" />
       <SignOutButton
         callbackUrl="/sign-in"
         className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/30"
@@ -151,7 +151,7 @@ export function AccountMenu({
         onClick={onClose}
         aria-label="Close account menu"
       />
-      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[100] max-h-[min(70dvh,520px)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-3xl border border-zinc-700/80 bg-zinc-900/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl">
+      <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[100] max-h-[min(70dvh,520px)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-3xl border border-zinc-200/90 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl dark:border-zinc-700/80 dark:bg-zinc-900/95">
         <AccountIdentity userName={userName} userEmail={userEmail} />
         <AccountActions isAdmin={isAdmin} onClose={onClose} />
       </div>
@@ -162,7 +162,7 @@ export function AccountMenu({
     <>
       <button
         ref={triggerRef}
-        className="flex w-full items-center justify-between rounded-md bg-zinc-100/85 px-3 py-2 text-xs text-zinc-700 transition hover:bg-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        className="flex w-full items-center justify-between rounded-md border border-zinc-200/80 bg-zinc-50/90 px-3 py-2 text-xs text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
         onClick={onToggle}
         aria-label="Profile menu"
       >
@@ -180,7 +180,7 @@ export function AccountMenu({
           />
           <div
             ref={desktopPanelRef}
-            className="fixed z-40 hidden w-[320px] rounded-3xl border border-zinc-700/80 bg-zinc-900/95 p-4 shadow-2xl backdrop-blur lg:block"
+            className="fixed z-40 hidden w-[320px] rounded-3xl border border-zinc-200/90 bg-white/95 p-4 shadow-2xl backdrop-blur dark:border-zinc-700/80 dark:bg-zinc-900/95 lg:block"
             style={desktopPosition ? { left: desktopPosition.left, top: desktopPosition.top } : undefined}
           >
             <AccountIdentity userName={userName} userEmail={userEmail} />
