@@ -1,6 +1,7 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { Fragment, type RefObject, useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown, Sparkles } from "lucide-react";
 import type { UiModelCapability, UiModelSummary } from "@/lib/types";
 import {
@@ -34,7 +35,10 @@ export function ModelSelector({
   agentModelIncompatible?: (model: UiModelSummary) => boolean;
 }) {
   const [open, setOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const desktopPanelRef = useRef<HTMLDivElement>(null);
+  const mobilePanelRef = useRef<HTMLDivElement>(null);
 
   const selected = models.find((m) => m.id === selectedModelId);
 
@@ -75,48 +79,50 @@ export function ModelSelector({
         }`}
       >
         <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-violet-500/90" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-1">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="flex min-w-0 flex-wrap items-center gap-1">
             <span
-              className={`text-sm font-semibold ${
+              className={`min-w-0 max-w-full break-words text-sm font-semibold leading-snug ${
                 isActive ? "text-violet-800 dark:text-violet-200" : "text-zinc-800 dark:text-zinc-200"
               }`}
             >
               {model.displayName}
             </span>
-            <span className="rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-500/95 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-500/95 dark:bg-zinc-800 dark:text-zinc-400">
               {PROVIDER_DISPLAY[model.provider]}
             </span>
-            <span className="rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-500/95 dark:bg-zinc-800 dark:text-zinc-400">
+            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-500/95 dark:bg-zinc-800 dark:text-zinc-400">
               {COST_TIER_DISPLAY[model.costTier]}
             </span>
           </div>
-          <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-500 dark:text-zinc-400">{model.shortDescription}</p>
+          <p className="mt-0.5 line-clamp-2 min-w-0 break-words text-[11px] leading-snug text-zinc-500 dark:text-zinc-400">
+            {model.shortDescription}
+          </p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {model.capabilities.filter((c): c is UiModelCapability => MODEL_CAPABILITY_CHIP_SET.has(c)).map((capability) => (
               <span
                 key={`${model.id}-${capability}`}
-                className="rounded-full bg-zinc-100/85 px-1.5 py-px text-[9px] font-medium text-zinc-500/85 dark:bg-zinc-800 dark:text-zinc-400"
+                className="max-w-full break-words rounded-full bg-zinc-100/85 px-1.5 py-px text-[9px] font-medium text-zinc-500/85 dark:bg-zinc-800 dark:text-zinc-400"
               >
                 {MODEL_CAPABILITY_LABELS[capability]}
               </span>
             ))}
           </div>
           {imageIncompatible ? (
-            <p className="mt-1 text-[10px] text-amber-700/90 dark:text-amber-400">
+            <p className="mt-1 break-words text-[10px] text-amber-700/90 dark:text-amber-400">
               Selected attachments require a Vision-capable model.
             </p>
           ) : null}
           {!imageIncompatible && agentIncompatible ? (
-            <p className="mt-1 text-[10px] text-amber-700/90 dark:text-amber-400">
+            <p className="mt-1 break-words text-[10px] text-amber-700/90 dark:text-amber-400">
               Not compatible with this assistant for your current message.
             </p>
           ) : null}
           {!imageIncompatible && !agentIncompatible && !model.enabled && model.disabledReason ? (
-            <p className="mt-1 text-[10px] text-zinc-500/90 dark:text-zinc-400">{model.disabledReason}</p>
+            <p className="mt-1 break-words text-[10px] text-zinc-500/90 dark:text-zinc-400">{model.disabledReason}</p>
           ) : null}
           {model.healthAdvisory?.status === "recently_rate_limited" ? (
-            <p className="mt-1 text-[10px] text-amber-700/90 dark:text-amber-400">
+            <p className="mt-1 break-words text-[10px] text-amber-700/90 dark:text-amber-400">
               {model.healthAdvisory.message}
             </p>
           ) : null}
@@ -126,9 +132,21 @@ export function ModelSelector({
   }
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
     if (!open) return;
     function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) close();
+      const target = e.target as Node;
+      if (
+        ref.current?.contains(target) ||
+        desktopPanelRef.current?.contains(target) ||
+        mobilePanelRef.current?.contains(target)
+      ) {
+        return;
+      }
+      close();
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") close();
@@ -155,6 +173,63 @@ export function ModelSelector({
     .slice(0, 2)
     .map((capability) => MODEL_CAPABILITY_LABELS[capability])
     .join(" · ");
+
+  function renderModelList(className: string, panelRef?: RefObject<HTMLDivElement>) {
+    return (
+      <div
+        ref={panelRef}
+        role="listbox"
+        aria-label="Choose a model"
+        className={className}
+      >
+        <div className="mb-1 px-2 pb-1 pt-1 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+          Curated models
+        </div>
+        {budgetStatus === "warning" ? (
+          <div className="mb-1 rounded-lg bg-amber-100/70 px-2.5 py-2 text-[11px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
+            Near your soft monthly limit — medium and high tier models are disabled until usage falls below the threshold.
+          </div>
+        ) : null}
+        {budgetStatus === "blocked" ? (
+          <div className="mb-1 rounded-lg bg-red-100/70 px-2.5 py-2 text-[11px] text-red-900 dark:bg-red-900/30 dark:text-red-200">
+            Monthly hard limit reached — models are unavailable until the next billing cycle or an admin updates limits.
+          </div>
+        ) : null}
+        <div className="space-y-0.5">
+          {curatedModels.map((model) => (
+            <Fragment key={model.id}>{renderModelRow(model)}</Fragment>
+          ))}
+        </div>
+        {moreModels.length > 0 ? (
+          <>
+            <div className="mb-1 mt-2 px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
+              More models
+            </div>
+            <div className="space-y-0.5">
+              {moreModels.map((model) => (
+                <Fragment key={model.id}>{renderModelRow(model)}</Fragment>
+              ))}
+            </div>
+          </>
+        ) : null}
+      </div>
+    );
+  }
+
+  const mobileSheet = (
+    <div className="md:hidden">
+      <button
+        type="button"
+        className="fixed inset-0 z-[70] bg-black/25"
+        onClick={close}
+        aria-label="Close model selector"
+      />
+      {renderModelList(
+        "fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[80] max-h-[min(72dvh,32rem)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-2xl border border-zinc-200/95 bg-white/95 p-1.5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900",
+        mobilePanelRef
+      )}
+    </div>
+  );
 
   return (
     <div ref={ref} className="relative flex min-w-0 max-w-full flex-col items-end gap-0.5">
@@ -187,42 +262,13 @@ export function ModelSelector({
       ) : null}
 
       {open ? (
-        <div
-          role="listbox"
-          aria-label="Choose a model"
-          className="absolute bottom-full right-0 z-50 mb-2 max-h-[min(70vh,28rem)] w-[min(100vw-1.5rem,22rem)] overflow-y-auto rounded-xl border border-zinc-200/95 bg-white/95 p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900"
-        >
-          <div className="mb-1 px-2 pb-1 pt-1 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-            Curated models
-          </div>
-          {budgetStatus === "warning" ? (
-            <div className="mb-1 rounded-lg bg-amber-100/70 px-2.5 py-2 text-[11px] text-amber-900 dark:bg-amber-900/30 dark:text-amber-200">
-              Near your soft monthly limit — medium and high tier models are disabled until usage falls below the threshold.
-            </div>
-          ) : null}
-          {budgetStatus === "blocked" ? (
-            <div className="mb-1 rounded-lg bg-red-100/70 px-2.5 py-2 text-[11px] text-red-900 dark:bg-red-900/30 dark:text-red-200">
-              Monthly hard limit reached — models are unavailable until the next billing cycle or an admin updates limits.
-            </div>
-          ) : null}
-          <div className="space-y-0.5">
-            {curatedModels.map((model) => (
-              <Fragment key={model.id}>{renderModelRow(model)}</Fragment>
-            ))}
-          </div>
-          {moreModels.length > 0 ? (
-            <>
-              <div className="mb-1 mt-2 px-2 pb-1 pt-2 text-[10px] uppercase tracking-wide text-zinc-400 dark:text-zinc-500">
-                More models
-              </div>
-              <div className="space-y-0.5">
-                {moreModels.map((model) => (
-                  <Fragment key={model.id}>{renderModelRow(model)}</Fragment>
-                ))}
-              </div>
-            </>
-          ) : null}
-        </div>
+        <>
+          {renderModelList(
+            "absolute bottom-full right-0 z-50 mb-2 hidden max-h-[min(70vh,28rem)] w-[min(100vw-1.5rem,22rem)] overflow-y-auto rounded-xl border border-zinc-200/95 bg-white/95 p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900 md:block",
+            desktopPanelRef
+          )}
+          {mounted ? createPortal(mobileSheet, document.body) : null}
+        </>
       ) : null}
     </div>
   );

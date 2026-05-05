@@ -124,7 +124,7 @@ export function ChatSidebar({
         collapsed ? "w-16" : "w-[min(100vw,360px)] md:w-72"
       }`}
     >
-      <div className="mb-2.5 flex flex-col gap-2 pr-12 md:pr-0">
+      <div className="mb-2 flex flex-col gap-1.5 pr-12 md:mb-2.5 md:gap-2 md:pr-0">
         {collapsed ? (
           <>
             <button
@@ -147,7 +147,7 @@ export function ChatSidebar({
           <div className="flex items-center justify-between gap-2">
             <button
               onClick={onNewChat}
-              className="w-full rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300"
+              className="w-full rounded-md bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-zinc-700 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-300 md:py-2"
               title="New Chat"
             >
               New Chat
