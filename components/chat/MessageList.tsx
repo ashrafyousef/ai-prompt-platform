@@ -62,9 +62,23 @@ type MarkdownChildProps = {
   children?: ReactNode;
 };
 
-function codeLabelFromClassName(className?: string) {
+function languageFromClassName(className?: string): string | null {
   const match = /(?:^|\s)language-([^\s]+)/.exec(className ?? "");
-  return match?.[1] ?? "code";
+  return match?.[1]?.toLowerCase() ?? null;
+}
+
+function isPromptLikeFence(language: string): boolean {
+  const normalized = language.trim().toLowerCase();
+  return (
+    normalized === "" ||
+    normalized === "text" ||
+    normalized === "txt" ||
+    normalized === "prompt" ||
+    normalized === "markdown" ||
+    normalized === "md" ||
+    normalized === "plaintext" ||
+    normalized === "output"
+  );
 }
 
 function textFromNode(node: ReactNode): string {
@@ -225,8 +239,31 @@ const MessageBubble = memo(function MessageBubble({
       const child = Children.toArray(props.children).find((item) => isValidElement<MarkdownChildProps>(item));
       const codeProps = isValidElement<MarkdownChildProps>(child) ? child.props : {};
       const codeChildren = codeProps.children ?? props.children;
-      const label = codeLabelFromClassName(codeProps.className);
+      const language = languageFromClassName(codeProps.className);
+      const label = language ?? "text";
+      const promptLike = !language || isPromptLikeFence(language);
       const copyText = textFromNode(codeChildren);
+
+      if (promptLike) {
+        return (
+          <div className="my-3 max-w-full overflow-hidden rounded-lg border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100">
+            <div className="flex min-w-0 items-center justify-between gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+              <span className="min-w-0 truncate">{label}</span>
+              <button
+                className="shrink-0 rounded px-2 py-0.5 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-white"
+                onClick={() => { navigator.clipboard.writeText(copyText); toast("Code copied"); }}
+              >
+                Copy
+              </button>
+            </div>
+            <pre className="max-w-full bg-zinc-50/70 px-4 py-3 text-xs leading-6 text-zinc-800 dark:bg-zinc-950 dark:text-zinc-100">
+              <code className="block max-w-full whitespace-pre-wrap break-words [overflow-wrap:anywhere] bg-transparent p-0 text-inherit">
+                {codeChildren}
+              </code>
+            </pre>
+          </div>
+        );
+      }
 
       return (
         <div className="my-3 max-w-full overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
@@ -274,13 +311,13 @@ const MessageBubble = memo(function MessageBubble({
   const alignment = message.role === "user" ? "justify-end" : "justify-start";
 
   return (
-    <div className="group w-full min-w-0 max-w-full">
+    <div className="group w-full min-w-0 max-w-full md:mx-auto md:max-w-3xl">
       <div className={`flex w-full min-w-0 max-w-full ${alignment}`}>
         <div
-          className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 shadow-sm transition ${
+          className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 transition ${
             message.role === "user"
-              ? "bg-violet-50/85 text-zinc-900 ring-1 ring-violet-200/60 dark:bg-violet-950/40 dark:text-zinc-100 md:max-w-2xl"
-              : "border border-zinc-200/90 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100 md:max-w-3xl"
+              ? "bg-violet-50/85 text-zinc-900 ring-1 ring-violet-200/60 shadow-sm dark:bg-violet-950/40 dark:text-zinc-100 md:max-w-xl"
+              : "border border-zinc-200/70 bg-white/90 text-zinc-900 shadow-[0_1px_1px_rgba(24,24,27,0.03)] dark:border-zinc-700 dark:bg-zinc-800/85 dark:text-zinc-100 md:max-w-[49rem]"
           }`}
         >
         {images && images.length > 0 ? (
@@ -556,7 +593,7 @@ export function MessageList({
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex h-full w-full min-w-0 max-w-full flex-col gap-4 overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1rem)] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6 md:pb-64"
+        className="flex h-full w-full min-w-0 max-w-full flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1rem)] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6"
       >
         {loading && messages.length === 0
           ? [1, 2, 3].map((skeleton) => (
@@ -578,7 +615,7 @@ export function MessageList({
       </div>
       {showScrollButton ? (
         <button
-          className="absolute bottom-[calc(var(--composer-bottom-inset)+0.75rem)] right-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 sm:right-8 md:bottom-64"
+          className="absolute bottom-[calc(var(--composer-bottom-inset)+0.75rem)] right-4 rounded-full border border-zinc-200 bg-white p-2 text-zinc-700 shadow transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700 sm:right-8"
           onClick={() => containerRef.current?.scrollTo({ top: containerRef.current.scrollHeight, behavior: "smooth" })}
           aria-label="Scroll to bottom"
         >
