@@ -78,7 +78,7 @@ export function ChatLayout({
       ) : null}
 
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/80 bg-white/90 px-4 py-2.5 shadow-[0_1px_0_rgba(24,24,27,0.03)] backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
+        <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/80 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
           <div className="flex min-w-0 items-center gap-3">
             <button
               className="rounded-md p-2 text-zinc-700 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
