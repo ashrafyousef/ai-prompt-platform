@@ -60,7 +60,7 @@ export function ChatLayout({
       {mobileSidebarOpen ? (
         <>
           <div
-            className="fixed inset-0 z-40 bg-black/40 md:hidden"
+            className="fixed inset-0 z-40 bg-black/30 md:hidden dark:bg-black/40"
             onClick={onToggleMobileSidebar}
           />
           <div className="fixed inset-y-0 left-0 z-50 w-[min(100vw,360px)] max-w-full overflow-hidden md:hidden [&>aside]:w-full">

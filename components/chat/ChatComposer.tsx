@@ -189,7 +189,7 @@ export function ChatComposer({
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className={`relative mx-auto w-full min-w-0 max-w-full overflow-hidden rounded-[30px] border p-2 shadow-[0_6px_24px_rgba(24,24,27,0.06)] transition-colors md:max-w-3xl md:p-2.5 ${
+      className={`relative mx-auto w-full min-w-0 max-w-full overflow-hidden rounded-[30px] border p-1.5 shadow-[0_6px_24px_rgba(24,24,27,0.06)] transition-colors md:max-w-3xl md:p-2.5 ${
         dragging
           ? "border-violet-300 bg-violet-100 ring-2 ring-violet-400 dark:bg-violet-950/40 dark:ring-violet-500"
           : "border-zinc-200/90 bg-white dark:border-zinc-700 dark:bg-[#1e1e1e]"
@@ -274,11 +274,11 @@ export function ChatComposer({
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        className="mb-0.5 max-h-44 min-h-[44px] w-full min-w-0 max-w-full resize-none overflow-y-hidden bg-transparent px-3.5 py-2 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-600 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400 md:mb-1.5 md:min-h-[48px] md:px-4 md:py-2.5"
+        className="mb-0.5 max-h-44 min-h-[42px] w-full min-w-0 max-w-full resize-none overflow-y-hidden bg-transparent px-3 py-1.5 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-600 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400 md:mb-1.5 md:min-h-[48px] md:px-4 md:py-2.5"
         placeholder={placeholderText ?? "Ask Assistant..."}
         disabled={disabled}
       />
-      <div className="flex min-w-0 max-w-full items-end justify-between gap-2 px-1 pb-0 sm:px-2 md:gap-2.5 md:pb-1">
+      <div className="flex min-w-0 max-w-full items-end justify-between gap-2 px-1 pb-0 sm:px-1.5 md:gap-2.5 md:pb-1">
         <input
           ref={fileInputRef}
           type="file"

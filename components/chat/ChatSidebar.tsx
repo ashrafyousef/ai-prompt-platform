@@ -172,7 +172,7 @@ export function ChatSidebar({
         />
       ) : null}
 
-      <div className="flex-1 space-y-3.5 overflow-auto pr-0.5">
+      <div className="flex-1 space-y-3.5 overflow-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.45)_transparent]">
         {Object.entries(groupedSessions).map(([group, items]) =>
           items.length === 0 ? null : (
             <div key={group}>
@@ -181,14 +181,14 @@ export function ChatSidebar({
                   {group}
                 </h3>
               ) : null}
-              <div className="space-y-1.5">
+              <div className="space-y-1">
                 {items.map((session) => (
                   <div
                     key={session.id}
-                    className={`group relative w-full rounded-lg px-2.5 py-2 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
+                    className={`group relative w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
                       activeSessionId === session.id
-                        ? "bg-zinc-200/90 ring-1 ring-zinc-300/80 dark:bg-zinc-700/90 dark:ring-zinc-600"
-                        : "bg-zinc-50/85 ring-1 ring-zinc-200/80 hover:bg-zinc-100 dark:bg-zinc-800/70 dark:hover:bg-zinc-700/70"
+                        ? "bg-zinc-200/85 ring-1 ring-zinc-300/80 dark:bg-zinc-700/80 dark:ring-zinc-600/70"
+                        : "bg-zinc-50/75 ring-1 ring-zinc-200/70 hover:bg-zinc-100/90 dark:bg-zinc-800/45 dark:ring-transparent dark:hover:bg-zinc-800/70"
                     }`}
                   >
                     {editingSessionId === session.id ? (
@@ -275,24 +275,26 @@ export function ChatSidebar({
 
       <div className="relative mt-2.5 border-t border-zinc-200/80 pt-2.5 dark:border-zinc-700/80">
         {!collapsed && usageData ? (
-          <div className="mb-2 flex items-center gap-1.5 rounded-md border border-zinc-200/80 bg-zinc-50/90 px-3 py-1.5 text-xs text-zinc-600 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-400">
+          <div className="mb-2 flex items-center gap-1.5 rounded-md border border-zinc-200/70 bg-zinc-50/70 px-3 py-1.5 text-xs text-zinc-500 dark:border-zinc-700/70 dark:bg-zinc-800/60 dark:text-zinc-500">
             <Zap className="h-3 w-3 text-amber-500" />
             <span>{(usageData.totalTokens ?? 0).toLocaleString()} tokens used</span>
           </div>
         ) : null}
-        <AccountMenu
-          open={profileOpen}
-          collapsed={collapsed}
-          userName={session?.user?.name}
-          userEmail={session?.user?.email}
-          isAdmin={
-            session?.user?.role === "ADMIN" ||
-            session?.user?.workspaceRole === "OWNER" ||
-            session?.user?.workspaceRole === "ADMIN"
-          }
-          onToggle={() => setProfileOpen((prev) => !prev)}
-          onClose={() => setProfileOpen(false)}
-        />
+        <div className="rounded-md bg-zinc-50/55 p-1 dark:bg-zinc-800/40">
+          <AccountMenu
+            open={profileOpen}
+            collapsed={collapsed}
+            userName={session?.user?.name}
+            userEmail={session?.user?.email}
+            isAdmin={
+              session?.user?.role === "ADMIN" ||
+              session?.user?.workspaceRole === "OWNER" ||
+              session?.user?.workspaceRole === "ADMIN"
+            }
+            onToggle={() => setProfileOpen((prev) => !prev)}
+            onClose={() => setProfileOpen(false)}
+          />
+        </div>
       </div>
     </aside>
   );
