@@ -120,8 +120,8 @@ export function ChatSidebar({
 
   return (
     <aside
-      className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/80 bg-white/90 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
-        collapsed ? "w-16" : "w-[min(100vw,360px)] md:w-72"
+      className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/80 bg-white/95 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
+        collapsed ? "w-16" : "w-[min(100vw,360px)] md:w-64"
       }`}
     >
       <div className="mb-2 flex flex-col gap-1.5 pr-12 md:mb-2.5 md:gap-2 md:pr-0">
@@ -185,10 +185,10 @@ export function ChatSidebar({
                 {items.map((session) => (
                   <div
                     key={session.id}
-                    className={`group relative w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
+                    className={`group relative w-full rounded-lg border px-2.5 py-1.5 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
                       activeSessionId === session.id
-                        ? "bg-zinc-200/85 ring-1 ring-zinc-300/80 dark:bg-zinc-700/80 dark:ring-zinc-600/70"
-                        : "bg-zinc-50/75 ring-1 ring-zinc-200/70 hover:bg-zinc-100/90 dark:bg-zinc-800/45 dark:ring-transparent dark:hover:bg-zinc-800/70"
+                        ? "border-zinc-300/90 bg-zinc-100 dark:border-zinc-600/70 dark:bg-zinc-800/75"
+                        : "border-zinc-200/70 bg-white/70 hover:border-zinc-300/80 hover:bg-zinc-50 dark:border-zinc-800/70 dark:bg-zinc-900/30 dark:hover:border-zinc-700/70 dark:hover:bg-zinc-800/55"
                     }`}
                   >
                     {editingSessionId === session.id ? (
