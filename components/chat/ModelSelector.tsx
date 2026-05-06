@@ -36,6 +36,11 @@ export function ModelSelector({
 }) {
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [desktopPanelStyle, setDesktopPanelStyle] = useState<{
+    left: number;
+    bottom: number;
+    width: number;
+  } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const desktopPanelRef = useRef<HTMLDivElement>(null);
   const mobilePanelRef = useRef<HTMLDivElement>(null);
@@ -159,6 +164,30 @@ export function ModelSelector({
     };
   }, [open, close]);
 
+  useEffect(() => {
+    if (!open) return;
+
+    const updateDesktopPanelPosition = () => {
+      if (!ref.current || typeof window === "undefined") return;
+      const triggerRect = ref.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const panelWidth = Math.min(352, Math.max(280, viewportWidth - 24));
+      const minLeft = 12;
+      const maxLeft = Math.max(minLeft, viewportWidth - panelWidth - 12);
+      const left = Math.min(Math.max(triggerRect.right - panelWidth, minLeft), maxLeft);
+      const bottom = Math.max(12, window.innerHeight - triggerRect.top + 8);
+      setDesktopPanelStyle({ left, bottom, width: panelWidth });
+    };
+
+    updateDesktopPanelPosition();
+    window.addEventListener("resize", updateDesktopPanelPosition);
+    window.addEventListener("scroll", updateDesktopPanelPosition, true);
+    return () => {
+      window.removeEventListener("resize", updateDesktopPanelPosition);
+      window.removeEventListener("scroll", updateDesktopPanelPosition, true);
+    };
+  }, [open]);
+
   if (loading || !models.length || !selected) {
     return (
       <div className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm text-zinc-400">
@@ -231,6 +260,13 @@ export function ModelSelector({
     </div>
   );
 
+  const desktopPopover = desktopPanelStyle
+    ? renderModelList(
+        "h-full overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900",
+        desktopPanelRef
+      )
+    : null;
+
   return (
     <div ref={ref} className="relative flex min-w-0 max-w-full flex-col items-end gap-0.5">
       <button
@@ -263,10 +299,22 @@ export function ModelSelector({
 
       {open ? (
         <>
-          {renderModelList(
-            "absolute bottom-full right-0 z-50 mb-2 hidden max-h-[min(70vh,28rem)] w-[min(100vw-1.5rem,22rem)] overflow-y-auto rounded-xl border border-zinc-200 bg-white p-1.5 shadow-[0_10px_24px_rgba(0,0,0,0.08)] dark:border-zinc-700 dark:bg-zinc-900 md:block",
-            desktopPanelRef
-          )}
+          {mounted && desktopPopover && desktopPanelStyle
+            ? createPortal(
+                <div
+                  className="fixed z-[90] hidden md:block"
+                  style={{
+                    left: desktopPanelStyle.left,
+                    bottom: desktopPanelStyle.bottom,
+                    width: desktopPanelStyle.width,
+                    maxHeight: "min(420px,calc(100vh-160px))",
+                  }}
+                >
+                  {desktopPopover}
+                </div>,
+                document.body
+              )
+            : null}
           {mounted ? createPortal(mobileSheet, document.body) : null}
         </>
       ) : null}

@@ -54,7 +54,7 @@ export function ChatLayout({
   );
 
   return (
-    <main className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-gradient-to-b from-zinc-100 via-zinc-100 to-zinc-200/50 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
+    <main className="flex h-[100dvh] w-full max-w-full overflow-hidden bg-gradient-to-b from-zinc-50 via-zinc-50 to-zinc-100 text-zinc-900 dark:from-zinc-950 dark:to-zinc-900 dark:text-zinc-100">
       <div className="hidden md:block">{sidebar}</div>
 
       {mobileSidebarOpen ? (
@@ -108,7 +108,7 @@ export function ChatLayout({
               <Bookmark className="h-4 w-4" />
             </button>
             <button
-              className="rounded-md p-2 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              className="hidden rounded-md p-2 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 md:inline-flex dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               onClick={onToggleDrawer}
               aria-label="Toggle context drawer"
             >

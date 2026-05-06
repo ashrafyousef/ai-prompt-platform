@@ -56,6 +56,7 @@ export function ChatComposer({
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
+  const [desktopViewport, setDesktopViewport] = useState(false);
 
   function handleDragEnter(e: DragEvent) {
     e.preventDefault();
@@ -156,6 +157,15 @@ export function ChatComposer({
   }, [initialText]);
 
   useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const syncViewport = () => setDesktopViewport(mediaQuery.matches);
+    syncViewport();
+    mediaQuery.addEventListener("change", syncViewport);
+    return () => mediaQuery.removeEventListener("change", syncViewport);
+  }, []);
+
+  useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
     textarea.style.height = "0px";
@@ -181,6 +191,16 @@ export function ChatComposer({
       void submit();
     }
   }
+
+  const resolvedPlaceholder = useMemo(() => {
+    if (desktopViewport) {
+      return placeholderText ?? "Ask Assistant...";
+    }
+    if (activeAgent?.name?.trim()) {
+      return `Ask ${activeAgent.name.trim()}...`;
+    }
+    return placeholderText ?? "Ask Assistant...";
+  }, [desktopViewport, placeholderText, activeAgent]);
 
   return (
     <form
@@ -275,7 +295,7 @@ export function ChatComposer({
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
         className="mb-0.5 max-h-44 min-h-[42px] w-full min-w-0 max-w-full resize-none overflow-y-hidden bg-transparent px-3 py-1.5 text-[15px] leading-relaxed text-zinc-900 placeholder:text-zinc-600 focus:outline-none dark:text-zinc-100 dark:placeholder:text-zinc-400 md:mb-1.5 md:min-h-[48px] md:px-4 md:py-2.5"
-        placeholder={placeholderText ?? "Ask Assistant..."}
+        placeholder={resolvedPlaceholder}
         disabled={disabled}
       />
       <div className="flex min-w-0 max-w-full items-end justify-between gap-2 px-1 pb-0 sm:px-1.5 md:gap-2.5 md:pb-1">
