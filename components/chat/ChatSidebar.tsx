@@ -120,7 +120,7 @@ export function ChatSidebar({
 
   return (
     <aside
-      className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/80 bg-white/95 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-900/80 dark:text-zinc-100 ${
+      className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/80 bg-white/90 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-950/90 dark:text-zinc-100 ${
         collapsed ? "w-16" : "w-[min(100vw,360px)] md:w-64"
       }`}
     >
@@ -172,7 +172,7 @@ export function ChatSidebar({
         />
       ) : null}
 
-      <div className="flex-1 space-y-3.5 overflow-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.45)_transparent]">
+      <div className="flex-1 space-y-2.5 overflow-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.45)_transparent]">
         {Object.entries(groupedSessions).map(([group, items]) =>
           items.length === 0 ? null : (
             <div key={group}>
@@ -187,8 +187,8 @@ export function ChatSidebar({
                     key={session.id}
                     className={`group relative w-full rounded-lg border px-2.5 py-1.5 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
                       activeSessionId === session.id
-                        ? "border-zinc-300/90 bg-zinc-100 dark:border-zinc-600/70 dark:bg-zinc-800/75"
-                        : "border-zinc-200/70 bg-white/70 hover:border-zinc-300/80 hover:bg-zinc-50 dark:border-zinc-800/70 dark:bg-zinc-900/30 dark:hover:border-zinc-700/70 dark:hover:bg-zinc-800/55"
+                        ? "border-violet-200/80 bg-violet-50/80 text-zinc-950 shadow-[inset_3px_0_0_rgba(124,58,237,0.75)] dark:border-violet-500/45 dark:bg-violet-950/25 dark:text-zinc-50 dark:shadow-[inset_3px_0_0_rgba(167,139,250,0.85)]"
+                        : "border-zinc-200/80 bg-white hover:border-zinc-200 hover:bg-zinc-50/80 dark:border-zinc-800/80 dark:bg-zinc-900/40 dark:hover:bg-zinc-800/55"
                     }`}
                   >
                     {editingSessionId === session.id ? (
@@ -275,12 +275,12 @@ export function ChatSidebar({
 
       <div className="relative mt-2.5 border-t border-zinc-200/80 pt-2.5 dark:border-zinc-700/80">
         {!collapsed && usageData ? (
-          <div className="mb-2 flex items-center gap-1.5 rounded-md border border-zinc-200/70 bg-zinc-50/70 px-3 py-1.5 text-xs text-zinc-500 dark:border-zinc-700/70 dark:bg-zinc-800/60 dark:text-zinc-500">
+          <div className="mb-2 flex items-center gap-1.5 rounded-md border border-zinc-200/80 bg-white px-3 py-1.5 text-xs text-zinc-500 dark:border-zinc-700/70 dark:bg-zinc-800/60 dark:text-zinc-500">
             <Zap className="h-3 w-3 text-amber-500" />
             <span>{(usageData.totalTokens ?? 0).toLocaleString()} tokens used</span>
           </div>
         ) : null}
-        <div className="rounded-md bg-zinc-50/55 p-1 dark:bg-zinc-800/40">
+        <div className="rounded-md bg-white p-1 dark:bg-zinc-800/40">
           <AccountMenu
             open={profileOpen}
             collapsed={collapsed}
