@@ -174,7 +174,7 @@ const MessageBubble = memo(function MessageBubble({
     },
     p(props: { children?: ReactNode }) {
       return (
-        <p className="my-2 min-w-0 max-w-full break-words leading-7 [overflow-wrap:anywhere]">
+        <p className="my-2 min-w-0 max-w-full break-words leading-relaxed [overflow-wrap:anywhere]">
           {props.children}
         </p>
       );
@@ -187,7 +187,7 @@ const MessageBubble = memo(function MessageBubble({
     },
     li(props: { children?: ReactNode }) {
       return (
-        <li className="min-w-0 max-w-full break-words pl-1 leading-7 [overflow-wrap:anywhere]">
+        <li className="min-w-0 max-w-full break-words pl-1 leading-relaxed [overflow-wrap:anywhere]">
           {props.children}
         </li>
       );
@@ -206,7 +206,7 @@ const MessageBubble = memo(function MessageBubble({
     },
     blockquote(props: { children?: ReactNode }) {
       return (
-        <blockquote className="my-3 min-w-0 max-w-full border-l-2 border-zinc-400 pl-3 text-zinc-700 dark:border-zinc-600 dark:text-zinc-300">
+        <blockquote className="my-3 min-w-0 max-w-full border-l-2 border-zinc-300 pl-3 text-zinc-600 dark:border-zinc-700 dark:text-zinc-300">
           {props.children}
         </blockquote>
       );
@@ -246,8 +246,8 @@ const MessageBubble = memo(function MessageBubble({
 
       if (promptLike) {
         return (
-          <div className="my-3 max-w-full overflow-hidden rounded-lg border border-zinc-200 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100">
-            <div className="flex min-w-0 items-center justify-between gap-2 border-b border-zinc-200 bg-zinc-50 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
+          <div className="my-3 max-w-full overflow-hidden rounded-lg border border-zinc-200/80 bg-white text-zinc-900 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-100">
+            <div className="flex min-w-0 items-center justify-between gap-2 border-b border-zinc-200/80 bg-zinc-50 px-3 py-1.5 text-[11px] uppercase tracking-wide text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
               <span className="min-w-0 truncate">{label}</span>
               <button
                 className="shrink-0 rounded px-2 py-0.5 text-zinc-600 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-zinc-700 dark:hover:text-white"
@@ -316,8 +316,8 @@ const MessageBubble = memo(function MessageBubble({
         <div
           className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 transition ${
             message.role === "user"
-              ? "bg-violet-50/85 text-zinc-900 ring-1 ring-violet-200/60 shadow-sm dark:bg-violet-950/40 dark:text-zinc-100 md:max-w-xl"
-              : "border border-zinc-200/70 bg-white/90 text-zinc-900 shadow-[0_1px_1px_rgba(24,24,27,0.03)] dark:border-zinc-700 dark:bg-zinc-800/85 dark:text-zinc-100 md:max-w-[49rem]"
+              ? "bg-violet-50/70 text-zinc-900 ring-1 ring-violet-200/50 shadow-sm dark:bg-violet-950/30 dark:text-zinc-100 md:max-w-xl"
+              : "border border-zinc-200/80 bg-white text-zinc-900 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 md:max-w-[49rem]"
           }`}
         >
         {images && images.length > 0 ? (
