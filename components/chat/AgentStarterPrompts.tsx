@@ -20,23 +20,23 @@ export function AgentStarterPrompts({
   return (
     <div className="mt-6" data-agent-id={agent.id}>
       <div className="mb-2.5 flex flex-col items-center gap-1 text-center">
-        <div className="flex items-center justify-center gap-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
-          <Sparkles className="h-3 w-3 shrink-0" />
+        <div className="flex items-center justify-center gap-2 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+          <Sparkles className="h-3 w-3 shrink-0 text-zinc-400 dark:text-zinc-500" />
           <span>Suggestions · {agent.name}</span>
         </div>
-        <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-500">
+        <p className="text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-400">
           {
             "Starters from this agent's configuration — they change when you switch agents."
           }
         </p>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
+      <div className="grid gap-2.5 sm:grid-cols-2 sm:gap-3">
         {visiblePrompts.map((prompt, index) => (
           <button
             key={`${agent.id}-${prompt.id}-${index}`}
             type="button"
             onClick={() => onPromptClick(prompt.prompt)}
-            className={`group rounded-xl border border-zinc-300/90 bg-white p-3.5 text-left text-sm text-zinc-800 shadow-[0_1px_2px_rgba(24,24,27,0.04)] transition hover:border-violet-300 hover:bg-violet-50/50 hover:shadow-sm active:scale-[0.99] dark:border-zinc-700 dark:bg-zinc-800/50 dark:text-zinc-300 dark:hover:border-violet-500 dark:hover:bg-violet-900/10 ${
+            className={`group rounded-2xl border border-zinc-200/80 bg-white p-3.5 text-left text-sm text-zinc-800 shadow-sm transition-colors hover:border-zinc-300 hover:bg-zinc-50/90 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/35 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-900/70 dark:focus-visible:ring-zinc-600 dark:focus-visible:ring-offset-zinc-950 ${
               index >= 2 ? "hidden sm:block" : ""
             }`}
           >
