@@ -531,7 +531,7 @@ export function MessageList({
       return (
         <div
           style={composerInsetStyle}
-          className="flex min-h-0 min-w-0 max-w-full flex-1 items-start justify-center overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-8 md:items-center md:px-6 md:pb-40"
+          className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-6 sm:px-6 md:pt-8"
         >
           <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading assistant…</p>
         </div>
@@ -541,45 +541,49 @@ export function MessageList({
     return (
       <div
         style={composerInsetStyle}
-        className="flex min-h-0 min-w-0 max-w-full flex-1 items-start justify-center overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-6 sm:px-6 md:items-center md:pb-40 md:pt-8"
+        className="flex min-h-0 min-w-0 max-w-full flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-6 sm:px-6 md:pt-8"
       >
-        <div className="mx-auto w-full min-w-0 max-w-full md:max-w-3xl">
+        <div className="mx-auto flex w-full min-w-0 max-w-full flex-col items-center gap-8 md:max-w-3xl">
           {activeAgent ? (
-            <div className="flex flex-col items-center">
-              <span className="text-3xl">{activeAgent.icon || "🤖"}</span>
-              <h2 className="mt-2 text-center text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
+            <div className="flex w-full flex-col items-center">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-zinc-200/80 bg-white text-3xl leading-none shadow-sm dark:border-zinc-800 dark:bg-zinc-950/90">
+                <span aria-hidden>{activeAgent.icon || "🤖"}</span>
+              </div>
+              <h2 className="mt-4 text-center text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
                 {activeAgent.name}
               </h2>
               {activeAgent.description ? (
-                <p className="mt-1.5 max-w-md text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+                <p className="mt-2 max-w-md text-center text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                   {activeAgent.description}
                 </p>
               ) : null}
               {emptyStateModelLine ? (
-                <p className="mt-2.5 max-w-lg text-center text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-500">
+                <p className="mt-3 max-w-lg text-center text-[11px] leading-relaxed text-zinc-600 dark:text-zinc-500">
                   {emptyStateModelLine}
                 </p>
               ) : null}
             </div>
           ) : (
-            <div className="text-center">
+            <div className="w-full max-w-md rounded-2xl border border-zinc-200/80 bg-white/90 px-5 py-6 text-center shadow-sm dark:border-zinc-800 dark:bg-zinc-950/90">
               <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
                 No assistant available
               </h2>
-              <p className="mt-1.5 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
+              <p className="mt-2 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">
                 There are no published agents for your account yet. Check back after an admin publishes one.
               </p>
             </div>
           )}
 
           {activeAgent && hasAgentStarters ? (
-            <AgentStarterPrompts
-              key={activeAgent.id}
-              agent={activeAgent}
-              onPromptClick={(text) => onSuggestionClick?.(text)}
-            />
+            <div className="w-full [&>div]:mt-0">
+              <AgentStarterPrompts
+                key={activeAgent.id}
+                agent={activeAgent}
+                onPromptClick={(text) => onSuggestionClick?.(text)}
+              />
+            </div>
           ) : activeAgent ? (
-            <p className="mt-5 text-center text-xs text-zinc-500 dark:text-zinc-500">
+            <p className="max-w-md text-center text-xs leading-relaxed text-zinc-600 dark:text-zinc-400">
               {`${activeAgent.name} has no starter prompts configured yet. Type a message below to get started.`}
             </p>
           ) : null}
