@@ -172,106 +172,108 @@ export function ChatSidebar({
         />
       ) : null}
 
-      <div className="flex-1 space-y-2.5 overflow-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.45)_transparent]">
-        {Object.entries(groupedSessions).map(([group, items]) =>
-          items.length === 0 ? null : (
-            <div key={group}>
-              {!collapsed ? (
+      {!collapsed ? (
+        <div className="flex-1 space-y-2.5 overflow-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.45)_transparent]">
+          {Object.entries(groupedSessions).map(([group, items]) =>
+            items.length === 0 ? null : (
+              <div key={group}>
                 <h3 className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-500">
                   {group}
                 </h3>
-              ) : null}
-              <div className="space-y-1">
-                {items.map((session) => (
-                  <div
-                    key={session.id}
-                    className={`group relative w-full rounded-lg border px-2.5 py-1.5 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
-                      activeSessionId === session.id
-                        ? "border-violet-200/80 bg-violet-50/80 text-zinc-950 shadow-[inset_3px_0_0_rgba(124,58,237,0.75)] dark:border-violet-500/45 dark:bg-violet-950/25 dark:text-zinc-50 dark:shadow-[inset_3px_0_0_rgba(167,139,250,0.85)]"
-                        : "border-zinc-200/80 bg-white hover:border-zinc-200 hover:bg-zinc-50/80 dark:border-zinc-800/80 dark:bg-zinc-900/40 dark:hover:bg-zinc-800/55"
-                    }`}
-                  >
-                    {editingSessionId === session.id ? (
-                      <input
-                        autoFocus
-                        value={titleDraft}
-                        onChange={(e) => setTitleDraft(e.target.value)}
-                        onBlur={() => void submitRename(session.id)}
-                        onKeyDown={(e) => onInputKeyDown(e, session.id)}
-                        className="w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
-                      />
-                    ) : (
-                      <div className="flex items-center justify-between gap-2">
-                        <button
-                          className={`${
-                            collapsed ? "w-6 truncate text-center" : "flex-1 truncate pr-1.5"
-                          } text-left ${activeSessionId === session.id ? "font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-800 dark:text-zinc-200"}`}
-                          onClick={() => onSelect(session.id)}
-                          title={session.title}
-                        >
-                          {collapsed ? session.title.slice(0, 1).toUpperCase() : session.title}
-                        </button>
-                        <button
-                          className={`rounded p-1 text-zinc-600 transition hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
-                            activeSessionId === session.id || menuSessionId === session.id
-                              ? "opacity-100"
-                              : "opacity-0 group-hover:opacity-100"
-                          }`}
-                          onClick={() => {
-                            setMenuSessionId((prev) => (prev === session.id ? null : session.id));
-                          }}
-                          aria-label="Open chat actions"
-                        >
-                          <Ellipsis className="h-4 w-4" />
-                        </button>
-                        {menuSessionId === session.id ? (
-                          <div
-                            ref={menuRef}
-                            className="absolute right-2 top-10 z-20 min-w-[160px] rounded-md border border-zinc-300 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
+                <div className="space-y-1">
+                  {items.map((session) => (
+                    <div
+                      key={session.id}
+                      className={`group relative w-full rounded-lg border px-2.5 py-1.5 text-left text-sm text-zinc-900 transition dark:text-zinc-100 ${
+                        activeSessionId === session.id
+                          ? "border-violet-200/80 bg-violet-50/80 text-zinc-950 shadow-[inset_3px_0_0_rgba(124,58,237,0.75)] dark:border-violet-500/45 dark:bg-violet-950/25 dark:text-zinc-50 dark:shadow-[inset_3px_0_0_rgba(167,139,250,0.85)]"
+                          : "border-zinc-200/80 bg-white hover:border-zinc-200 hover:bg-zinc-50/80 dark:border-zinc-800/80 dark:bg-zinc-900/40 dark:hover:bg-zinc-800/55"
+                      }`}
+                    >
+                      {editingSessionId === session.id ? (
+                        <input
+                          autoFocus
+                          value={titleDraft}
+                          onChange={(e) => setTitleDraft(e.target.value)}
+                          onBlur={() => void submitRename(session.id)}
+                          onKeyDown={(e) => onInputKeyDown(e, session.id)}
+                          className="w-full rounded border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100"
+                        />
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            className={`flex-1 truncate pr-1.5 text-left ${
+                              activeSessionId === session.id ? "font-medium text-zinc-900 dark:text-zinc-100" : "text-zinc-800 dark:text-zinc-200"
+                            }`}
+                            onClick={() => onSelect(session.id)}
+                            title={session.title}
                           >
-                            <button
-                              className="block w-full rounded px-3 py-2 text-left text-xs text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                              onClick={() => {
-                                setMenuSessionId(null);
-                                setEditingSessionId(session.id);
-                                setTitleDraft(session.title);
-                              }}
+                            {session.title}
+                          </button>
+                          <button
+                            className={`rounded p-1 text-zinc-600 transition hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
+                              activeSessionId === session.id || menuSessionId === session.id
+                                ? "opacity-100"
+                                : "opacity-0 group-hover:opacity-100"
+                            }`}
+                            onClick={() => {
+                              setMenuSessionId((prev) => (prev === session.id ? null : session.id));
+                            }}
+                            aria-label="Open chat actions"
+                          >
+                            <Ellipsis className="h-4 w-4" />
+                          </button>
+                          {menuSessionId === session.id ? (
+                            <div
+                              ref={menuRef}
+                              className="absolute right-2 top-10 z-20 min-w-[160px] rounded-md border border-zinc-300 bg-white p-1 shadow-lg dark:border-zinc-700 dark:bg-zinc-800"
                             >
-                              Rename
-                            </button>
-                            <button
-                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
-                              onClick={async () => {
-                                setMenuSessionId(null);
-                                await onShare(session.id);
-                              }}
-                            >
-                              <Share2 className="h-3.5 w-3.5" />
-                              Share
-                            </button>
-                            <button
-                              className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                              onClick={async () => {
-                                setMenuSessionId(null);
-                                const confirmed = window.confirm("Delete this chat and all its messages?");
-                                if (!confirmed) return;
-                                await onDelete(session.id);
-                              }}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                              Delete
-                            </button>
-                          </div>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                              <button
+                                className="block w-full rounded px-3 py-2 text-left text-xs text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                                onClick={() => {
+                                  setMenuSessionId(null);
+                                  setEditingSessionId(session.id);
+                                  setTitleDraft(session.title);
+                                }}
+                              >
+                                Rename
+                              </button>
+                              <button
+                                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-zinc-800 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                                onClick={async () => {
+                                  setMenuSessionId(null);
+                                  await onShare(session.id);
+                                }}
+                              >
+                                <Share2 className="h-3.5 w-3.5" />
+                                Share
+                              </button>
+                              <button
+                                className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                                onClick={async () => {
+                                  setMenuSessionId(null);
+                                  const confirmed = window.confirm("Delete this chat and all its messages?");
+                                  if (!confirmed) return;
+                                  await onDelete(session.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )
-        )}
-      </div>
+            )
+          )}
+        </div>
+      ) : (
+        <div className="min-h-0 flex-1 shrink-0" aria-hidden="true" />
+      )}
 
       <div className="relative mt-2.5 border-t border-zinc-200/80 pt-2.5 dark:border-zinc-700/80">
         {!collapsed && usageData ? (
