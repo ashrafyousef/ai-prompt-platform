@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Ellipsis, LogOut, Shield, User } from "lucide-react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
@@ -94,57 +94,14 @@ export function AccountMenu({
   onToggle,
   onClose,
 }: AccountMenuProps) {
-  const triggerRef = useRef<HTMLButtonElement | null>(null);
-  const desktopPanelRef = useRef<HTMLDivElement | null>(null);
-  const [desktopPosition, setDesktopPosition] = useState<{ left: number; top: number } | null>(null);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-
-    function updatePosition() {
-      const trigger = triggerRef.current;
-      if (!trigger) return;
-
-      const rect = trigger.getBoundingClientRect();
-      const panelWidth = 320;
-      const viewportPadding = 12;
-      const gap = 8;
-      const estimatedPanelHeight = desktopPanelRef.current?.offsetHeight ?? 300;
-
-      // Prefer opening to the right of collapsed rail trigger when possible.
-      const preferredLeft = collapsed ? rect.right + gap : rect.right - panelWidth;
-      const maxLeft = window.innerWidth - panelWidth - viewportPadding;
-      const left = Math.max(viewportPadding, Math.min(preferredLeft, maxLeft));
-
-      // Prefer opening below trigger; if not enough room, open upward.
-      const belowTop = rect.bottom + gap;
-      const aboveTop = rect.top - estimatedPanelHeight - gap;
-      const preferredTop =
-        belowTop + estimatedPanelHeight <= window.innerHeight - viewportPadding ? belowTop : aboveTop;
-      const maxTop = window.innerHeight - estimatedPanelHeight - viewportPadding;
-      const top = Math.max(viewportPadding, Math.min(preferredTop, maxTop));
-
-      setDesktopPosition({ left, top });
-    }
-
-    updatePosition();
-    const raf = window.requestAnimationFrame(updatePosition);
-    window.addEventListener("resize", updatePosition);
-    window.addEventListener("scroll", updatePosition, true);
-    return () => {
-      window.cancelAnimationFrame(raf);
-      window.removeEventListener("resize", updatePosition);
-      window.removeEventListener("scroll", updatePosition, true);
-    };
-  }, [open, collapsed]);
-
   const mobileSheet = (
-    <div className="lg:hidden">
+    <div className="md:hidden">
       <button
         type="button"
         className="fixed inset-0 z-[90] bg-black/45"
@@ -159,9 +116,8 @@ export function AccountMenu({
   );
 
   return (
-    <>
+    <div className="relative">
       <button
-        ref={triggerRef}
         className="flex w-full items-center justify-between rounded-md border border-zinc-200/80 bg-zinc-50/90 px-3 py-2 text-xs text-zinc-800 transition hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
         onClick={onToggle}
         aria-label="Profile menu"
@@ -174,14 +130,16 @@ export function AccountMenu({
         <>
           <button
             type="button"
-            className="fixed inset-0 z-30 hidden cursor-default bg-transparent lg:block"
+            className="fixed inset-0 z-30 hidden cursor-default bg-transparent md:block"
             onClick={onClose}
             aria-label="Close account menu backdrop"
           />
           <div
-            ref={desktopPanelRef}
-            className="fixed z-40 hidden w-[320px] rounded-3xl border border-zinc-200/90 bg-white/95 p-4 shadow-2xl backdrop-blur dark:border-zinc-700/80 dark:bg-zinc-900/95 lg:block"
-            style={desktopPosition ? { left: desktopPosition.left, top: desktopPosition.top } : undefined}
+            className={`absolute z-40 hidden max-w-none rounded-2xl border border-zinc-200/80 bg-white/95 p-4 shadow-lg backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95 md:block ${
+              collapsed
+                ? "bottom-0 left-[calc(100%+0.5rem)] w-[320px]"
+                : "bottom-[calc(100%+0.5rem)] left-0 right-0 w-full min-w-0"
+            }`}
           >
             <AccountIdentity userName={userName} userEmail={userEmail} />
             <AccountActions isAdmin={isAdmin} onClose={onClose} />
@@ -190,6 +148,6 @@ export function AccountMenu({
           {mounted ? createPortal(mobileSheet, document.body) : null}
         </>
       ) : null}
-    </>
+    </div>
   );
 }
