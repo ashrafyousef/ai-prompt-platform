@@ -593,7 +593,7 @@ export function MessageList({
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="flex h-full w-full min-w-0 max-w-full flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1rem)] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6"
+        className="flex h-full w-full min-w-0 max-w-full flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 pb-[calc(var(--composer-bottom-inset)+1.5rem)] pt-5 text-zinc-900 dark:text-zinc-100 sm:px-6 sm:pt-6"
       >
         {loading && messages.length === 0
           ? [1, 2, 3].map((skeleton) => (
