@@ -132,21 +132,21 @@ const MessageBubble = memo(function MessageBubble({
   const markdownComponents = useMemo(() => ({
     h1(props: { children?: ReactNode }) {
       return (
-        <h1 className="mb-3 mt-4 min-w-0 max-w-full break-words text-xl font-semibold leading-tight [overflow-wrap:anywhere]">
+        <h1 className="mb-3 mt-4 min-w-0 max-w-full break-words text-lg font-semibold leading-tight md:text-xl [overflow-wrap:anywhere]">
           {props.children}
         </h1>
       );
     },
     h2(props: { children?: ReactNode }) {
       return (
-        <h2 className="mb-2.5 mt-4 min-w-0 max-w-full break-words text-lg font-semibold leading-tight [overflow-wrap:anywhere]">
+        <h2 className="mb-2.5 mt-4 min-w-0 max-w-full break-words text-base font-semibold leading-tight md:text-lg [overflow-wrap:anywhere]">
           {props.children}
         </h2>
       );
     },
     h3(props: { children?: ReactNode }) {
       return (
-        <h3 className="mb-2 mt-3.5 min-w-0 max-w-full break-words text-base font-semibold leading-snug [overflow-wrap:anywhere]">
+        <h3 className="mb-2 mt-3.5 min-w-0 max-w-full break-words text-sm font-semibold leading-snug md:text-base [overflow-wrap:anywhere]">
           {props.children}
         </h3>
       );
@@ -314,7 +314,7 @@ const MessageBubble = memo(function MessageBubble({
     <div className="group w-full min-w-0 max-w-full md:mx-auto md:max-w-3xl">
       <div className={`flex w-full min-w-0 max-w-full ${alignment}`}>
         <div
-          className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-7 transition ${
+          className={`w-full min-w-0 max-w-full overflow-hidden rounded-2xl p-4 text-sm leading-relaxed transition ${
             message.role === "user"
               ? "bg-violet-50/70 text-zinc-900 ring-1 ring-violet-200/50 shadow-sm dark:bg-violet-950/30 dark:text-zinc-100 md:max-w-xl"
               : "border border-zinc-200/80 bg-white text-zinc-900 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 md:max-w-[49rem]"
