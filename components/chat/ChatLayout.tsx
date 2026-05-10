@@ -81,7 +81,7 @@ export function ChatLayout({
         <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/80 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
           <div className="flex min-w-0 items-center gap-3">
             <button
-              className="rounded-md p-2 text-zinc-700 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
+              className="rounded-lg p-2 text-zinc-700 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"
               onClick={onToggleMobileSidebar}
               aria-label="Open sidebar"
             >
@@ -98,7 +98,7 @@ export function ChatLayout({
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
             <button
-              className={`rounded-md p-2 transition hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
+              className={`rounded-lg p-2 transition hover:bg-zinc-200 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 ${
                 savedPromptsOpen ? "bg-zinc-200 text-zinc-900 dark:bg-zinc-700 dark:text-zinc-100" : "text-zinc-600 dark:text-zinc-300"
               }`}
               onClick={onToggleSavedPrompts}
@@ -108,7 +108,7 @@ export function ChatLayout({
               <Bookmark className="h-4 w-4" />
             </button>
             <button
-              className="hidden rounded-md p-2 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 md:inline-flex dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              className="hidden rounded-lg p-2 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 md:inline-flex dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               onClick={onToggleDrawer}
               aria-label="Toggle context drawer"
             >

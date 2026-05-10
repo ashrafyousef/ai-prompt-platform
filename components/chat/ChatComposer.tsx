@@ -209,14 +209,14 @@ export function ChatComposer({
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
       onDrop={handleDrop}
-      className={`relative mx-auto w-full min-w-0 max-w-full overflow-hidden rounded-[30px] border p-1.5 shadow-[0_6px_24px_rgba(24,24,27,0.06)] transition-colors md:max-w-3xl md:p-2.5 ${
+      className={`relative mx-auto w-full min-w-0 max-w-full overflow-hidden rounded-2xl border p-1.5 shadow-sm transition-colors md:max-w-3xl md:p-2.5 ${
         dragging
           ? "border-violet-300 bg-violet-100 ring-2 ring-violet-400 dark:bg-violet-950/40 dark:ring-violet-500"
-          : "border-zinc-200/90 bg-white dark:border-zinc-700 dark:bg-[#1e1e1e]"
+          : "border-zinc-200/80 bg-white dark:border-zinc-800 dark:bg-zinc-950"
       }`}
     >
       {dragging ? (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-[32px]">
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-2xl">
           <span className="text-sm font-medium text-violet-600 dark:text-violet-300">
             Drop images here
           </span>
@@ -328,7 +328,7 @@ export function ChatComposer({
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 pl-1">
           {onModelRoutingModeChange ? (
-            <label className="flex items-center gap-1 text-[11px] text-zinc-600 dark:text-zinc-400">
+            <label className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
               <span className="sr-only">Routing</span>
               <select
                 value={modelRoutingMode}
@@ -336,7 +336,7 @@ export function ChatComposer({
                   onModelRoutingModeChange(e.target.value as "manual" | "auto" | "suggested")
                 }
                 disabled={disabled}
-                className="max-w-[124px] rounded-lg border border-zinc-300 bg-white px-1.5 py-1 text-[11px] text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
+                className="max-w-[124px] rounded-lg border border-zinc-300 bg-white px-1.5 py-1 text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
               >
                 <option value="manual">Manual</option>
                 <option value="auto">Auto</option>

@@ -273,7 +273,7 @@ export function ModelSelector({
         type="button"
         onClick={() => setOpen((p) => !p)}
         disabled={disabled}
-        className="flex max-w-[min(100%,18rem)] items-center gap-1.5 rounded-full border border-zinc-200/90 bg-white/80 py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none disabled:opacity-50 dark:border-transparent dark:bg-transparent dark:text-zinc-400 dark:hover:bg-zinc-800"
+        className="flex max-w-[min(100%,18rem)] items-center gap-1.5 rounded-xl border border-zinc-200/80 bg-white/80 py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:bg-zinc-800"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={`Model: ${selected.displayName}`}
