@@ -214,7 +214,7 @@ export function ChatSidebar({
                             className={`rounded p-1 text-zinc-600 transition hover:bg-zinc-300 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-600 dark:hover:text-zinc-100 ${
                               activeSessionId === session.id || menuSessionId === session.id
                                 ? "opacity-100"
-                                : "opacity-0 group-hover:opacity-100"
+                                : "opacity-100 md:opacity-0 md:group-hover:opacity-100"
                             }`}
                             onClick={() => {
                               setMenuSessionId((prev) => (prev === session.id ? null : session.id));

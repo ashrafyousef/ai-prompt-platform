@@ -280,7 +280,7 @@ export function ChatComposer({
               <button
                 type="button"
                 onClick={() => setImageFiles((prev) => prev.filter((_, i) => i !== index))}
-                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white opacity-0 transition-opacity group-hover/thumb:opacity-100 hover:bg-zinc-600 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white opacity-100 transition-opacity hover:bg-zinc-600 md:opacity-0 md:group-hover/thumb:opacity-100 dark:bg-zinc-600 dark:hover:bg-zinc-500"
                 aria-label="Remove image"
               >
                 <X className="h-3 w-3" />
