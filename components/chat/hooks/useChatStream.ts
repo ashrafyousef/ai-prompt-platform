@@ -81,8 +81,37 @@ export function useChatStream({
       const formData = new FormData();
       formData.append("image", compressed);
       const res = await fetch("/api/upload/image", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.url) urls.push(data.url);
+
+      let data: unknown;
+      const ct = res.headers.get("content-type") ?? "";
+      try {
+        data = ct.includes("application/json") ? await res.json() : await res.text();
+      } catch {
+        throw new Error(`Image upload failed (${res.status}). Could not read the server response.`);
+      }
+
+      if (!res.ok) {
+        const body =
+          typeof data === "object" && data !== null && "error" in data
+            ? String((data as { error?: unknown }).error ?? "").trim()
+            : typeof data === "string"
+            ? data.trim().slice(0, 400)
+            : "";
+        throw new Error(
+          body || `Image upload failed (${res.status}). Please try again.`
+        );
+      }
+
+      const url =
+        typeof data === "object" && data !== null && "url" in data
+          ? String((data as { url?: unknown }).url ?? "").trim()
+          : "";
+      if (!url) {
+        throw new Error(
+          "Image upload succeeded but returned no URL. Try again or use a smaller image."
+        );
+      }
+      urls.push(url);
     }
     return urls.length > 0 ? urls : undefined;
   };
@@ -163,7 +192,29 @@ export function useChatStream({
 
     const userMsgOptimisticId = `usr-${Date.now()}`;
     const assistantMsgOptimisticId = `tmp-${Date.now()}`;
-    const imageUrls = overrideImageUrls ?? (await uploadImages(imageFiles));
+
+    let imageUrls: string[] | undefined;
+    try {
+      imageUrls = overrideImageUrls ?? (await uploadImages(imageFiles));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Image upload failed.";
+      onError?.(msg);
+      setLoading(false);
+      sendCooldownUntilRef.current = Date.now() + 400;
+      throw e instanceof Error ? e : new Error(msg);
+    }
+
+    if (
+      imageFiles &&
+      imageFiles.length > 0 &&
+      (!imageUrls || imageUrls.length === 0)
+    ) {
+      const msg = "Image upload did not return any URLs. Please try again.";
+      onError?.(msg);
+      setLoading(false);
+      sendCooldownUntilRef.current = Date.now() + 400;
+      throw new Error(msg);
+    }
 
     const isRegenerate = Boolean(regenOfId);
     let turnId = crypto.randomUUID();

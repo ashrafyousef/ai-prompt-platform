@@ -180,9 +180,13 @@ export function ChatComposer({
     e?.preventDefault();
     if (disabled) return;
     if (!text.trim() || blockingIssue) return;
-    await onSend(text.trim(), imageFiles);
-    setText("");
-    setImageFiles([]);
+    try {
+      await onSend(text.trim(), imageFiles);
+      setText("");
+      setImageFiles([]);
+    } catch {
+      // onError from useChatStream surfaces the message; keep draft and attachments.
+    }
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
