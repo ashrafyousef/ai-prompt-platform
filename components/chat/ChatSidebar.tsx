@@ -121,7 +121,7 @@ export function ChatSidebar({
   return (
     <aside
       className={`flex h-[100dvh] max-w-full flex-col border-r border-zinc-200/80 bg-white/90 p-2.5 text-zinc-900 backdrop-blur transition-all duration-200 dark:border-zinc-700/70 dark:bg-zinc-950/90 dark:text-zinc-100 ${
-        collapsed ? "w-16" : "w-[min(100vw,360px)] md:w-64"
+        collapsed ? "w-16" : "w-full max-w-full md:w-64"
       }`}
     >
       <div className="mb-2 flex flex-col gap-1.5 pr-12 md:mb-2.5 md:gap-2 md:pr-0">

@@ -63,7 +63,7 @@ export function ChatLayout({
             className="fixed inset-0 z-40 bg-black/30 md:hidden dark:bg-black/40"
             onClick={onToggleMobileSidebar}
           />
-          <div className="fixed inset-y-0 left-0 z-50 w-[min(100vw,360px)] max-w-full overflow-hidden md:hidden [&>aside]:w-full">
+          <div className="fixed inset-y-0 left-3 z-50 w-[calc(100vw-24px)] max-w-[360px] overflow-hidden md:hidden [&>aside]:w-full">
             <button
               type="button"
               className="absolute right-3 top-3 z-10 rounded-md bg-zinc-200 p-2 text-zinc-700 shadow-sm hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
