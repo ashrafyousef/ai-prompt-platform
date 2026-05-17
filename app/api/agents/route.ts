@@ -8,7 +8,7 @@ import { DEFAULT_AGENT_SLUG } from "@/lib/chatDefaultAgent";
 import { parseStarterPromptsFromAgentInputSchema } from "@/lib/chatStarterPrompts";
 import { getSystemChatConfig } from "@/lib/systemConfig";
 import { canViewAgentForActor } from "@/lib/agentScope";
-import { resolveEffectiveAgentKnowledge } from "@/lib/knowledgeRepository";
+import { countEffectiveAgentKnowledge } from "@/lib/knowledgeRepository";
 
 export async function GET() {
   try {
@@ -28,7 +28,6 @@ export async function GET() {
         name: true,
         slug: true,
         description: true,
-        systemPrompt: true,
         inputSchema: true,
         scope: true,
         teamId: true,
@@ -37,21 +36,7 @@ export async function GET() {
           select: {
             legacyItemId: true,
             knowledge: {
-              select: {
-                id: true,
-                title: true,
-                sourceType: true,
-                content: true,
-                fileRef: true,
-                summary: true,
-                tags: true,
-                priority: true,
-                appliesTo: true,
-                isActive: true,
-                ownerNote: true,
-                lastReviewedAt: true,
-                processingStatus: true,
-              },
+              select: { id: true },
             },
           },
         },
@@ -74,7 +59,7 @@ export async function GET() {
       )
       .map((a) => {
         const schema = normalizeAgentInputSchema(a.inputSchema);
-        const effectiveKnowledge = resolveEffectiveAgentKnowledge({
+        const knowledgeCount = countEffectiveAgentKnowledge({
           inputSchema: a.inputSchema,
           knowledgeLinks: a.knowledgeLinks,
         });
@@ -96,8 +81,8 @@ export async function GET() {
             a.inputSchema,
             schema.meta.identity.category
           ),
-          systemPromptSnippet: a.systemPrompt?.slice(0, 200) ?? null,
-          knowledgeCount: effectiveKnowledge.length,
+          systemPromptSnippet: null,
+          knowledgeCount,
           outputFormat: schema.outputConfig.format,
           responseDepth: schema.outputConfig.responseDepth,
           preferredModelId: prefs.preferredModelId,

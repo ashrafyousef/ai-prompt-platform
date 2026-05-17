@@ -104,6 +104,18 @@ function normalizeTags(tags: Prisma.JsonValue | null): string[] {
   return tags.filter((tag): tag is string => typeof tag === "string" && tag.trim().length > 0);
 }
 
+/** Count knowledge sources for list APIs without loading content bodies. */
+export function countEffectiveAgentKnowledge(input: {
+  inputSchema: unknown;
+  knowledgeLinks?: Array<{ legacyItemId: string | null; knowledge: { id: string } }>;
+}): number {
+  const relational = input.knowledgeLinks ?? [];
+  if (relational.length > 0) {
+    return relational.length;
+  }
+  return extractKnowledgeItemsFromInputSchema(input.inputSchema).length;
+}
+
 export function resolveEffectiveAgentKnowledge(input: DualReadKnowledgeInput): AgentKnowledgeItem[] {
   const relational = input.knowledgeLinks ?? [];
   if (relational.length > 0) {
