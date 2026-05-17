@@ -16,6 +16,10 @@ import { resolveWorkspaceAccessForUser } from "@/lib/workspaceAccess";
 import { canViewAgentForActor } from "@/lib/agentScope";
 import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
 import type { KnowledgeInjectionMeta } from "@/lib/knowledgeInjection";
+import {
+  ensureMarkdownSections,
+  shouldEnforceLegacyMarkdownSections,
+} from "@/lib/orchestration/outputInstructions";
 
 type AgentContract = {
   id: string;
@@ -149,6 +153,7 @@ export async function prepareOrchestrator(params: {
   let knowledgeInjection: KnowledgeInjectionMeta | null = null;
   const messages = buildMessages({
     agent,
+    outputConfig: effective.outputConfig,
     history,
     userInput: text,
     imageUrls: resolvedImageUrls ?? imageUrls,
@@ -249,7 +254,8 @@ export async function finalizeAssistantMessage(params: {
   } = params;
   const agent = await db.agentConfig.findFirst({ where: { id: agentId } });
   if (!agent) throw new Error("Agent not found.");
-  const contract = buildAgentContract(agent);
+  const effective = buildEffectiveAgentConfig(agent);
+  const contract = buildAgentContract(agent, effective.outputConfig);
   const outputMode = getOutputMode(agent);
 
   let finalOutput = responseText;
@@ -307,7 +313,7 @@ export async function finalizeAssistantMessage(params: {
       }
     }
   } else if (contract.enforceMarkdownSections && !requiresJsonOutput(agent)) {
-    finalOutput = ensureMarkdownSections(finalOutput);
+    finalOutput = ensureMarkdownSections(finalOutput, effective.outputConfig.requiredSections);
   }
 
   const assistantMessage = assistantMessageId
@@ -504,7 +510,10 @@ export async function runOrchestrator(params: {
   });
 }
 
-function buildAgentContract(agent: AgentConfig): AgentContract {
+function buildAgentContract(
+  agent: AgentConfig,
+  outputConfig: ReturnType<typeof buildEffectiveAgentConfig>["outputConfig"]
+): AgentContract {
   const hasOutputSchema = Boolean(agent.outputSchema);
   return {
     id: agent.id,
@@ -513,14 +522,6 @@ function buildAgentContract(agent: AgentConfig): AgentContract {
     outputSchema: agent.outputSchema ?? undefined,
     temperature: agent.temperature,
     requiresStructuredValidation: hasOutputSchema,
-    enforceMarkdownSections: !hasOutputSchema,
+    enforceMarkdownSections: shouldEnforceLegacyMarkdownSections(agent, outputConfig),
   };
-}
-
-function ensureMarkdownSections(output: string): string {
-  const trimmed = output.trim();
-  const hasResult = /^##\s*Result\b/im.test(trimmed);
-  const hasDetails = /^##\s*Details\b/im.test(trimmed);
-  if (hasResult && hasDetails) return trimmed;
-  return `## Result\n${trimmed || "No result provided."}\n\n## Details\n- Generated in markdown structured mode.`;
 }
