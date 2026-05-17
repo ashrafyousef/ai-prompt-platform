@@ -180,20 +180,28 @@ export function ChatComposer({
     e?.preventDefault();
     if (disabled) return;
     if (!text.trim() || blockingIssue) return;
+
+    const submittedText = text.trim();
+    const submittedImages = [...imageFiles];
+
+    setText("");
+    setImageFiles([]);
+
     try {
-      await onSend(text.trim(), imageFiles);
-      setText("");
-      setImageFiles([]);
+      await onSend(submittedText, submittedImages.length > 0 ? submittedImages : undefined);
     } catch {
-      // onError from useChatStream surfaces the message; keep draft and attachments.
+      // onError from useChatStream surfaces the message; restore draft and attachments.
+      setText(submittedText);
+      setImageFiles(submittedImages);
     }
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      void submit();
-    }
+    if (e.key !== "Enter" || e.shiftKey) return;
+    if (e.nativeEvent.isComposing) return;
+    if (disabled || !text.trim() || blockingIssue) return;
+    e.preventDefault();
+    void submit();
   }
 
   const resolvedPlaceholder = useMemo(() => {
