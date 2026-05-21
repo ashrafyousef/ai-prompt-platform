@@ -173,7 +173,7 @@ export function ChatSidebar({
       ) : null}
 
       {!collapsed ? (
-        <div className="flex-1 space-y-2.5 overflow-auto pr-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.45)_transparent]">
+        <div className="flex-1 space-y-2.5 overflow-y-auto overscroll-y-contain pr-0.5 [scrollbar-width:thin] [scrollbar-color:rgba(161,161,170,0.45)_transparent]">
           {Object.entries(groupedSessions).map(([group, items]) =>
             items.length === 0 ? null : (
               <div key={group}>

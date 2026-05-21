@@ -249,12 +249,12 @@ export function ModelSelector({
     <div className="md:hidden">
       <button
         type="button"
-        className="fixed inset-0 z-[70] bg-black/25"
+        className="fixed inset-0 z-[90] bg-black/25"
         onClick={close}
         aria-label="Close model selector"
       />
       {renderModelList(
-        "fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[80] max-h-[min(72dvh,32rem)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-2xl border border-zinc-200 bg-white p-1.5 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-2xl dark:border-zinc-700 dark:bg-zinc-900",
+        "fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[100] max-h-[min(72dvh,32rem)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto overscroll-y-contain rounded-2xl border border-zinc-200 bg-white p-1.5 pb-3 shadow-2xl dark:border-zinc-700 dark:bg-zinc-900",
         mobilePanelRef
       )}
     </div>
@@ -273,7 +273,7 @@ export function ModelSelector({
         type="button"
         onClick={() => setOpen((p) => !p)}
         disabled={disabled}
-        className="flex max-w-[min(100%,18rem)] items-center gap-1.5 rounded-xl border border-zinc-200/80 bg-white/80 py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none disabled:opacity-50 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className="flex max-w-[min(100%,10.5rem)] items-center gap-1.5 rounded-xl border border-zinc-200/80 bg-white/80 py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none disabled:opacity-50 sm:max-w-[min(100%,18rem)] dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:bg-zinc-800"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={`Model: ${selected.displayName}`}

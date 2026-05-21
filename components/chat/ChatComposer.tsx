@@ -278,9 +278,9 @@ export function ChatComposer({
         </div>
       ) : null}
       {imagePreviews.length > 0 ? (
-        <div className="mb-2 flex flex-wrap gap-2 px-2">
+        <div className="mb-2 flex gap-2 overflow-x-auto overscroll-x-contain px-2 pb-0.5 [-webkit-overflow-scrolling:touch]">
           {imagePreviews.map((preview, index) => (
-            <div key={`${preview.file.name}-${index}`} className="group/thumb relative">
+            <div key={`${preview.file.name}-${index}`} className="group/thumb relative shrink-0">
               <Image
                 src={preview.url}
                 alt={preview.file.name}
@@ -292,7 +292,7 @@ export function ChatComposer({
               <button
                 type="button"
                 onClick={() => setImageFiles((prev) => prev.filter((_, i) => i !== index))}
-                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-800 text-white opacity-100 transition-opacity hover:bg-zinc-600 md:opacity-0 md:group-hover/thumb:opacity-100 dark:bg-zinc-600 dark:hover:bg-zinc-500"
+                className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-zinc-800 text-white opacity-100 transition-opacity hover:bg-zinc-600 md:-right-1.5 md:-top-1.5 md:h-5 md:w-5 md:opacity-0 md:group-hover/thumb:opacity-100 dark:bg-zinc-600 dark:hover:bg-zinc-500"
                 aria-label="Remove image"
               >
                 <X className="h-3 w-3" />
@@ -338,9 +338,9 @@ export function ChatComposer({
           </button>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 pl-1">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-1 sm:gap-2">
           {onModelRoutingModeChange ? (
-            <label className="flex items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400">
+            <label className="hidden shrink-0 items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400 sm:flex">
               <span className="sr-only">Routing</span>
               <select
                 value={modelRoutingMode}
@@ -348,7 +348,7 @@ export function ChatComposer({
                   onModelRoutingModeChange(e.target.value as "manual" | "auto" | "suggested")
                 }
                 disabled={disabled}
-                className="max-w-[124px] rounded-lg border border-zinc-300 bg-white px-1.5 py-1 text-xs text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200"
+                className="max-w-[5.5rem] rounded-lg border border-zinc-300 bg-white px-1 py-1 text-[11px] text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 sm:max-w-[124px] sm:px-1.5 sm:text-xs"
               >
                 <option value="manual">Manual</option>
                 <option value="auto">Auto</option>

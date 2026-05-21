@@ -63,7 +63,7 @@ export function ChatLayout({
             className="fixed inset-0 z-40 bg-black/30 md:hidden dark:bg-black/40"
             onClick={onToggleMobileSidebar}
           />
-          <div className="fixed inset-y-0 left-3 z-50 w-[calc(100vw-24px)] max-w-[360px] overflow-hidden md:hidden [&>aside]:w-full">
+          <div className="fixed inset-y-0 left-3 z-50 w-[calc(100vw-24px)] max-w-[360px] overflow-hidden overscroll-contain rounded-r-2xl shadow-xl md:hidden [&>aside]:w-full [&>aside]:rounded-r-2xl">
             <button
               type="button"
               className="absolute right-3 top-3 z-10 rounded-md bg-zinc-200 p-2 text-zinc-700 shadow-sm hover:bg-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
@@ -78,7 +78,7 @@ export function ChatLayout({
       ) : null}
 
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
-        <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/80 bg-white/80 px-4 py-2.5 backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
+        <div className="sticky top-0 z-10 flex min-w-0 items-center justify-between border-b border-zinc-200/80 bg-white/80 px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur dark:border-zinc-700/70 dark:bg-zinc-900/70">
           <div className="flex min-w-0 items-center gap-3">
             <button
               className="rounded-lg p-2 text-zinc-700 hover:bg-zinc-200 md:hidden dark:text-zinc-300 dark:hover:bg-zinc-800"

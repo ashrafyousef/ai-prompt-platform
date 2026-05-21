@@ -339,7 +339,7 @@ export function ChatClient() {
           />
           <div
             ref={composerDockRef}
-            className="pointer-events-none absolute inset-x-0 bottom-0 max-w-full overflow-hidden pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4"
+            className="pointer-events-none absolute inset-x-0 bottom-0 z-20 max-w-full overflow-hidden pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:pb-4"
           >
             <div className="pointer-events-auto w-full min-w-0 max-w-full px-3 sm:px-4">
               <ChatComposer
