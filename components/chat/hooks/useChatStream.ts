@@ -13,6 +13,17 @@ export type ChatRouteMeta = {
   taskClass?: string;
 };
 
+const UPLOAD_INTERNAL_ERROR_RE = /ENOENT|EPERM|EACCES|mkdir|writeFile/i;
+
+function sanitizeUploadErrorMessage(message: string): string {
+  const trimmed = message.trim();
+  if (!trimmed) return "Image upload failed. Please try again.";
+  if (UPLOAD_INTERNAL_ERROR_RE.test(trimmed)) {
+    return "Image upload failed. Please try again or contact support if this persists.";
+  }
+  return trimmed;
+}
+
 /** Secondary toast when the thread already shows full failure copy. */
 export type ChatStreamErrorOptions = {
   /** When true, ChatClient should use a short ping instead of duplicating the error body. */
@@ -98,7 +109,9 @@ export function useChatStream({
             ? data.trim().slice(0, 400)
             : "";
         throw new Error(
-          body || `Image upload failed (${res.status}). Please try again.`
+          sanitizeUploadErrorMessage(
+            body || `Image upload failed (${res.status}). Please try again.`
+          )
         );
       }
 
