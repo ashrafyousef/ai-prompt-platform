@@ -108,9 +108,10 @@ export function ChatLayout({
               <Bookmark className="h-4 w-4" />
             </button>
             <button
-              className="hidden rounded-lg p-2 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 md:inline-flex dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
+              className="hidden rounded-lg p-2 text-zinc-700 hover:bg-zinc-200 hover:text-zinc-900 lg:inline-flex dark:text-zinc-300 dark:hover:bg-zinc-800 dark:hover:text-zinc-100"
               onClick={onToggleDrawer}
               aria-label="Toggle context drawer"
+              title="Conversation context"
             >
               {drawerOpen ? <PanelRightClose className="h-4 w-4" /> : <PanelRightOpen className="h-4 w-4" />}
             </button>

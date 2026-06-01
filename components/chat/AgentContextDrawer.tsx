@@ -1,12 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import Image from "next/image";
 import useSWR from "swr";
 import { Bot, Images, Info, MessagesSquare, Sparkles } from "lucide-react";
 import type { UiAgent, UiModelCapability, UiModelsResponse, UiSession } from "@/lib/types";
 import { buildAgentModelExpectationLines } from "@/lib/chatAgentModelGuidance";
-import { resolveModelById } from "@/lib/models";
 import {
   COST_TIER_DISPLAY,
   MODEL_CAPABILITY_CHIP_SET,
@@ -72,10 +71,13 @@ export function AgentContextDrawer({
     revalidateOnFocus: false,
     dedupingInterval: 60_000,
   });
-  const governedModels = modelsData?.models ?? [];
+  const governedModels = useMemo(() => modelsData?.models ?? [], [modelsData?.models]);
   const expectationLines = buildAgentModelExpectationLines(agent, governedModels);
 
-  const model = resolveModelById(selectedModelId);
+  const governedModel = useMemo(
+    () => governedModels.find((m) => m.id === selectedModelId),
+    [governedModels, selectedModelId]
+  );
   const activityLabel = session ? formatSessionActivity(session.updatedAt) : null;
 
   return (
@@ -191,21 +193,23 @@ export function AgentContextDrawer({
         ) : null}
 
         <Section title="Model" icon={Sparkles}>
-          {model ? (
+          {governedModel ? (
             <>
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{model.displayName}</p>
-              <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">{model.shortDescription}</p>
+              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{governedModel.displayName}</p>
+              <p className="mt-1 text-xs leading-relaxed text-zinc-600 dark:text-zinc-300">
+                {governedModel.shortDescription}
+              </p>
               <div className="mt-2 flex flex-wrap gap-1.5">
                 <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  {PROVIDER_DISPLAY[model.provider]}
+                  {PROVIDER_DISPLAY[governedModel.provider]}
                 </span>
                 <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
-                  {COST_TIER_DISPLAY[model.costTier]}
+                  {COST_TIER_DISPLAY[governedModel.costTier]}
                 </span>
               </div>
               <div className="mt-2 flex flex-wrap gap-1">
-                {model.capabilities
-                  .filter((c): c is UiModelCapability => MODEL_CAPABILITY_CHIP_SET.has(c as UiModelCapability))
+                {governedModel.capabilities
+                  .filter((c): c is UiModelCapability => MODEL_CAPABILITY_CHIP_SET.has(c))
                   .map((capability) => (
                     <span
                       key={capability}
@@ -215,9 +219,16 @@ export function AgentContextDrawer({
                     </span>
                   ))}
               </div>
+              {!governedModel.enabled && governedModel.disabledReason ? (
+                <p className="mt-2 text-[10px] leading-relaxed text-amber-700/90 dark:text-amber-400">
+                  {governedModel.disabledReason}
+                </p>
+              ) : null}
             </>
+          ) : selectedModelId ? (
+            <Muted>Loading model details for your account…</Muted>
           ) : (
-            <Muted>Choose a model in the composer — details appear here for the curated list.</Muted>
+            <Muted>Choose a model in the composer — details appear here for your available models.</Muted>
           )}
         </Section>
       </div>

@@ -340,19 +340,30 @@ export function ChatComposer({
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-1.5 pl-1 sm:gap-2">
           {onModelRoutingModeChange ? (
-            <label className="hidden shrink-0 items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400 sm:flex">
-              <span className="sr-only">Routing</span>
+            <label
+              className="hidden shrink-0 items-center gap-1 text-xs text-zinc-600 dark:text-zinc-400 sm:flex"
+              title="How the app picks a model for each message"
+            >
+              <span className="sr-only">Model routing mode</span>
               <select
                 value={modelRoutingMode}
                 onChange={(e) =>
                   onModelRoutingModeChange(e.target.value as "manual" | "auto" | "suggested")
                 }
                 disabled={disabled}
+                aria-label="Model routing mode"
+                title="Model routing mode"
                 className="max-w-[5.5rem] rounded-lg border border-zinc-300 bg-white px-1 py-1 text-[11px] text-zinc-900 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-200 sm:max-w-[124px] sm:px-1.5 sm:text-xs"
               >
-                <option value="manual">Manual</option>
-                <option value="auto">Auto</option>
-                <option value="suggested">Suggest</option>
+                <option value="manual" title="Manual: use the model you selected">
+                  Manual
+                </option>
+                <option value="auto" title="Auto: the app picks the best available model">
+                  Auto
+                </option>
+                <option value="suggested" title="Suggest: show a routing recommendation">
+                  Suggest
+                </option>
               </select>
             </label>
           ) : null}

@@ -11,6 +11,36 @@ import {
   PROVIDER_DISPLAY,
 } from "@/lib/modelUiLabels";
 
+function pickTriggerCapability(
+  model: UiModelSummary,
+  hasImages?: boolean
+): UiModelCapability | null {
+  const chips = model.capabilities.filter((c): c is UiModelCapability => MODEL_CAPABILITY_CHIP_SET.has(c));
+  if (hasImages) {
+    return model.visionCapable && chips.includes("vision") ? "vision" : null;
+  }
+  return chips[0] ?? null;
+}
+
+function selectedModelUnavailableHint(
+  model: UiModelSummary,
+  hasImages?: boolean,
+  agentModelIncompatible?: (model: UiModelSummary) => boolean
+): string | null {
+  const imageIncompatible = Boolean(hasImages && !model.visionCapable);
+  const agentIncompatible = Boolean(agentModelIncompatible?.(model));
+  if (imageIncompatible) {
+    return "Selected attachments require a Vision-capable model.";
+  }
+  if (agentIncompatible) {
+    return "Not compatible with this assistant for your current message.";
+  }
+  if (!model.enabled && model.disabledReason) {
+    return model.disabledReason;
+  }
+  return null;
+}
+
 export function ModelSelector({
   selectedModelId,
   onModelChange,
@@ -197,11 +227,8 @@ export function ModelSelector({
     );
   }
 
-  const capabilityHint = selected.capabilities
-    .filter((c): c is UiModelCapability => MODEL_CAPABILITY_CHIP_SET.has(c))
-    .slice(0, 2)
-    .map((capability) => MODEL_CAPABILITY_LABELS[capability])
-    .join(" · ");
+  const triggerCapability = pickTriggerCapability(selected, hasImages);
+  const unavailableHint = selectedModelUnavailableHint(selected, hasImages, agentModelIncompatible);
 
   function renderModelList(className: string, panelRef?: RefObject<HTMLDivElement>) {
     return (
@@ -273,7 +300,7 @@ export function ModelSelector({
         type="button"
         onClick={() => setOpen((p) => !p)}
         disabled={disabled}
-        className="flex max-w-[min(100%,10.5rem)] items-center gap-1.5 rounded-xl border border-zinc-200/80 bg-white/80 py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none disabled:opacity-50 sm:max-w-[min(100%,18rem)] dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:bg-zinc-800"
+        className="flex max-w-[min(100%,10.5rem)] items-center gap-1 rounded-xl border border-zinc-200/80 bg-white/80 py-1.5 pl-2.5 pr-2 text-left text-sm font-medium text-zinc-700 transition hover:bg-zinc-100 focus:outline-none disabled:opacity-50 sm:max-w-[min(100%,20rem)] sm:gap-1.5 dark:border-zinc-700/80 dark:bg-zinc-900/90 dark:text-zinc-300 dark:hover:bg-zinc-800"
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-label={`Model: ${selected.displayName}`}
@@ -283,14 +310,24 @@ export function ModelSelector({
         <span className="hidden shrink-0 rounded-full bg-zinc-100 px-1.5 py-px text-[10px] font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 sm:inline">
           {PROVIDER_DISPLAY[selected.provider]}
         </span>
-        <span
-          className="hidden max-w-[5.5rem] truncate text-[10px] text-zinc-600 dark:text-zinc-400 lg:inline"
-          title={capabilityHint}
-        >
-          {capabilityHint}
+        <span className="hidden shrink-0 rounded-full bg-zinc-100 px-1.5 py-px text-[10px] font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 sm:inline">
+          {COST_TIER_DISPLAY[selected.costTier]}
         </span>
+        {triggerCapability ? (
+          <span className="hidden shrink-0 rounded-full bg-violet-100/80 px-1.5 py-px text-[10px] font-medium text-violet-800 dark:bg-violet-950/50 dark:text-violet-200 sm:inline">
+            {MODEL_CAPABILITY_LABELS[triggerCapability]}
+          </span>
+        ) : null}
         <ChevronDown className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
+      {unavailableHint ? (
+        <p
+          className="max-w-[min(100%,15rem)] text-right text-[10px] leading-snug text-amber-700/90 dark:text-amber-400"
+          title={unavailableHint}
+        >
+          {unavailableHint}
+        </p>
+      ) : null}
       {agentHint ? (
         <p className="max-w-[min(100%,15rem)] text-right text-[10px] leading-snug text-zinc-600 dark:text-zinc-500" title={agentHint}>
           {agentHint}
