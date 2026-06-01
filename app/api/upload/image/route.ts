@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { mkdir, writeFile } from "fs/promises";
-import path from "path";
-import { randomUUID } from "crypto";
 import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
-
-const UPLOAD_UNAVAILABLE_MESSAGE =
-  "Image upload storage is not configured for this environment. Attachments are unavailable until cloud storage is set up.";
+import {
+  IMAGE_UPLOAD_UNAVAILABLE_MESSAGE,
+  isBlobStorageConfigured,
+  saveChatImage,
+  shouldUseLocalImageStorage,
+} from "@/lib/imageStorage";
 
 const UPLOAD_GENERIC_FAILURE_MESSAGE =
   "Image upload failed. Please try again or contact support if this persists.";
-
-function isLocalUploadSupported(): boolean {
-  if (process.env.VERCEL === "1") return false;
-  if (process.env.IMAGE_UPLOAD_LOCAL === "1") return true;
-  return process.env.NODE_ENV !== "production";
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -33,8 +27,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!isLocalUploadSupported()) {
-      return NextResponse.json({ error: UPLOAD_UNAVAILABLE_MESSAGE }, { status: 503 });
+    if (!shouldUseLocalImageStorage() && !isBlobStorageConfigured()) {
+      return NextResponse.json({ error: IMAGE_UPLOAD_UNAVAILABLE_MESSAGE }, { status: 503 });
     }
 
     const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
@@ -64,16 +58,12 @@ export async function POST(req: NextRequest) {
 
     const rawExt = (file.name.split(".").pop() ?? "").toLowerCase();
     const ext = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : "png";
+    const contentType = file.type || "image/png";
 
     const bytes = Buffer.from(await file.arrayBuffer());
-    const uploadsDir = path.join(process.cwd(), "public", "uploads");
-    await mkdir(uploadsDir, { recursive: true });
+    const { url } = await saveChatImage({ bytes, ext, contentType, userId });
 
-    const fileName = `${randomUUID()}.${ext}`;
-    const absolutePath = path.join(uploadsDir, fileName);
-    await writeFile(absolutePath, bytes);
-
-    return NextResponse.json({ url: `/uploads/${fileName}` });
+    return NextResponse.json({ url });
   } catch (error) {
     const status = authErrorStatus(error, 500);
     if (status === 401) {
@@ -81,6 +71,10 @@ export async function POST(req: NextRequest) {
     }
     if (status === 403) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
+    }
+
+    if (error instanceof Error && error.message === "BLOB_STORAGE_NOT_CONFIGURED") {
+      return NextResponse.json({ error: IMAGE_UPLOAD_UNAVAILABLE_MESSAGE }, { status: 503 });
     }
 
     console.error("[upload/image]", error);
