@@ -30,6 +30,28 @@ export function usesMaxCompletionTokens(modelNameOrRegistryId: string | null | u
   return id.startsWith("gpt-5") || id.startsWith("openai-gpt-5");
 }
 
+/** GPT-5 family OpenAI models reject non-default temperature on chat/completions. */
+export function openAiOmitsTemperature(
+  provider: ModelProvider,
+  apiModelId: string,
+  registryModelId: string | null
+): boolean {
+  if (provider !== "openai") return false;
+  return usesMaxCompletionTokens(registryModelId) || usesMaxCompletionTokens(apiModelId);
+}
+
+function samplingBodyForProvider(
+  provider: ModelProvider,
+  apiModelId: string,
+  registryModelId: string | null,
+  temperature: number
+): Record<string, unknown> {
+  if (openAiOmitsTemperature(provider, apiModelId, registryModelId)) {
+    return {};
+  }
+  return { temperature };
+}
+
 function tokenLimitBodyForProvider(
   provider: ModelProvider,
   apiModelId: string,
@@ -48,16 +70,168 @@ function tokenLimitBodyForProvider(
   return { max_tokens: maxTokens };
 }
 
-function logIfOpenAiMaxTokensRejected(status: number, errorBody: string, context: string): void {
-  if (
-    status === 400 &&
-    errorBody.includes("max_tokens") &&
-    errorBody.includes("max_completion_tokens")
-  ) {
-    console.error(
-      `[openai:${context}] Chat completions rejected max_tokens for this model; use max_completion_tokens (GPT-5 family). See usesMaxCompletionTokens() in lib/openai/client.ts.`
-    );
+export type LlmProviderErrorDetails = {
+  provider: ModelProvider;
+  model: string;
+  status: number;
+  errorType: string | null;
+  errorCode: string | null;
+  errorParam: string | null;
+  errorMessage: string | null;
+};
+
+export class LlmRequestFailedError extends Error {
+  readonly details: LlmProviderErrorDetails;
+
+  constructor(details: LlmProviderErrorDetails) {
+    super(`LLM request failed: ${details.status}`);
+    this.name = "LlmRequestFailedError";
+    this.details = details;
   }
+}
+
+export function parseProviderErrorBody(bodyText: string): Pick<
+  LlmProviderErrorDetails,
+  "errorType" | "errorCode" | "errorParam" | "errorMessage"
+> {
+  try {
+    const parsed = JSON.parse(bodyText) as {
+      error?: { type?: unknown; code?: unknown; param?: unknown; message?: unknown };
+    };
+    const err = parsed?.error;
+    if (!err || typeof err !== "object") {
+      return {
+        errorType: null,
+        errorCode: null,
+        errorParam: null,
+        errorMessage: bodyText.trim().slice(0, 500) || null,
+      };
+    }
+    return {
+      errorType: typeof err.type === "string" ? err.type : null,
+      errorCode: typeof err.code === "string" ? err.code : null,
+      errorParam: typeof err.param === "string" ? err.param : null,
+      errorMessage: typeof err.message === "string" ? err.message.slice(0, 500) : null,
+    };
+  } catch {
+    return {
+      errorType: null,
+      errorCode: null,
+      errorParam: null,
+      errorMessage: bodyText.trim().slice(0, 500) || null,
+    };
+  }
+}
+
+export function mapLlmProviderErrorToClientMessage(details: LlmProviderErrorDetails): string {
+  if (details.status === 401) {
+    return "AI API rejected the request. Check OPENAI_API_KEY / GROQ_API_KEY on the server.";
+  }
+  if (details.status === 429) {
+    return "AI provider rate limit reached for the current workspace key. Wait briefly, send one request at a time, or switch to another available model.";
+  }
+
+  const param = (details.errorParam ?? "").toLowerCase();
+  const code = (details.errorCode ?? "").toLowerCase();
+  const msg = (details.errorMessage ?? "").toLowerCase();
+
+  const isUnsupportedParameter =
+    param === "temperature" ||
+    code === "unsupported_parameter" ||
+    code === "unsupported_value" ||
+    msg.includes("unsupported parameter") ||
+    (msg.includes("temperature") &&
+      (msg.includes("unsupported") || msg.includes("not supported") || msg.includes("only the default")));
+
+  if (isUnsupportedParameter) {
+    return "The selected model rejected one of the request settings. Try again or switch models.";
+  }
+
+  const isContextLength =
+    param.includes("context") ||
+    code.includes("context") ||
+    msg.includes("context length") ||
+    msg.includes("maximum context") ||
+    msg.includes("too many tokens") ||
+    msg.includes("reduce the length");
+
+  if (isContextLength && (details.status === 400 || msg.includes("context") || msg.includes("token"))) {
+    return "This conversation is too long for the selected model. Start a new chat or switch to a larger-context model.";
+  }
+
+  const isImageError =
+    param.includes("image") ||
+    msg.includes("image_url") ||
+    (msg.includes("image") &&
+      (msg.includes("download") ||
+        msg.includes("fetch") ||
+        msg.includes("invalid") ||
+        msg.includes("could not") ||
+        msg.includes("unable to") ||
+        msg.includes("process")));
+
+  if (isImageError) {
+    return "The model could not read the attached image. Re-upload it or try a smaller image.";
+  }
+
+  if (details.status === 400) {
+    return "The AI provider rejected this request (prompt, image, or model). Try a smaller image or different model.";
+  }
+
+  return "The AI provider returned an error. Try again.";
+}
+
+export function llmProviderErrorLogPayload(
+  details: LlmProviderErrorDetails,
+  hasImages?: boolean
+): Record<string, unknown> {
+  return {
+    provider: details.provider,
+    model: details.model,
+    status: details.status,
+    errorType: details.errorType,
+    errorCode: details.errorCode,
+    errorParam: details.errorParam,
+    errorMessage: details.errorMessage,
+    hasImages: Boolean(hasImages),
+  };
+}
+
+function throwLlmRequestFailed(
+  resolved: ResolvedProvider,
+  model: string,
+  status: number,
+  bodyText: string
+): never {
+  throw new LlmRequestFailedError({
+    provider: resolved.provider,
+    model,
+    status,
+    ...parseProviderErrorBody(bodyText),
+  });
+}
+
+function buildChatCompletionRequestBody(params: {
+  resolved: ResolvedProvider;
+  model: string;
+  messages: ChatMessage[];
+  temperature: number;
+  maxTokens: number;
+  stream: boolean;
+  includeStreamUsage?: boolean;
+}): Record<string, unknown> {
+  const { resolved, model, messages, temperature, maxTokens, stream, includeStreamUsage } = params;
+  const body: Record<string, unknown> = {
+    model,
+    messages,
+    ...samplingBodyForProvider(resolved.provider, model, resolved.registryModelId, temperature),
+    ...tokenLimitBodyForProvider(resolved.provider, model, resolved.registryModelId, maxTokens),
+    stream,
+  };
+  if (includeStreamUsage) {
+    body.stream_options = { include_usage: true };
+  }
+  return body;
 }
 
 export type ResolvedProvider = {
@@ -207,18 +381,21 @@ export async function createChatCompletion(
   const model = options.model ?? resolved.defaultModel;
   const maxTokens = options.maxTokens ?? 900;
 
-  const response = await postChatCompletions(resolved, {
-    model,
-    messages,
-    temperature: options.temperature ?? 0.4,
-    ...tokenLimitBodyForProvider(resolved.provider, model, resolved.registryModelId, maxTokens),
-    stream: false,
-  });
+  const response = await postChatCompletions(
+    resolved,
+    buildChatCompletionRequestBody({
+      resolved,
+      model,
+      messages,
+      temperature: options.temperature ?? 0.4,
+      maxTokens,
+      stream: false,
+    })
+  );
 
   if (!response.ok) {
     const text = await response.text();
-    logIfOpenAiMaxTokensRejected(response.status, text, "createChatCompletion");
-    throw new Error(`LLM request failed: ${response.status} ${text}`);
+    throwLlmRequestFailed(resolved, model, response.status, text);
   }
 
   const data = (await response.json()) as {
@@ -247,23 +424,22 @@ export async function* streamChatCompletion(
   const model = options.model ?? resolved.defaultModel;
   const isOpenAi = resolved.apiUrl === OPENAI_API_URL;
   const maxTokens = options.maxTokens ?? 900;
-  const body: Record<string, unknown> = {
-    model,
-    messages,
-    temperature: options.temperature ?? 0.4,
-    ...tokenLimitBodyForProvider(resolved.provider, model, resolved.registryModelId, maxTokens),
-    stream: true,
-  };
-  if (isOpenAi) {
-    body.stream_options = { include_usage: true };
-  }
-
-  const response = await postChatCompletions(resolved, body);
+  const response = await postChatCompletions(
+    resolved,
+    buildChatCompletionRequestBody({
+      resolved,
+      model,
+      messages,
+      temperature: options.temperature ?? 0.4,
+      maxTokens,
+      stream: true,
+      includeStreamUsage: isOpenAi,
+    })
+  );
 
   if (!response.ok) {
     const text = await response.text();
-    logIfOpenAiMaxTokensRejected(response.status, text, "streamChatCompletion");
-    throw new Error(`LLM request failed: ${response.status} ${text}`);
+    throwLlmRequestFailed(resolved, model, response.status, text);
   }
 
   if (!response.body) return;

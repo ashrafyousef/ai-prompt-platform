@@ -13,7 +13,7 @@ import {
 } from "@/lib/orchestration/chatOrchestrator";
 import { chatSendNeedsLongContextHeuristic } from "@/lib/chatAgentModelRules";
 import { checkRateLimit } from "@/lib/rateLimit";
-import { streamChatCompletion, type StreamUsageSink } from "@/lib/openai/client";
+import { streamChatCompletion, type StreamUsageSink, LlmRequestFailedError, llmProviderErrorLogPayload, mapLlmProviderErrorToClientMessage } from "@/lib/openai/client";
 import { assertGovernedModelSessionAccessible } from "@/lib/agentModelGovernance";
 import { assertUserWithinSoftTokenLimit, assertModelAccessForRole, getGovernedModelsForUser } from "@/lib/usage";
 import { resolveModelById } from "@/lib/models";
@@ -48,7 +48,10 @@ async function toBase64DataUri(url: string): Promise<string> {
 }
 
 /** User-safe text for SSE `error` events (no stack traces). */
-function sseErrorMessageForClient(error: unknown): string {
+function sseErrorMessageForClient(error: unknown, hasImages?: boolean): string {
+  if (error instanceof LlmRequestFailedError) {
+    return mapLlmProviderErrorToClientMessage(error.details);
+  }
   const raw = error instanceof Error ? error.message : String(error);
   if (raw.includes("LLM request failed")) {
     if (raw.includes("401") || raw.includes("Unauthorized")) {
@@ -69,6 +72,11 @@ function sseErrorMessageForClient(error: unknown): string {
   if (raw.includes("No API key configured")) return raw;
   if (raw.includes("Streaming failed")) return raw;
   return "An error occurred while generating the response.";
+}
+
+function providerErrorLogFromCause(error: unknown, hasImages?: boolean): Record<string, unknown> | null {
+  if (!(error instanceof LlmRequestFailedError)) return null;
+  return llmProviderErrorLogPayload(error.details, hasImages);
 }
 
 function isAbortLike(error: unknown): boolean {
@@ -122,6 +130,7 @@ export async function POST(req: NextRequest) {
   let requestKind: "send" | "retry" = "send";
   let selectedModelIdForAttempt: string | null = null;
   let selectedProviderForAttempt: ModelProvider | null = null;
+  let hasImagesForAttempt = false;
   let titleFallbackContext: { sessionId: string; seedText: string } | null = null;
   const maybeApplyFirstTurnTitleFallback = async () => {
     if (!titleFallbackContext) return;
@@ -132,11 +141,11 @@ export async function POST(req: NextRequest) {
       seedText: titleFallbackContext.seedText,
     });
   };
-  const finalizeAttemptFailed = async (id: string, cause: unknown) => {
+  const finalizeAttemptFailed = async (id: string, cause: unknown, hasImages?: boolean) => {
     const clientMessage =
       typeof cause === "string" && cause.trim().length > 0
         ? cause.trim()
-        : sseErrorMessageForClient(cause);
+        : sseErrorMessageForClient(cause, hasImages);
     const classified = classifyChatError(clientMessage);
     await db.message.update({
       where: { id },
@@ -153,6 +162,7 @@ export async function POST(req: NextRequest) {
         provider: selectedProviderForAttempt,
       });
     }
+    const providerError = providerErrorLogFromCause(cause, hasImages);
     logJson("error", {
       route: "/api/chat/send",
       userId: userIdForLogs,
@@ -161,6 +171,7 @@ export async function POST(req: NextRequest) {
       assistantAttemptId: id,
       errorCode: classified.code,
       errorDetail: classified.detail,
+      ...(providerError ? { providerError } : {}),
     });
   };
   const finalizeAttemptCancelled = async (id: string) => {
@@ -266,6 +277,7 @@ export async function POST(req: NextRequest) {
     });
 
     const hasImages = Boolean(payload.imageUrls && payload.imageUrls.length > 0);
+    hasImagesForAttempt = hasImages;
     const resolvedImageUrls = hasImages
       ? await Promise.all(payload.imageUrls!.map(toBase64DataUri))
       : undefined;
@@ -507,11 +519,12 @@ export async function POST(req: NextRequest) {
             }
             return;
           }
-          const clientMessage = sseErrorMessageForClient(error);
-          await finalizeAttemptFailed(assistantAttempt.id, error);
+          const clientMessage = sseErrorMessageForClient(error, hasImages);
+          await finalizeAttemptFailed(assistantAttempt.id, error, hasImages);
           await maybeApplyFirstTurnTitleFallback();
           finalized = true;
           captureError(error, { route: "/api/chat/send", userId });
+          const providerError = providerErrorLogFromCause(error, hasImages);
           logJson("error", {
             route: "/api/chat/send",
             userId,
@@ -520,6 +533,7 @@ export async function POST(req: NextRequest) {
             latencyMs: Date.now() - start,
             status: "error",
             error: error instanceof Error ? { message: error.message, stack: error.stack } : message,
+            ...(providerError ? { providerError } : {}),
           });
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ error: clientMessage })}\n\n`)
@@ -556,7 +570,7 @@ export async function POST(req: NextRequest) {
       if (isAbortLike(error)) {
         await finalizeAttemptCancelled(assistantAttemptId);
       } else {
-        await finalizeAttemptFailed(assistantAttemptId, error);
+        await finalizeAttemptFailed(assistantAttemptId, error, hasImagesForAttempt);
         await maybeApplyFirstTurnTitleFallback();
       }
     }

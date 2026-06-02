@@ -72,6 +72,27 @@ export function classifyChatError(raw: string): ClassifiedChatError {
       detail: t,
     };
   }
+  if (lower.includes("could not read the attached image")) {
+    return {
+      code: "image_read",
+      title: "Image",
+      detail: t,
+    };
+  }
+  if (lower.includes("rejected one of the request settings")) {
+    return {
+      code: "provider_param",
+      title: "Model settings",
+      detail: t,
+    };
+  }
+  if (lower.includes("too long for the selected model")) {
+    return {
+      code: "context_length",
+      title: "Conversation too long",
+      detail: t,
+    };
+  }
 
   return {
     code: "unknown",
