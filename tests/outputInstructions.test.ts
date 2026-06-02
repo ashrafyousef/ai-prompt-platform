@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildChatOutputInstructions,
+  buildFlexibleMarkdownOutputInstructions,
   buildLegacyMarkdownOutputInstructions,
+  buildSimpleConversationalOutputInstructions,
   ensureMarkdownSections,
+  isSimpleConversationalTurn,
   shouldEnforceLegacyMarkdownSections,
 } from "@/lib/orchestration/outputInstructions";
 import type { AgentOutputConfig } from "@/lib/agentConfig";
@@ -16,6 +19,25 @@ const baseOutputConfig: AgentOutputConfig = {
   template: null,
   schema: null,
 };
+
+describe("isSimpleConversationalTurn", () => {
+  it("matches short acknowledgements", () => {
+    expect(isSimpleConversationalTurn("Thanks")).toBe(true);
+    expect(isSimpleConversationalTurn("thank you!")).toBe(true);
+    expect(isSimpleConversationalTurn("ok")).toBe(true);
+    expect(isSimpleConversationalTurn("perfect.")).toBe(true);
+  });
+
+  it("does not match task-like or long messages", () => {
+    expect(
+      isSimpleConversationalTurn("Analyze this image and improve the creative direction")
+    ).toBe(false);
+    expect(isSimpleConversationalTurn("Thanks for the prompt, now refine the campaign")).toBe(
+      false
+    );
+    expect(isSimpleConversationalTurn("")).toBe(false);
+  });
+});
 
 describe("buildChatOutputInstructions", () => {
   it("uses JSON instructions when outputSchema is set", () => {
@@ -35,7 +57,8 @@ describe("buildChatOutputInstructions", () => {
       {
         ...baseOutputConfig,
         requiredSections: ["Creative direction", "Final prompt"],
-      }
+      },
+      "Analyze this image and improve the creative direction"
     );
     expect(text).toContain("### Creative direction");
     expect(text).toContain("### Final prompt");
@@ -43,9 +66,32 @@ describe("buildChatOutputInstructions", () => {
     expect(text).not.toBe(buildLegacyMarkdownOutputInstructions());
   });
 
-  it("falls back to legacy markdown when requiredSections is empty", () => {
-    const text = buildChatOutputInstructions({ outputSchema: null }, baseOutputConfig);
-    expect(text).toBe(buildLegacyMarkdownOutputInstructions());
+  it("uses conversational instructions for simple acknowledgements", () => {
+    const text = buildChatOutputInstructions({ outputSchema: null }, baseOutputConfig, "Thanks");
+    expect(text).toBe(buildSimpleConversationalOutputInstructions());
+    expect(text).not.toBe(buildLegacyMarkdownOutputInstructions());
+  });
+
+  it("uses flexible markdown when requiredSections is empty and the turn is not simple", () => {
+    const text = buildChatOutputInstructions(
+      { outputSchema: null },
+      baseOutputConfig,
+      "Analyze this image and improve the creative direction"
+    );
+    expect(text).toBe(buildFlexibleMarkdownOutputInstructions());
+    expect(text).not.toBe(buildLegacyMarkdownOutputInstructions());
+  });
+
+  it("prefers conversational instructions over custom sections for simple turns", () => {
+    const text = buildChatOutputInstructions(
+      { outputSchema: null },
+      {
+        ...baseOutputConfig,
+        requiredSections: ["Creative direction", "Final prompt"],
+      },
+      "Thanks"
+    );
+    expect(text).toBe(buildSimpleConversationalOutputInstructions());
   });
 });
 
@@ -58,15 +104,21 @@ describe("ensureMarkdownSections", () => {
     expect(output).not.toContain("## Result");
   });
 
-  it("injects legacy headings when no custom sections are configured", () => {
+  it("does not inject legacy headings for simple conversational turns", () => {
+    const output = ensureMarkdownSections("You're welcome!", [], "Thanks");
+    expect(output).toBe("You're welcome!");
+    expect(output).not.toContain("## Result");
+  });
+
+  it("does not inject legacy headings when no custom sections are configured", () => {
     const output = ensureMarkdownSections("plain answer", []);
-    expect(output).toContain("## Result");
-    expect(output).toContain("## Details");
+    expect(output).toBe("plain answer");
+    expect(output).not.toContain("## Result");
   });
 });
 
 describe("shouldEnforceLegacyMarkdownSections", () => {
-  it("is false for JSON agents and custom-section markdown agents", () => {
+  it("is false for JSON agents, custom-section markdown agents, and legacy markdown agents", () => {
     expect(
       shouldEnforceLegacyMarkdownSections(
         { outputSchema: { type: "object" } },
@@ -79,11 +131,14 @@ describe("shouldEnforceLegacyMarkdownSections", () => {
         { ...baseOutputConfig, requiredSections: ["Final prompt"] }
       )
     ).toBe(false);
-  });
-
-  it("is true for legacy markdown agents without custom sections", () => {
     expect(
       shouldEnforceLegacyMarkdownSections({ outputSchema: null }, baseOutputConfig)
-    ).toBe(true);
+    ).toBe(false);
+  });
+
+  it("is false for simple conversational turns", () => {
+    expect(
+      shouldEnforceLegacyMarkdownSections({ outputSchema: null }, baseOutputConfig, "Thanks")
+    ).toBe(false);
   });
 });

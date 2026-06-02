@@ -255,7 +255,7 @@ export async function finalizeAssistantMessage(params: {
   const agent = await db.agentConfig.findFirst({ where: { id: agentId } });
   if (!agent) throw new Error("Agent not found.");
   const effective = buildEffectiveAgentConfig(agent);
-  const contract = buildAgentContract(agent, effective.outputConfig);
+  const contract = buildAgentContract(agent, effective.outputConfig, text);
   const outputMode = getOutputMode(agent);
 
   let finalOutput = responseText;
@@ -313,7 +313,11 @@ export async function finalizeAssistantMessage(params: {
       }
     }
   } else if (contract.enforceMarkdownSections && !requiresJsonOutput(agent)) {
-    finalOutput = ensureMarkdownSections(finalOutput, effective.outputConfig.requiredSections);
+    finalOutput = ensureMarkdownSections(
+      finalOutput,
+      effective.outputConfig.requiredSections,
+      text
+    );
   }
 
   const assistantMessage = assistantMessageId
@@ -512,7 +516,8 @@ export async function runOrchestrator(params: {
 
 function buildAgentContract(
   agent: AgentConfig,
-  outputConfig: ReturnType<typeof buildEffectiveAgentConfig>["outputConfig"]
+  outputConfig: ReturnType<typeof buildEffectiveAgentConfig>["outputConfig"],
+  userInput?: string
 ): AgentContract {
   const hasOutputSchema = Boolean(agent.outputSchema);
   return {
@@ -522,6 +527,10 @@ function buildAgentContract(
     outputSchema: agent.outputSchema ?? undefined,
     temperature: agent.temperature,
     requiresStructuredValidation: hasOutputSchema,
-    enforceMarkdownSections: shouldEnforceLegacyMarkdownSections(agent, outputConfig),
+    enforceMarkdownSections: shouldEnforceLegacyMarkdownSections(
+      agent,
+      outputConfig,
+      userInput
+    ),
   };
 }
