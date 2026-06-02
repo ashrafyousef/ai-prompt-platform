@@ -5,6 +5,7 @@ import {
   buildChatOutputInstructions,
   isSimpleConversationalTurn,
 } from "@/lib/orchestration/outputInstructions";
+import { buildFollowUpContextSystemMessage } from "@/lib/orchestration/followUpContext";
 
 type ChatRole = "system" | "user" | "assistant";
 
@@ -77,6 +78,7 @@ export function buildMessages(params: {
       ].join("\n");
 
   const outputInstructions = buildChatOutputInstructions(agent, outputConfig, userInput);
+  const followUpContextBlock = buildFollowUpContextSystemMessage(userInput, history);
 
   const summaryBlock =
     contextSummary && contextSummary.trim().length > 0
@@ -102,6 +104,7 @@ export function buildMessages(params: {
     estimateTokensFromString(coreSystemRules) +
     estimateTokensFromString(agent.systemPrompt) +
     estimateTokensFromString(outputInstructions) +
+    estimateTokensFromString(followUpContextBlock ?? "") +
     estimateTokensFromString(summaryBlock) +
     estimateTokensFromString(knowledgeBlock) +
     estimateTokensFromContent(userContent);
@@ -112,6 +115,9 @@ export function buildMessages(params: {
     { role: "system", content: coreSystemRules },
     { role: "system", content: agent.systemPrompt },
     { role: "system", content: outputInstructions },
+    ...(followUpContextBlock
+      ? [{ role: "system" as const, content: followUpContextBlock }]
+      : []),
     { role: "system", content: summaryBlock },
     ...(knowledgeBlock ? [{ role: "system" as const, content: knowledgeBlock }] : []),
     ...trimmed.map((m) => {
