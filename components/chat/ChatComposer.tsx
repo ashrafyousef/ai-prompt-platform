@@ -10,7 +10,7 @@ import { compactModelSelectorHint } from "@/lib/chatAgentModelGuidance";
 import { modelFailsManualRouterForChat } from "@/lib/chatAgentModelRules";
 import { computeChatModelCompatibilityIssues } from "@/lib/chatModelCompatibility";
 import type { UiModelSummary } from "@/lib/types";
-import type { ChatRouteMeta } from "@/components/chat/hooks/useChatStream";
+import { IMAGE_ONLY_DEFAULT_PROMPT, type ChatRouteMeta } from "@/components/chat/hooks/useChatStream";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]);
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
@@ -113,6 +113,9 @@ export function ChatComposer({
 
   const blockingIssue = compatibilityIssues.find((issue) => issue.severity === "blocking");
 
+  const canSend =
+    !disabled && !blockingIssue && (text.trim().length > 0 || imageFiles.length > 0);
+
   /** Avoid repeating guidance already shown in compatibility banners. */
   const modelSelectorHint = useMemo(() => {
     if (compatibilityIssues.length > 0) return null;
@@ -178,17 +181,21 @@ export function ChatComposer({
 
   async function submit(e?: FormEvent) {
     e?.preventDefault();
-    if (disabled) return;
-    if (!text.trim() || blockingIssue) return;
+    if (!canSend) return;
 
     const submittedText = text.trim();
     const submittedImages = [...imageFiles];
+    const outgoingText =
+      submittedText || (submittedImages.length > 0 ? IMAGE_ONLY_DEFAULT_PROMPT : "");
 
     setText("");
     setImageFiles([]);
 
     try {
-      await onSend(submittedText, submittedImages.length > 0 ? submittedImages : undefined);
+      await onSend(
+        outgoingText,
+        submittedImages.length > 0 ? submittedImages : undefined
+      );
     } catch {
       // onError from useChatStream surfaces the message; restore draft and attachments.
       setText(submittedText);
@@ -199,7 +206,7 @@ export function ChatComposer({
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key !== "Enter" || e.shiftKey) return;
     if (e.nativeEvent.isComposing) return;
-    if (disabled || !text.trim() || blockingIssue) return;
+    if (!canSend) return;
     e.preventDefault();
     void submit();
   }
@@ -406,11 +413,11 @@ export function ChatComposer({
             <button
               type="submit"
               className={`flex h-10 w-10 items-center justify-center rounded-full transition ${
-                text.trim() && !disabled
+                canSend
                   ? "bg-zinc-900 text-white hover:bg-zinc-700 dark:bg-white dark:text-black dark:hover:bg-zinc-300"
                   : "bg-zinc-200 text-zinc-400 dark:bg-zinc-800 dark:text-zinc-600"
               }`}
-              disabled={disabled || !text.trim() || Boolean(blockingIssue)}
+              disabled={!canSend}
               aria-label="Send message"
             >
               <ArrowUp className="h-5 w-5" />

@@ -3,6 +3,16 @@ import type { UiGenerationState, UiMessage } from "@/lib/types";
 import { parseSSEStream } from "@/lib/streaming/parseStream";
 import { classifyChatError } from "@/lib/chatErrorTaxonomy";
 
+/** Used when the user attaches images but leaves the composer text empty. */
+export const IMAGE_ONLY_DEFAULT_PROMPT =
+  "Analyze the attached image and suggest a stronger creative direction.";
+
+export function resolveOutgoingChatText(text: string, hasImages: boolean): string {
+  const trimmed = text.trim();
+  if (trimmed) return trimmed;
+  return hasImages ? IMAGE_ONLY_DEFAULT_PROMPT : "";
+}
+
 export type ChatRouteMeta = {
   assistantMessageId?: string;
   turnId?: string;
@@ -201,6 +211,13 @@ export function useChatStream({
     if (Date.now() < sendCooldownUntilRef.current) return;
     if (loading) return;
 
+    const hasImageInput = Boolean(
+      (imageFiles && imageFiles.length > 0) ||
+        (overrideImageUrls && overrideImageUrls.length > 0)
+    );
+    const outgoingText = resolveOutgoingChatText(text, hasImageInput);
+    if (!outgoingText) return;
+
     setLoading(true);
 
     const userMsgOptimisticId = `usr-${Date.now()}`;
@@ -266,18 +283,14 @@ export function useChatStream({
     } else {
       setMessages((prev) => [
         ...prev,
-        ...(text
-          ? [
-              {
-                id: userMsgOptimisticId,
-                role: "user" as const,
-                turnId,
-                content: text,
-                imageUrls,
-                createdAt: new Date().toISOString(),
-              },
-            ]
-          : []),
+        {
+          id: userMsgOptimisticId,
+          role: "user" as const,
+          turnId,
+          content: outgoingText,
+          imageUrls,
+          createdAt: new Date().toISOString(),
+        },
         {
           id: assistantMsgOptimisticId,
           role: "assistant" as const,
@@ -300,7 +313,7 @@ export function useChatStream({
         body: JSON.stringify({
           sessionId: effectiveSessionId,
           agentId,
-          text,
+          text: outgoingText,
           imageUrls,
           editedFromId,
           regenOfId,
