@@ -7,10 +7,33 @@ import { classifyChatError } from "@/lib/chatErrorTaxonomy";
 export const IMAGE_ONLY_DEFAULT_PROMPT =
   "Analyze the attached image and suggest a stronger creative direction.";
 
+const MAX_IMAGES_PER_MESSAGE = 4;
+const MAX_IMAGE_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_TOTAL_IMAGE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
+const IMAGE_UPLOAD_TIMEOUT_MS = 30_000;
+
+const IMAGE_UPLOAD_TIMEOUT_MESSAGE =
+  "Image upload took too long. Please try again with fewer or smaller images.";
+
 export function resolveOutgoingChatText(text: string, hasImages: boolean): string {
   const trimmed = text.trim();
   if (trimmed) return trimmed;
   return hasImages ? IMAGE_ONLY_DEFAULT_PROMPT : "";
+}
+
+export function validateImageUploadBatch(files?: File[]): string | null {
+  if (!files || files.length === 0) return null;
+  if (files.length > MAX_IMAGES_PER_MESSAGE) {
+    return "You can attach up to 4 images per message.";
+  }
+  if (files.some((file) => file.size > MAX_IMAGE_FILE_SIZE_BYTES)) {
+    return "Each image must be 10 MB or smaller.";
+  }
+  const totalSize = files.reduce((sum, file) => sum + file.size, 0);
+  if (totalSize > MAX_TOTAL_IMAGE_SIZE_BYTES) {
+    return "Total image size must be 25 MB or smaller.";
+  }
+  return null;
 }
 
 export type ChatRouteMeta = {
@@ -32,6 +55,15 @@ function sanitizeUploadErrorMessage(message: string): string {
     return "Image upload failed. Please try again or contact support if this persists.";
   }
   return trimmed;
+}
+
+function isAbortLikeError(error: unknown): boolean {
+  if (error && typeof error === "object" && "name" in error) {
+    const name = String((error as { name?: unknown }).name ?? "");
+    if (name === "AbortError") return true;
+  }
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message === "UPLOAD_ABORTED" || message.toLowerCase().includes("abort");
 }
 
 /** Secondary toast when the thread already shows full failure copy. */
@@ -59,6 +91,7 @@ export function useChatStream({
   const [loading, setLoading] = useState(false);
   const [lastRouteMeta, setLastRouteMeta] = useState<ChatRouteMeta | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const uploadAbortRef = useRef<AbortController | null>(null);
   /** Prevents double-submit / accidental repeat while a turn is in flight. */
   const sendCooldownUntilRef = useRef(0);
 
@@ -94,14 +127,44 @@ export function useChatStream({
     });
   };
 
-  const uploadImages = async (files?: File[]) => {
+  const uploadImages = async (files?: File[], signal?: AbortSignal) => {
     if (!files || files.length === 0) return undefined;
     const urls: string[] = [];
     for (const file of files) {
       const compressed = await compressImage(file);
       const formData = new FormData();
       formData.append("image", compressed);
-      const res = await fetch("/api/upload/image", { method: "POST", body: formData });
+      const requestController = new AbortController();
+      let timedOut = false;
+      const abortFromParent = () => requestController.abort();
+      signal?.addEventListener("abort", abortFromParent, { once: true });
+      const timeout = setTimeout(() => {
+        timedOut = true;
+        requestController.abort();
+      }, IMAGE_UPLOAD_TIMEOUT_MS);
+
+      let res: Response;
+      try {
+        res = await fetch("/api/upload/image", {
+          method: "POST",
+          body: formData,
+          signal: requestController.signal,
+        });
+      } catch (error) {
+        clearTimeout(timeout);
+        signal?.removeEventListener("abort", abortFromParent);
+        if (timedOut) {
+          throw new Error(IMAGE_UPLOAD_TIMEOUT_MESSAGE);
+        }
+        if (isAbortLikeError(error)) {
+          throw new Error("UPLOAD_ABORTED");
+        }
+        throw error instanceof Error
+          ? error
+          : new Error("Image upload failed. Please try again.");
+      }
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", abortFromParent);
 
       let data: unknown;
       const ct = res.headers.get("content-type") ?? "";
@@ -211,6 +274,19 @@ export function useChatStream({
     if (Date.now() < sendCooldownUntilRef.current) return;
     if (loading) return;
 
+    const imageValidationError = validateImageUploadBatch(imageFiles);
+    if (imageValidationError) {
+      onError?.(imageValidationError);
+      sendCooldownUntilRef.current = Date.now() + 400;
+      throw new Error(imageValidationError);
+    }
+    if (overrideImageUrls && overrideImageUrls.length > MAX_IMAGES_PER_MESSAGE) {
+      const message = "You can attach up to 4 images per message.";
+      onError?.(message);
+      sendCooldownUntilRef.current = Date.now() + 400;
+      throw new Error(message);
+    }
+
     const hasImageInput = Boolean(
       (imageFiles && imageFiles.length > 0) ||
         (overrideImageUrls && overrideImageUrls.length > 0)
@@ -219,20 +295,27 @@ export function useChatStream({
     if (!outgoingText) return;
 
     setLoading(true);
+    uploadAbortRef.current = new AbortController();
 
     const userMsgOptimisticId = `usr-${Date.now()}`;
     const assistantMsgOptimisticId = `tmp-${Date.now()}`;
 
     let imageUrls: string[] | undefined;
     try {
-      imageUrls = overrideImageUrls ?? (await uploadImages(imageFiles));
+      imageUrls =
+        overrideImageUrls ??
+        (await uploadImages(imageFiles, uploadAbortRef.current.signal));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Image upload failed.";
-      onError?.(msg);
+      if (!isAbortLikeError(e)) {
+        onError?.(msg);
+      }
       setLoading(false);
+      uploadAbortRef.current = null;
       sendCooldownUntilRef.current = Date.now() + 400;
       throw e instanceof Error ? e : new Error(msg);
     }
+    uploadAbortRef.current = null;
 
     if (
       imageFiles &&
@@ -402,6 +485,7 @@ export function useChatStream({
         );
       }
     } finally {
+      uploadAbortRef.current = null;
       abortRef.current = null;
       setLoading(false);
       sendCooldownUntilRef.current = Date.now() + 400;
@@ -568,6 +652,7 @@ export function useChatStream({
   };
 
   const cancel = () => {
+    uploadAbortRef.current?.abort();
     abortRef.current?.abort();
   };
 

@@ -213,6 +213,12 @@ export async function POST(req: NextRequest) {
     }
 
     const payload = sendSchema.parse(await req.json());
+    if (payload.imageUrls && payload.imageUrls.length > 4) {
+      return NextResponse.json(
+        { error: "You can attach up to 4 images per message." },
+        { status: 400 }
+      );
+    }
     titleFallbackContext = {
       sessionId: payload.sessionId,
       seedText: payload.text,
