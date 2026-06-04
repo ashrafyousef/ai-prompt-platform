@@ -26,29 +26,46 @@ export function isNewerAssistantAttempt(
   return createdAtMs(challenger.createdAt) > createdAtMs(current.createdAt);
 }
 
+/** Group key for one user turn's assistant attempts (explicit turnId or nearest preceding user). */
+export function assistantTurnGroupKey(
+  message: ChatMessageForDisplay,
+  lastUserTurnKey: string | null
+): string | null {
+  if (message.role !== "assistant") return null;
+  const explicit = message.turnId?.trim();
+  if (explicit) return explicit;
+  return lastUserTurnKey;
+}
+
 /**
- * Returns messages in input order, hiding older assistant rows that share a turnId.
- * User/system rows are always kept. Assistants without turnId are kept (legacy rows).
+ * Returns messages in input order, hiding older assistant rows in the same turn group.
+ * User/system rows are always kept. Ungroupable orphan assistants are kept (legacy rows).
  */
 export function selectVisibleChatMessages<T extends ChatMessageForDisplay>(
   messages: T[]
 ): T[] {
   const latestAssistantByTurn = new Map<string, T>();
   const hiddenAssistantIds = new Set<string>();
+  let lastUserTurnKey: string | null = null;
 
   for (const message of messages) {
+    if (message.role === "user") {
+      lastUserTurnKey = message.turnId?.trim() || message.id;
+      continue;
+    }
     if (message.role !== "assistant") continue;
-    const turnId = message.turnId?.trim();
-    if (!turnId) continue;
 
-    const existing = latestAssistantByTurn.get(turnId);
+    const groupKey = assistantTurnGroupKey(message, lastUserTurnKey);
+    if (!groupKey) continue;
+
+    const existing = latestAssistantByTurn.get(groupKey);
     if (!existing) {
-      latestAssistantByTurn.set(turnId, message);
+      latestAssistantByTurn.set(groupKey, message);
       continue;
     }
     if (isNewerAssistantAttempt(existing, message)) {
       hiddenAssistantIds.add(existing.id);
-      latestAssistantByTurn.set(turnId, message);
+      latestAssistantByTurn.set(groupKey, message);
     } else {
       hiddenAssistantIds.add(message.id);
     }
@@ -56,8 +73,6 @@ export function selectVisibleChatMessages<T extends ChatMessageForDisplay>(
 
   return messages.filter((message) => {
     if (message.role !== "assistant") return true;
-    const turnId = message.turnId?.trim();
-    if (!turnId) return true;
     return !hiddenAssistantIds.has(message.id);
   });
 }

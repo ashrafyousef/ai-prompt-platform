@@ -255,7 +255,32 @@ export async function POST(req: NextRequest) {
       retrySource = source;
     }
     const skipUserInsertForAttemptFlow = Boolean(retrySource || payload.regenOfId);
-    const effectiveTurnId = payload.turnId?.trim() || retrySource?.turnId || crypto.randomUUID();
+
+    let regenSourceTurnId: string | null = null;
+    if (payload.regenOfId) {
+      const regenSource = await db.message.findFirst({
+        where: {
+          id: payload.regenOfId,
+          sessionId: payload.sessionId,
+          userId,
+          role: "assistant",
+        },
+        select: { turnId: true },
+      });
+      if (!regenSource) {
+        return NextResponse.json(
+          { error: "Regenerate target must be an assistant message in this conversation." },
+          { status: 400 }
+        );
+      }
+      regenSourceTurnId = regenSource.turnId?.trim() || null;
+    }
+
+    const effectiveTurnId =
+      regenSourceTurnId ||
+      payload.turnId?.trim() ||
+      retrySource?.turnId ||
+      crypto.randomUUID();
 
     const activeAttempt = await db.message.findFirst({
       where: {

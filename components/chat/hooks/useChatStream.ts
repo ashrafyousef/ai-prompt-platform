@@ -96,6 +96,13 @@ export function useChatStream({
   /** Prevents double-submit / accidental repeat while a turn is in flight. */
   const sendCooldownUntilRef = useRef(0);
 
+  const commitVisibleMessages = useCallback(
+    (updater: (prev: UiMessage[]) => UiMessage[]) => {
+      setMessages((prev) => selectVisibleChatMessages(updater(prev)));
+    },
+    []
+  );
+
   const compressImage = async (file: File): Promise<File> => {
     if (file.size < 3 * 1024 * 1024) return file;
     return new Promise((resolve) => {
@@ -242,7 +249,7 @@ export function useChatStream({
   const markAssistantFailed = useCallback(
     (assistantId: string, rawError: string, partialContent: string) => {
       const classified = classifyChatError(rawError);
-      setMessages((prev) =>
+      commitVisibleMessages((prev) =>
         prev.map((m) => {
           if (m.id !== assistantId) return m;
           const gen: UiGenerationState = {
@@ -260,7 +267,7 @@ export function useChatStream({
       );
       onError?.(classified.detail, { detailShownInThread: true });
     },
-    [onError]
+    [commitVisibleMessages, onError]
   );
 
   const send = async (
@@ -345,17 +352,25 @@ export function useChatStream({
     }
 
     if (isRegenerate) {
-      setMessages((prev) => {
-        const idx = prev.findIndex((m) => m.id === regenOfId);
-        if (idx < 0) return prev;
-        let userTurnId = "";
-        for (let i = idx - 1; i >= 0; i--) {
-          if (prev[i].role === "user") {
-            userTurnId = prev[i].turnId ?? prev[i].id;
+      const regenTarget = messages.find(
+        (m) => m.id === regenOfId && m.role === "assistant"
+      );
+      let userTurnId = "";
+      const assistantIndex = messages.findIndex((m) => m.id === regenOfId);
+      if (assistantIndex > 0) {
+        for (let i = assistantIndex - 1; i >= 0; i--) {
+          if (messages[i].role === "user") {
+            userTurnId = messages[i].turnId ?? messages[i].id;
             break;
           }
         }
-        turnId = userTurnId || crypto.randomUUID();
+      }
+      turnId =
+        regenTarget?.turnId?.trim() || userTurnId || crypto.randomUUID();
+
+      commitVisibleMessages((prev) => {
+        const idx = prev.findIndex((m) => m.id === regenOfId);
+        if (idx < 0) return prev;
         const streaming: UiGenerationState = { status: "streaming" };
         return prev.map((m) =>
           m.id === regenOfId
@@ -372,7 +387,7 @@ export function useChatStream({
         );
       });
     } else {
-      setMessages((prev) => [
+      commitVisibleMessages((prev) => [
         ...prev,
         {
           id: userMsgOptimisticId,
@@ -445,12 +460,16 @@ export function useChatStream({
         res,
         (chunk) => {
           currentOutput += chunk;
-          setMessages((prev) =>
+          commitVisibleMessages((prev) =>
             prev.map((m) => {
               if (m.id !== assistantMsgOptimisticId) return m;
               if (isRegenerate) {
                 // Preserve old content until regeneration fully succeeds.
-                return { ...m, generation: { status: "streaming" } };
+                return {
+                  ...m,
+                  content: currentOutput,
+                  generation: { status: "streaming" },
+                };
               }
               return {
                 ...m,
@@ -478,7 +497,7 @@ export function useChatStream({
           setLastRouteMeta(typed);
           const persistedAssistantId = typed.assistantMessageId;
           if (persistedAssistantId) {
-            setMessages((prev) =>
+            commitVisibleMessages((prev) =>
               prev.map((m) =>
                 m.id === assistantMsgOptimisticId
                   ? { ...m, id: persistedAssistantId, turnId: typed.turnId ?? m.turnId }
@@ -526,7 +545,7 @@ export function useChatStream({
       if (!user || !failedAsst) return;
 
       const newAssistantId = `tmp-${Date.now()}`;
-      setMessages((prev) =>
+      commitVisibleMessages((prev) =>
         prev.map((m) =>
           m.id === failedAsst.id
             ? {
@@ -590,7 +609,7 @@ export function useChatStream({
           res,
           (chunk) => {
             currentOutput += chunk;
-            setMessages((prev) =>
+            commitVisibleMessages((prev) =>
               prev.map((m) =>
                 m.id === newAssistantId
                   ? { ...m, content: currentOutput, generation: { status: "streaming" } }
@@ -612,7 +631,7 @@ export function useChatStream({
             setLastRouteMeta(typed);
             const persistedAssistantId = typed.assistantMessageId;
             if (persistedAssistantId) {
-              setMessages((prev) =>
+              commitVisibleMessages((prev) =>
                 prev.map((m) =>
                   m.id === newAssistantId
                     ? { ...m, id: persistedAssistantId, turnId: typed.turnId ?? m.turnId }
@@ -651,6 +670,7 @@ export function useChatStream({
       modelVersion,
       modelRoutingMode,
       markAssistantFailed,
+      commitVisibleMessages,
       loadMessages,
       onMessageAdded,
     ]

@@ -76,15 +76,25 @@ describe("selectVisibleChatMessages", () => {
     expect(visible.some((m) => m.id === "a1")).toBe(false);
   });
 
-  it("keeps legacy assistant rows without turnId", () => {
+  it("groups legacy assistants without turnId under the preceding user", () => {
     const messages = [
       { id: "u1", role: "user", createdAt: "2026-01-01T00:00:00.000Z" },
-      { id: "a1", role: "assistant", createdAt: "2026-01-01T00:00:01.000Z" },
-      { id: "a2", role: "assistant", createdAt: "2026-01-01T00:00:02.000Z" },
+      {
+        id: "a1",
+        role: "assistant",
+        attemptIndex: 1,
+        createdAt: "2026-01-01T00:00:01.000Z",
+      },
+      {
+        id: "a2",
+        role: "assistant",
+        attemptIndex: 2,
+        createdAt: "2026-01-01T00:00:02.000Z",
+      },
     ];
 
     const visible = selectVisibleChatMessages(messages);
-    expect(visible.map((m) => m.id)).toEqual(["u1", "a1", "a2"]);
+    expect(visible.map((m) => m.id)).toEqual(["u1", "a2"]);
   });
 });
 
