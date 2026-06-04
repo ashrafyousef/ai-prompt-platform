@@ -330,6 +330,10 @@ export function useChatStream({
     }
 
     const isRegenerate = Boolean(regenOfId);
+    let regenPreviousContent =
+      (isRegenerate
+        ? messages.find((m) => m.id === regenOfId && m.role === "assistant")?.content
+        : "") ?? "";
     let turnId = crypto.randomUUID();
 
     if (isRegenerate && !messages.some((m) => m.id === regenOfId)) {
@@ -355,7 +359,8 @@ export function useChatStream({
             ? {
                 ...m,
                 id: assistantMsgOptimisticId,
-                content: "",
+                // Keep prior response visible while regenerate is pending.
+                content: m.content,
                 turnId,
                 generation: streaming,
                 createdAt: new Date().toISOString(),
@@ -424,7 +429,11 @@ export function useChatStream({
         } catch {
           errorMsg = `Request failed (${res.status}).`;
         }
-        markAssistantFailed(assistantMsgOptimisticId, errorMsg, "");
+        markAssistantFailed(
+          assistantMsgOptimisticId,
+          errorMsg,
+          isRegenerate ? regenPreviousContent : ""
+        );
         return;
       }
 
@@ -434,15 +443,18 @@ export function useChatStream({
         (chunk) => {
           currentOutput += chunk;
           setMessages((prev) =>
-            prev.map((m) =>
-              m.id === assistantMsgOptimisticId
-                ? {
-                    ...m,
-                    content: currentOutput,
-                    generation: { status: "streaming" },
-                  }
-                : m
-            )
+            prev.map((m) => {
+              if (m.id !== assistantMsgOptimisticId) return m;
+              if (isRegenerate) {
+                // Preserve old content until regeneration fully succeeds.
+                return { ...m, generation: { status: "streaming" } };
+              }
+              return {
+                ...m,
+                content: currentOutput,
+                generation: { status: "streaming" },
+              };
+            })
           );
         },
         (errMsg) => {
@@ -450,7 +462,11 @@ export function useChatStream({
             errMsg === "Internal server error"
               ? "An error occurred while generating the response."
               : errMsg;
-          markAssistantFailed(assistantMsgOptimisticId, friendlyMsg, currentOutput);
+          const fallbackContent =
+            isRegenerate && regenPreviousContent.trim().length > 0
+              ? regenPreviousContent
+              : currentOutput;
+          markAssistantFailed(assistantMsgOptimisticId, friendlyMsg, fallbackContent);
         },
         controller.signal,
         (meta) => {
@@ -481,7 +497,7 @@ export function useChatStream({
         markAssistantFailed(
           assistantMsgOptimisticId,
           e instanceof Error ? e.message : "Request failed.",
-          ""
+          isRegenerate ? regenPreviousContent : ""
         );
       }
     } finally {
