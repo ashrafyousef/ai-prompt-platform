@@ -254,6 +254,7 @@ export async function POST(req: NextRequest) {
       }
       retrySource = source;
     }
+    const skipUserInsertForAttemptFlow = Boolean(retrySource || payload.regenOfId);
     const effectiveTurnId = payload.turnId?.trim() || retrySource?.turnId || crypto.randomUUID();
 
     const activeAttempt = await db.message.findFirst({
@@ -292,7 +293,7 @@ export async function POST(req: NextRequest) {
       userId,
       ...payload,
       turnId: effectiveTurnId,
-      skipUserInsert: Boolean(retrySource),
+      skipUserInsert: skipUserInsertForAttemptFlow,
       resolvedImageUrls,
     });
 
