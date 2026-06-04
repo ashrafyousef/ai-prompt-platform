@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from "react";
 import type { UiGenerationState, UiMessage } from "@/lib/types";
 import { parseSSEStream } from "@/lib/streaming/parseStream";
 import { classifyChatError } from "@/lib/chatErrorTaxonomy";
+import { selectVisibleChatMessages } from "@/lib/chatVisibleMessages";
 
 /** Used when the user attaches images but leaves the composer text empty. */
 export const IMAGE_ONLY_DEFAULT_PROMPT =
@@ -206,13 +207,15 @@ export function useChatStream({
     if (!customFetch && id === sessionId) return;
     const res = await fetch(`/api/chat/history?sessionId=${id}`);
     const data = await res.json();
-    const list = (data.messages ?? []) as Array<
-      UiMessage & {
-        deliveryStatus?: "PENDING" | "STREAMING" | "FAILED" | "COMPLETED" | "CANCELLED";
-        errorCode?: string | null;
-        errorMessage?: string | null;
-      }
-    >;
+    const list = selectVisibleChatMessages(
+      (data.messages ?? []) as Array<
+        UiMessage & {
+          deliveryStatus?: "PENDING" | "STREAMING" | "FAILED" | "COMPLETED" | "CANCELLED";
+          errorCode?: string | null;
+          errorMessage?: string | null;
+        }
+      >
+    );
     setMessages(
       list.map((m) => ({
         ...m,
