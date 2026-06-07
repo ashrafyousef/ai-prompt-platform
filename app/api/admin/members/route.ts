@@ -1,16 +1,21 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import {
+  assertTeamContextForScopedAdmin,
+  formatAdminRouteError,
+  isTeamScopedWorkspaceAdmin,
+  requireWorkspaceMemberManagerContext,
+} from "@/lib/adminAuth";
 
 export async function GET() {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
-    const scopedToOwnTeam =
-      auth.workspaceRole === "ADMIN" && auth.platformRole !== "ADMIN";
+    assertTeamContextForScopedAdmin(auth);
+    const scopedToOwnTeam = isTeamScopedWorkspaceAdmin(auth);
     const members = await db.workspaceMember.findMany({
       where: {
         workspaceId: auth.workspaceId,
-        ...(scopedToOwnTeam ? { teamId: auth.teamId ?? "__no_team__" } : {}),
+        ...(scopedToOwnTeam ? { teamId: auth.teamId! } : {}),
       },
       orderBy: [{ role: "asc" }, { createdAt: "asc" }],
       select: {
@@ -49,8 +54,7 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load members.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to load members.");
+    return NextResponse.json(body, { status });
   }
 }

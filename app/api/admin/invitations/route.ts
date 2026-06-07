@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import {
+  activeInvitationRevokeFilter,
+  assertTeamContextForScopedAdmin,
+  formatAdminRouteError,
+  isTeamScopedWorkspaceAdmin,
+  requireWorkspaceMemberManagerContext,
+} from "@/lib/adminAuth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import { issueWorkspaceInvitationToken } from "@/lib/workspaceInvitations";
 import { buildAppUrl } from "@/lib/appUrl";
@@ -16,12 +22,12 @@ const createSchema = z.object({
 export async function GET() {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
-    const scopedToOwnTeam =
-      auth.workspaceRole === "ADMIN" && auth.platformRole !== "ADMIN";
+    assertTeamContextForScopedAdmin(auth);
+    const scopedToOwnTeam = isTeamScopedWorkspaceAdmin(auth);
     const invitations = await db.workspaceInvitation.findMany({
       where: {
         workspaceId: auth.workspaceId,
-        ...(scopedToOwnTeam ? { teamId: auth.teamId ?? "__no_team__" } : {}),
+        ...(scopedToOwnTeam ? { teamId: auth.teamId! } : {}),
       },
       orderBy: { createdAt: "desc" },
       take: 50,
@@ -52,19 +58,17 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load invitations.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to load invitations.");
+    return NextResponse.json(body, { status });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertTeamContextForScopedAdmin(auth);
     const body = createSchema.parse(await req.json());
-    const viewerIsOwner = auth.workspaceRole === "OWNER";
-    const scopedToOwnTeam =
-      auth.workspaceRole === "ADMIN" && auth.platformRole !== "ADMIN";
+    const scopedToOwnTeam = isTeamScopedWorkspaceAdmin(auth);
     if (scopedToOwnTeam && body.role !== "MEMBER") {
       return NextResponse.json(
         { error: "Only owners can invite with ADMIN or OWNER roles." },
@@ -124,12 +128,7 @@ export async function POST(req: NextRequest) {
     }
 
     await db.workspaceInvitation.updateMany({
-      where: {
-        workspaceId: auth.workspaceId,
-        email: body.email,
-        acceptedAt: null,
-        revokedAt: null,
-      },
+      where: activeInvitationRevokeFilter(auth, body.email),
       data: {
         revokedAt: new Date(),
       },
@@ -140,7 +139,7 @@ export async function POST(req: NextRequest) {
       invitedById: auth.userId,
       email: body.email,
       role: body.role,
-      teamId: scopedToOwnTeam ? auth.teamId ?? null : body.teamId ?? null,
+      teamId: scopedToOwnTeam ? auth.teamId! : body.teamId ?? null,
     });
 
     const workspace = await db.workspace.findUnique({
@@ -170,19 +169,16 @@ export async function POST(req: NextRequest) {
         id: issued.invitationId,
         email: body.email,
         role: body.role,
-        teamId: scopedToOwnTeam ? auth.teamId ?? null : body.teamId ?? null,
+        teamId: scopedToOwnTeam ? auth.teamId! : body.teamId ?? null,
         expiresAt: issued.expiresAt.toISOString(),
       },
       ...(process.env.NODE_ENV !== "production" ? { inviteUrl } : {}),
     }, { status: deliveryError ? 502 : 200 });
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? "Invalid invitation input."
-        : error instanceof Error
-          ? error.message
-          : "Failed to create invitation.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid invitation input." }, { status: 400 });
+    }
+    const { status, body } = formatAdminRouteError(error, "Failed to create invitation.");
+    return NextResponse.json(body, { status: status === 500 ? 400 : status });
   }
 }

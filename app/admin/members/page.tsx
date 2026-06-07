@@ -25,6 +25,11 @@ type Viewer = {
   platformRole: "USER" | "TEAM_LEAD" | "ADMIN" | null;
 };
 
+function adminApiError(data: { error?: string; message?: string }, fallback: string): string {
+  if (data.message) return data.message;
+  return data.error ?? fallback;
+}
+
 type Invitation = {
   id: string;
   email: string;
@@ -58,7 +63,10 @@ export default function AdminMembersPage() {
   >({});
 
   const viewerIsOwner = viewer?.workspaceRole === "OWNER";
-  const viewerIsAdmin = viewer?.workspaceRole === "ADMIN" || viewer?.platformRole === "ADMIN";
+  const viewerIsPlatformAdmin = viewer?.platformRole === "ADMIN";
+  const viewerIsAdmin = viewer?.workspaceRole === "ADMIN" || viewerIsPlatformAdmin;
+  const canCrossAssignTeams = viewerIsOwner || viewerIsPlatformAdmin;
+  const canChooseInviteRole = viewerIsOwner || viewerIsPlatformAdmin;
 
   async function load() {
     setLoading(true);
@@ -71,27 +79,30 @@ export default function AdminMembersPage() {
       ]);
       const membersData = (await membersRes.json()) as {
         error?: string;
+        message?: string;
         viewer?: Viewer;
         members?: Member[];
       };
       const teamsData = (await teamsRes.json()) as {
         error?: string;
+        message?: string;
         teams?: Team[];
       };
       const invitationsData = (await invitationsRes.json()) as {
         error?: string;
+        message?: string;
         invitations?: Invitation[];
       };
       if (!membersRes.ok || !membersData.members || !membersData.viewer) {
-        setError(membersData.error ?? "Failed to load members.");
+        setError(adminApiError(membersData, "Failed to load members."));
         return;
       }
       if (!teamsRes.ok || !teamsData.teams) {
-        setError(teamsData.error ?? "Failed to load teams.");
+        setError(adminApiError(teamsData, "Failed to load teams."));
         return;
       }
       if (!invitationsRes.ok || !invitationsData.invitations) {
-        setError(invitationsData.error ?? "Failed to load invitations.");
+        setError(adminApiError(invitationsData, "Failed to load invitations."));
         return;
       }
 
@@ -121,14 +132,14 @@ export default function AdminMembersPage() {
   function canEditRole(member: Member): boolean {
     if (!viewer) return false;
     if (member.userId === viewer.userId) return false;
-    if (viewerIsOwner) return true;
+    if (viewerIsOwner || viewerIsPlatformAdmin) return true;
     return false;
   }
 
   function canEditMember(member: Member): boolean {
     if (!viewer) return false;
     if (member.userId === viewer.userId) return false;
-    if (viewerIsOwner) return true;
+    if (viewerIsOwner || viewerIsPlatformAdmin) return true;
     if (!viewerIsAdmin) return false;
     return member.role === "MEMBER";
   }
@@ -160,9 +171,9 @@ export default function AdminMembersPage() {
           teamId: draft.teamId,
         }),
       });
-      const data = (await res.json()) as { error?: string; member?: Member };
+      const data = (await res.json()) as { error?: string; message?: string; member?: Member };
       if (!res.ok || !data.member) {
-        setError(data.error ?? "Failed to update member.");
+        setError(adminApiError(data, "Failed to update member."));
         return;
       }
       setMembers((prev) => prev.map((m) => (m.id === data.member!.id ? data.member! : m)));
@@ -207,7 +218,7 @@ export default function AdminMembersPage() {
         invitation?: { id: string };
       };
       if (!res.ok && !data.invitation) {
-        setInviteError(data.error ?? data.message ?? "Failed to create invitation.");
+        setInviteError(adminApiError(data, "Failed to create invitation."));
         return;
       }
       if (!res.ok) {
@@ -230,9 +241,9 @@ export default function AdminMembersPage() {
   async function revokeInvite(invitationId: string) {
     setInviteError(null);
     const res = await fetch(`/api/admin/invitations/${invitationId}`, { method: "DELETE" });
-    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
     if (!res.ok) {
-      setInviteError(data.error ?? "Failed to revoke invitation.");
+      setInviteError(adminApiError(data, "Failed to revoke invitation."));
       return;
     }
     await load();
@@ -258,7 +269,8 @@ export default function AdminMembersPage() {
       <section className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
         <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Invite member</h3>
         <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Owners can invite OWNER/ADMIN/MEMBER. Admins can invite MEMBER only.
+          Workspace owners or platform admins can invite OWNER/ADMIN/MEMBER. Team-scoped workspace admins can invite
+          MEMBER only.
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-4">
           <input
@@ -271,7 +283,7 @@ export default function AdminMembersPage() {
           <select
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value as "OWNER" | "ADMIN" | "MEMBER")}
-            disabled={!viewerIsOwner}
+            disabled={!canChooseInviteRole}
             className="min-w-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           >
             <option value="MEMBER">MEMBER</option>
@@ -283,7 +295,7 @@ export default function AdminMembersPage() {
             onChange={(e) => setInviteTeamId(e.target.value)}
             className="min-w-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           >
-            <option value="">No team</option>
+            {canCrossAssignTeams ? <option value="">No team</option> : null}
             {teams.map((team) => (
               <option key={team.id} value={team.id}>
                 {team.name}
@@ -390,7 +402,7 @@ export default function AdminMembersPage() {
                     }
                     className="min-w-0 rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
                   >
-                    <option value="">No team</option>
+                    {canCrossAssignTeams ? <option value="">No team</option> : null}
                     {teams.map((team) => (
                       <option key={team.id} value={team.id}>
                         {team.name}
@@ -510,7 +522,7 @@ export default function AdminMembersPage() {
                       }
                       className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
                     >
-                      <option value="">No team</option>
+                      {canCrossAssignTeams ? <option value="">No team</option> : null}
                       {teams.map((team) => (
                         <option key={team.id} value={team.id}>
                           {team.name}

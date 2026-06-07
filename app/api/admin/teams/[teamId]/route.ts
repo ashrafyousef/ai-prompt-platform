@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import {
+  assertTeamContextForScopedAdmin,
+  canArchiveTeams,
+  formatAdminRouteError,
+  isTeamScopedWorkspaceAdmin,
+  requireWorkspaceMemberManagerContext,
+} from "@/lib/adminAuth";
 
 const updateSchema = z.object({
   name: z.string().trim().min(1).max(80).optional(),
@@ -14,6 +20,7 @@ export async function PATCH(
 ) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertTeamContextForScopedAdmin(auth);
     const body = updateSchema.parse(await req.json());
     if (body.name === undefined && body.isArchived === undefined) {
       return NextResponse.json({ error: "No changes provided." }, { status: 400 });
@@ -27,12 +34,18 @@ export async function PATCH(
       return NextResponse.json({ error: "Team not found." }, { status: 404 });
     }
 
-    const viewerIsOwner = auth.workspaceRole === "OWNER" || auth.platformRole === "ADMIN";
-    if (!viewerIsOwner && auth.teamId !== team.id) {
+    if (isTeamScopedWorkspaceAdmin(auth) && auth.teamId !== team.id) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
-    if (!viewerIsOwner && body.isArchived !== undefined && body.isArchived !== team.isArchived) {
-      return NextResponse.json({ error: "Only owners can archive teams." }, { status: 403 });
+    if (
+      !canArchiveTeams(auth) &&
+      body.isArchived !== undefined &&
+      body.isArchived !== team.isArchived
+    ) {
+      return NextResponse.json(
+        { error: "Only workspace owners or platform admins can archive teams." },
+        { status: 403 }
+      );
     }
 
     if (body.name !== undefined) {
@@ -88,13 +101,10 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? "Invalid team update input."
-        : error instanceof Error
-          ? error.message
-          : "Failed to update team.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid team update input." }, { status: 400 });
+    }
+    const { status, body } = formatAdminRouteError(error, "Failed to update team.");
+    return NextResponse.json(body, { status: status === 500 ? 400 : status });
   }
 }

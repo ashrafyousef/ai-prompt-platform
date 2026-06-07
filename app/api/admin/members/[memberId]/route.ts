@@ -1,7 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import {
+  assertTeamContextForScopedAdmin,
+  formatAdminRouteError,
+  isTeamScopedWorkspaceAdmin,
+  isWorkspaceWideManager,
+  requireWorkspaceMemberManagerContext,
+  validateTeamScopedMemberUpdate,
+} from "@/lib/adminAuth";
 
 const schema = z.object({
   role: z.enum(["OWNER", "ADMIN", "MEMBER"]).optional(),
@@ -15,6 +22,7 @@ export async function PATCH(
 ) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertTeamContextForScopedAdmin(auth);
     const body = schema.parse(await req.json());
     if (body.role === undefined && body.isActive === undefined && body.teamId === undefined) {
       return NextResponse.json({ error: "No changes provided." }, { status: 400 });
@@ -34,11 +42,13 @@ export async function PATCH(
       return NextResponse.json({ error: "Member not found." }, { status: 404 });
     }
 
-    const actorRole = auth.workspaceRole;
-    const actorIsOwner = actorRole === "OWNER";
-    const actorIsAdmin = actorRole === "ADMIN" || auth.platformRole === "ADMIN";
-    if (!actorIsOwner && !actorIsAdmin) {
+    if (!isWorkspaceWideManager(auth) && !isTeamScopedWorkspaceAdmin(auth)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const teamScopedViolation = validateTeamScopedMemberUpdate(auth, target, body);
+    if (teamScopedViolation) {
+      return NextResponse.json({ error: teamScopedViolation }, { status: 403 });
     }
 
     const roleChangeRequested = body.role !== undefined && body.role !== target.role;
@@ -46,26 +56,6 @@ export async function PATCH(
 
     if (target.userId === auth.userId && (roleChangeRequested || body.isActive === false)) {
       return NextResponse.json({ error: "You cannot demote or deactivate yourself." }, { status: 400 });
-    }
-
-    // Admins can only manage active-state/team for MEMBER users.
-    if (!actorIsOwner) {
-      if (target.teamId !== auth.teamId) {
-        return NextResponse.json({ error: "You can only manage members in your team." }, { status: 403 });
-      }
-      if (target.role !== "MEMBER") {
-        return NextResponse.json({ error: "Only owners can manage admins or owners." }, { status: 403 });
-      }
-      if (roleChangeRequested) {
-        return NextResponse.json({ error: "Only owners can change workspace roles." }, { status: 403 });
-      }
-      if (body.teamId !== undefined && body.teamId !== null && body.teamId !== auth.teamId) {
-        return NextResponse.json({ error: "You can only assign members to your team." }, { status: 403 });
-      }
-    }
-
-    if (actorIsOwner && body.role === "OWNER" && target.role !== "OWNER") {
-      // Owner promotion is allowed, but keep the update explicit.
     }
 
     if (roleChangeRequested || statusChangeRequested) {
@@ -139,13 +129,10 @@ export async function PATCH(
       },
     });
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? "Invalid request body."
-        : error instanceof Error
-          ? error.message
-          : "Failed to update member.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+    }
+    const { status, body } = formatAdminRouteError(error, "Failed to update member.");
+    return NextResponse.json(body, { status: status === 500 ? 400 : status });
   }
 }

@@ -4,6 +4,115 @@ import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolveWorkspaceAccessForUser } from "@/lib/workspaceAccess";
 
+export const TEAM_CONTEXT_REQUIRED_CODE = "TEAM_CONTEXT_REQUIRED";
+export const TEAM_CONTEXT_REQUIRED_MESSAGE =
+  "Your admin account is not assigned to a team. Ask an owner to assign you to a team.";
+
+export class TeamContextRequiredError extends Error {
+  readonly code = TEAM_CONTEXT_REQUIRED_CODE;
+
+  constructor() {
+    super(TEAM_CONTEXT_REQUIRED_MESSAGE);
+    this.name = "TeamContextRequiredError";
+  }
+}
+
+export type WorkspaceMemberManagerContext = {
+  userId: string;
+  workspaceId: string;
+  workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | null;
+  platformRole: "USER" | "TEAM_LEAD" | "ADMIN" | null;
+  teamId: string | null;
+};
+
+export function isPlatformAdmin(context: WorkspaceMemberManagerContext): boolean {
+  return context.platformRole === "ADMIN";
+}
+
+export function isWorkspaceOwner(context: WorkspaceMemberManagerContext): boolean {
+  return context.workspaceRole === "OWNER";
+}
+
+export function isWorkspaceWideManager(context: WorkspaceMemberManagerContext): boolean {
+  return isWorkspaceOwner(context) || isPlatformAdmin(context);
+}
+
+/** Workspace ADMIN who is not platform ADMIN — constrained to own team. */
+export function isTeamScopedWorkspaceAdmin(context: WorkspaceMemberManagerContext): boolean {
+  return context.workspaceRole === "ADMIN" && !isPlatformAdmin(context);
+}
+
+export function assertTeamContextForScopedAdmin(context: WorkspaceMemberManagerContext): void {
+  if (isTeamScopedWorkspaceAdmin(context) && !context.teamId) {
+    throw new TeamContextRequiredError();
+  }
+}
+
+/** Workspace-wide managers may assign/unassign members across teams. */
+export function canCrossAssignMemberTeams(context: WorkspaceMemberManagerContext): boolean {
+  return isWorkspaceWideManager(context);
+}
+
+export function canCreateTeams(context: WorkspaceMemberManagerContext): boolean {
+  return isWorkspaceWideManager(context);
+}
+
+export function canArchiveTeams(context: WorkspaceMemberManagerContext): boolean {
+  return isWorkspaceWideManager(context);
+}
+
+export function activeInvitationRevokeFilter(
+  context: WorkspaceMemberManagerContext,
+  email: string
+) {
+  return {
+    workspaceId: context.workspaceId,
+    email,
+    acceptedAt: null,
+    revokedAt: null,
+    ...(isTeamScopedWorkspaceAdmin(context) ? { teamId: context.teamId! } : {}),
+  };
+}
+
+export function validateTeamScopedMemberUpdate(
+  context: WorkspaceMemberManagerContext,
+  target: { teamId: string | null; role: "OWNER" | "ADMIN" | "MEMBER" },
+  body: { role?: "OWNER" | "ADMIN" | "MEMBER"; teamId?: string | null }
+): string | null {
+  if (!isTeamScopedWorkspaceAdmin(context)) return null;
+  if (target.teamId !== context.teamId) {
+    return "You can only manage members in your team.";
+  }
+  if (target.role !== "MEMBER") {
+    return "Only owners can manage admins or owners.";
+  }
+  if (body.role !== undefined && body.role !== target.role) {
+    return "Only owners can change workspace roles.";
+  }
+  if (body.teamId !== undefined && body.teamId !== context.teamId) {
+    return body.teamId === null
+      ? "You cannot remove members from your team."
+      : "You can only assign members to your own team.";
+  }
+  return null;
+}
+
+export function formatAdminRouteError(
+  error: unknown,
+  fallbackMessage: string
+): { status: number; body: { error: string; message?: string } } {
+  if (error instanceof TeamContextRequiredError) {
+    return {
+      status: 403,
+      body: { error: TEAM_CONTEXT_REQUIRED_CODE, message: TEAM_CONTEXT_REQUIRED_MESSAGE },
+    };
+  }
+  const message = error instanceof Error ? error.message : fallbackMessage;
+  const status =
+    message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
+  return { status, body: { error: message } };
+}
+
 function isDatabaseUnavailableError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   const message = error.message.toLowerCase();
@@ -81,13 +190,7 @@ export async function requireAdminUserId(): Promise<string> {
   return session.user.id;
 }
 
-export async function requireWorkspaceMemberManagerContext(): Promise<{
-  userId: string;
-  workspaceId: string;
-  workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | null;
-  platformRole: "USER" | "TEAM_LEAD" | "ADMIN" | null;
-  teamId: string | null;
-}> {
+export async function requireWorkspaceMemberManagerContext(): Promise<WorkspaceMemberManagerContext> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     throw new Error("Unauthorized");

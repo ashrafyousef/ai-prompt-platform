@@ -10,29 +10,53 @@ type TeamRow = {
   memberCount: number;
 };
 
+type Viewer = {
+  workspaceRole: "OWNER" | "ADMIN" | "MEMBER" | null;
+  platformRole: "USER" | "TEAM_LEAD" | "ADMIN" | null;
+};
+
+function adminApiError(data: { error?: string; message?: string }, fallback: string): string {
+  if (data.message) return data.message;
+  return data.error ?? fallback;
+}
+
 export default function AdminTeamsPage() {
   const [teams, setTeams] = useState<TeamRow[]>([]);
+  const [viewer, setViewer] = useState<Viewer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createName, setCreateName] = useState("");
   const [creating, setCreating] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [draftName, setDraftName] = useState<Record<string, string>>({});
 
+  const viewerCanManageTeams =
+    viewer?.workspaceRole === "OWNER" || viewer?.platformRole === "ADMIN";
+
   async function load() {
     setLoading(true);
     setError(null);
+    setLoadFailed(false);
     try {
       const res = await fetch("/api/admin/teams");
-      const data = (await res.json()) as { error?: string; teams?: TeamRow[] };
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        viewer?: Viewer;
+        teams?: TeamRow[];
+      };
       if (!res.ok || !data.teams) {
-        setError(data.error ?? "Failed to load teams.");
+        setError(adminApiError(data, "Failed to load teams."));
+        setLoadFailed(true);
         return;
       }
+      setViewer(data.viewer ?? null);
       setTeams(data.teams);
       setDraftName(Object.fromEntries(data.teams.map((t) => [t.id, t.name])));
     } catch {
       setError("Failed to load teams.");
+      setLoadFailed(true);
     } finally {
       setLoading(false);
     }
@@ -57,9 +81,9 @@ export default function AdminTeamsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: createName.trim() }),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { error?: string; message?: string };
       if (!res.ok) {
-        setError(data.error ?? "Failed to create team.");
+        setError(adminApiError(data, "Failed to create team."));
         return;
       }
       setCreateName("");
@@ -80,9 +104,9 @@ export default function AdminTeamsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(next),
       });
-      const data = (await res.json()) as { error?: string };
+      const data = (await res.json()) as { error?: string; message?: string };
       if (!res.ok) {
-        setError(data.error ?? "Failed to update team.");
+        setError(adminApiError(data, "Failed to update team."));
         return;
       }
       await load();
@@ -95,6 +119,22 @@ export default function AdminTeamsPage() {
 
   if (loading) {
     return <div className="py-10 text-sm text-zinc-500">Loading teams...</div>;
+  }
+
+  if (loadFailed) {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Teams</h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Manage workspace teams and prepare team-scoped boundaries for agents and member access.
+          </p>
+        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
+          {error}
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -112,24 +152,26 @@ export default function AdminTeamsPage() {
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Create team</h3>
-        <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={onCreateTeam}>
-          <input
-            value={createName}
-            onChange={(e) => setCreateName(e.target.value)}
-            placeholder="Team name"
-            className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-          />
-          <button
-            type="submit"
-            disabled={creating}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            {creating ? "Creating..." : "Create"}
-          </button>
-        </form>
-      </section>
+      {viewerCanManageTeams ? (
+        <section className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
+          <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Create team</h3>
+          <form className="mt-3 flex flex-col gap-2 sm:flex-row" onSubmit={onCreateTeam}>
+            <input
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+              placeholder="Team name"
+              className="w-full rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            />
+            <button
+              type="submit"
+              disabled={creating}
+              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+            >
+              {creating ? "Creating..." : "Create"}
+            </button>
+          </form>
+        </section>
+      ) : null}
 
       <section className="space-y-3 md:hidden">
         <h3 className="px-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Workspace teams</h3>
@@ -175,14 +217,16 @@ export default function AdminTeamsPage() {
                 >
                   Save name
                 </button>
-                <button
-                  type="button"
-                  onClick={() => void saveTeam(team.id, { isArchived: !team.isArchived })}
-                  disabled={savingId === team.id}
-                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  {team.isArchived ? "Restore" : "Archive"}
-                </button>
+                {viewerCanManageTeams ? (
+                  <button
+                    type="button"
+                    onClick={() => void saveTeam(team.id, { isArchived: !team.isArchived })}
+                    disabled={savingId === team.id}
+                    className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                  >
+                    {team.isArchived ? "Restore" : "Archive"}
+                  </button>
+                ) : null}
               </div>
             </article>
           ))
@@ -224,14 +268,16 @@ export default function AdminTeamsPage() {
                     >
                       Save name
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => void saveTeam(team.id, { isArchived: !team.isArchived })}
-                      disabled={savingId === team.id}
-                      className="rounded-md bg-zinc-900 px-2 py-1 text-xs text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-                    >
-                      {team.isArchived ? "Restore" : "Archive"}
-                    </button>
+                    {viewerCanManageTeams ? (
+                      <button
+                        type="button"
+                        onClick={() => void saveTeam(team.id, { isArchived: !team.isArchived })}
+                        disabled={savingId === team.id}
+                        className="rounded-md bg-zinc-900 px-2 py-1 text-xs text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                      >
+                        {team.isArchived ? "Restore" : "Archive"}
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>
@@ -242,7 +288,7 @@ export default function AdminTeamsPage() {
 
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         Scoped access rule in this phase: workspace admins are constrained to their own team scope for member and invite
-        management, while owners keep full workspace visibility.
+        management, while owners and platform admins keep full workspace visibility.
       </p>
     </div>
   );

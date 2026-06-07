@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import {
+  assertTeamContextForScopedAdmin,
+  canCreateTeams,
+  formatAdminRouteError,
+  isTeamScopedWorkspaceAdmin,
+  requireWorkspaceMemberManagerContext,
+} from "@/lib/adminAuth";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(80),
@@ -20,17 +26,13 @@ function slugifyTeamName(name: string): string {
 export async function GET() {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
-    const scopedToOwnTeam =
-      auth.workspaceRole === "ADMIN" && auth.platformRole !== "ADMIN";
+    assertTeamContextForScopedAdmin(auth);
+    const scopedToOwnTeam = isTeamScopedWorkspaceAdmin(auth);
 
     const teams = await db.team.findMany({
       where: {
         workspaceId: auth.workspaceId,
-        ...(scopedToOwnTeam
-          ? {
-              id: auth.teamId ?? "__no_team__",
-            }
-          : {}),
+        ...(scopedToOwnTeam ? { id: auth.teamId! } : {}),
       },
       orderBy: { name: "asc" },
       select: {
@@ -46,6 +48,10 @@ export async function GET() {
       },
     });
     return NextResponse.json({
+      viewer: {
+        workspaceRole: auth.workspaceRole,
+        platformRole: auth.platformRole,
+      },
       teams: teams.map((t) => ({
         id: t.id,
         name: t.name,
@@ -55,15 +61,20 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load teams.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to load teams.");
+    return NextResponse.json(body, { status });
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    if (!canCreateTeams(auth)) {
+      return NextResponse.json(
+        { error: "Only workspace owners or platform admins can create teams." },
+        { status: 403 }
+      );
+    }
     const body = createSchema.parse(await req.json());
     const existing = await db.team.findFirst({
       where: {
@@ -97,13 +108,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ team: created });
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? "Invalid team input."
-        : error instanceof Error
-          ? error.message
-          : "Failed to create team.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid team input." }, { status: 400 });
+    }
+    const { status, body } = formatAdminRouteError(error, "Failed to create team.");
+    return NextResponse.json(body, { status: status === 500 ? 400 : status });
   }
 }
