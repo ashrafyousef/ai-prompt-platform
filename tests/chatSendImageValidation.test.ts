@@ -4,6 +4,7 @@ const getServerSession = vi.fn();
 const checkRateLimit = vi.fn();
 const readFile = vi.fn();
 const prepareOrchestrator = vi.fn();
+const getGovernedModelsForUser = vi.fn();
 
 vi.mock("next/server", () => ({
   NextResponse: {
@@ -29,7 +30,7 @@ vi.mock("fs/promises", () => ({
 }));
 
 vi.mock("@/lib/usage", () => ({
-  getGovernedModelsForUser: vi.fn(),
+  getGovernedModelsForUser,
   assertUserWithinSoftTokenLimit: vi.fn(),
   assertModelAccessForRole: vi.fn(),
 }));
@@ -67,6 +68,8 @@ vi.mock("@/lib/sentry", () => ({
 const userId = "11111111-1111-4111-8111-111111111111";
 const validUuid = "aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee";
 const validLocal = `/uploads/${validUuid}.png`;
+const productionBlobUrl =
+  "https://iudfi1f90ecnygej.public.blob.vercel-storage.com/chat/cmofhx9vf00018zjke53igowg/18ee2653-7fc3-4d3d-8f24-bc9b401e0024.jpg";
 
 describe("chat send route image validation", () => {
   beforeEach(() => {
@@ -76,6 +79,7 @@ describe("chat send route image validation", () => {
       user: { id: userId, role: "USER", teamId: null },
     });
     checkRateLimit.mockResolvedValue({ allowed: true });
+    getGovernedModelsForUser.mockRejectedValue(new Error("STOP_AFTER_IMAGE_VALIDATION"));
   });
 
   async function post(imageUrls?: string[]) {
@@ -129,6 +133,17 @@ describe("chat send route image validation", () => {
     ]);
     expect(res.status).toBe(400);
     expect(prepareOrchestrator).not.toHaveBeenCalled();
+    expect(readFile).not.toHaveBeenCalled();
+  });
+
+  it("accepts the production Blob URL shape and advances past image validation", async () => {
+    getServerSession.mockResolvedValue({
+      user: { id: "cmofhx9vf00018zjke53igowg", role: "USER", teamId: null },
+    });
+
+    await post([productionBlobUrl]);
+
+    expect(getGovernedModelsForUser).toHaveBeenCalled();
     expect(readFile).not.toHaveBeenCalled();
   });
 });

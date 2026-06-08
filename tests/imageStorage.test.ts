@@ -3,24 +3,25 @@ import {
   INVALID_IMAGE_REFERENCE_MESSAGE,
   InvalidImageReferenceError,
   detectImageTypeFromBytes,
-  getBlobStoreHost,
   normalizeClaimedImageMime,
   resolveValidatedLocalUploadPath,
+  saveChatImage,
   validateChatImageReference,
   validateChatImageReferences,
 } from "@/lib/imageStorage";
 
 const userId = "11111111-1111-4111-8111-111111111111";
 const validUuid = "aaaaaaaa-bbbb-4ccc-dddd-eeeeeeeeeeee";
+const productionUserId = "cmofhx9vf00018zjke53igowg";
+const productionBlobUrl =
+  "https://iudfi1f90ecnygej.public.blob.vercel-storage.com/chat/cmofhx9vf00018zjke53igowg/18ee2653-7fc3-4d3d-8f24-bc9b401e0024.jpg";
 
 function localPath(ext: string): string {
   return `/uploads/${validUuid}.${ext}`;
 }
 
 function blobUrl(user: string = userId, ext = "png"): string {
-  const host = getBlobStoreHost();
-  if (!host) throw new Error("Blob host not configured in test");
-  return `https://${host}/chat/${user}/${validUuid}.${ext}`;
+  return `https://iudfi1f90ecnygej.public.blob.vercel-storage.com/chat/${user}/${validUuid}.${ext}`;
 }
 
 describe("validateChatImageReference local uploads", () => {
@@ -58,23 +59,22 @@ describe("validateChatImageReference local uploads", () => {
 });
 
 describe("validateChatImageReference blob uploads", () => {
-  beforeEach(() => {
-    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_teststore_suffix");
-  });
-
-  afterEach(() => {
-    vi.unstubAllEnvs();
-  });
-
   it("accepts configured blob URLs for the current user", () => {
     expect(() => validateChatImageReference(blobUrl(), userId)).not.toThrow();
   });
 
+  it("accepts the production Vercel Blob URL returned by saveChatImage", () => {
+    expect(() =>
+      validateChatImageReference(productionBlobUrl, productionUserId)
+    ).not.toThrow();
+  });
+
   it("rejects wrong blob host, user path, and insecure schemes", () => {
-    const host = getBlobStoreHost()!;
+    const host = "iudfi1f90ecnygej.public.blob.vercel-storage.com";
     const rejected = [
       `http://${host}/chat/${userId}/${validUuid}.png`,
       `https://evil.public.blob.vercel-storage.com/chat/${userId}/${validUuid}.png`,
+      `https://iudfi1f90ecnygej.public.blob.vercel-storage.com.evil.example/chat/${userId}/${validUuid}.png`,
       `https://${host}/chat/other-user/${validUuid}.png`,
       `https://${host}/chat/${userId}/${validUuid}.png?sig=1`,
       `https://${host}/chat/${userId}/${validUuid}.png#x`,
@@ -87,6 +87,61 @@ describe("validateChatImageReference blob uploads", () => {
     for (const url of rejected) {
       expect(() => validateChatImageReference(url, userId)).toThrow(InvalidImageReferenceError);
     }
+  });
+});
+
+describe("saveChatImage blob response contract", () => {
+  beforeEach(() => {
+    vi.stubEnv("VERCEL", "1");
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_legacytokenid_suffix");
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("returns a provider Blob URL accepted by chat validation", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ url: productionBlobUrl }),
+      })
+    );
+
+    const result = await saveChatImage({
+      bytes: Buffer.from([0xff, 0xd8, 0xff]),
+      ext: "jpg",
+      contentType: "image/jpeg",
+      userId: productionUserId,
+    });
+
+    expect(result.url).toBe(productionBlobUrl);
+    expect(() =>
+      validateChatImageReference(result.url, productionUserId)
+    ).not.toThrow();
+  });
+
+  it("rejects an invalid host returned by the Blob provider", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          url: `https://example.com/chat/${productionUserId}/${validUuid}.jpg`,
+        }),
+      })
+    );
+
+    await expect(
+      saveChatImage({
+        bytes: Buffer.from([0xff, 0xd8, 0xff]),
+        ext: "jpg",
+        contentType: "image/jpeg",
+        userId: productionUserId,
+      })
+    ).rejects.toBeInstanceOf(InvalidImageReferenceError);
   });
 });
 

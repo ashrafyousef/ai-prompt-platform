@@ -15,6 +15,8 @@ const LOCAL_UPLOAD_PATH_REGEX =
   /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|gif|webp)$/i;
 const UPLOAD_FILENAME_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|gif|webp)$/i;
+const VERCEL_PUBLIC_BLOB_HOST_REGEX =
+  /^[a-z0-9]{16}\.public\.blob\.vercel-storage\.com$/;
 
 export class InvalidImageReferenceError extends Error {
   constructor(message: string = INVALID_IMAGE_REFERENCE_MESSAGE) {
@@ -44,14 +46,6 @@ export function parseStoreIdFromReadWriteToken(token: string): string {
   return storeId;
 }
 
-export function getBlobStoreHost(): string | null {
-  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  if (!token) return null;
-  const storeId = parseStoreIdFromReadWriteToken(token);
-  if (!storeId) return null;
-  return `${storeId}.public.blob.vercel-storage.com`;
-}
-
 function rejectUnsafeImageReferenceShape(url: string): void {
   if (
     url.includes("\\") ||
@@ -77,10 +71,6 @@ function validateLocalUploadReference(url: string): void {
 
 function validateBlobImageReference(url: string, userId: string): void {
   rejectUnsafeImageReferenceShape(url);
-  const expectedHost = getBlobStoreHost();
-  if (!expectedHost) {
-    throw new InvalidImageReferenceError();
-  }
 
   let parsed: URL;
   try {
@@ -95,7 +85,7 @@ function validateBlobImageReference(url: string, userId: string): void {
   if (parsed.username || parsed.password || parsed.port) {
     throw new InvalidImageReferenceError();
   }
-  if (parsed.hostname !== expectedHost) {
+  if (!VERCEL_PUBLIC_BLOB_HOST_REGEX.test(parsed.hostname)) {
     throw new InvalidImageReferenceError();
   }
   if (parsed.search || parsed.hash) {
@@ -188,11 +178,13 @@ async function putBlobViaFetch({
   bytes,
   contentType,
   token,
+  userId,
 }: {
   pathname: string;
   bytes: Buffer;
   contentType: string;
   token: string;
+  userId: string;
 }): Promise<{ url: string }> {
   const storeId = parseStoreIdFromReadWriteToken(token);
   const params = new URLSearchParams({ pathname });
@@ -220,6 +212,7 @@ async function putBlobViaFetch({
     throw new Error("BLOB_UPLOAD_FAILED");
   }
 
+  validateBlobImageReference(data.url, userId);
   return { url: data.url };
 }
 
@@ -254,5 +247,6 @@ export async function saveChatImage({
     bytes,
     contentType,
     token,
+    userId,
   });
 }
