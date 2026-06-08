@@ -237,9 +237,6 @@ export function ChatClient() {
 
   const handleAgentChange = (id: string) => {
     if (id === activeAgentId) return;
-    if (messages.length > 0) {
-      setActiveSessionId(undefined);
-    }
     setActiveAgentId(id);
     const uid = session?.user?.id;
     if (uid && typeof window !== "undefined") {
