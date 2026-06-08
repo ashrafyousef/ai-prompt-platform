@@ -81,6 +81,7 @@ export async function POST(req: NextRequest) {
         { status: 403 }
       );
     }
+    const invitationTeamId = scopedToOwnTeam ? auth.teamId! : body.teamId ?? null;
 
     const limit = await checkRateLimit({
       userId: `invite:${auth.userId}`,
@@ -95,12 +96,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (body.teamId) {
-      const team = await db.team.findUnique({
-        where: { id: body.teamId },
-        select: { id: true, workspaceId: true },
+    if (invitationTeamId) {
+      const team = await db.team.findFirst({
+        where: {
+          id: invitationTeamId,
+          workspaceId: auth.workspaceId,
+          isArchived: false,
+        },
+        select: { id: true },
       });
-      if (!team || (team.workspaceId && team.workspaceId !== auth.workspaceId)) {
+      if (!team) {
         return NextResponse.json({ error: "Team not found." }, { status: 400 });
       }
     }
@@ -139,7 +144,7 @@ export async function POST(req: NextRequest) {
       invitedById: auth.userId,
       email: body.email,
       role: body.role,
-      teamId: scopedToOwnTeam ? auth.teamId! : body.teamId ?? null,
+      teamId: invitationTeamId,
     });
 
     const workspace = await db.workspace.findUnique({
@@ -169,7 +174,7 @@ export async function POST(req: NextRequest) {
         id: issued.invitationId,
         email: body.email,
         role: body.role,
-        teamId: scopedToOwnTeam ? auth.teamId! : body.teamId ?? null,
+        teamId: invitationTeamId,
         expiresAt: issued.expiresAt.toISOString(),
       },
       ...(process.env.NODE_ENV !== "production" ? { inviteUrl } : {}),

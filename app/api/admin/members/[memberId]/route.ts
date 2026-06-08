@@ -80,11 +80,15 @@ export async function PATCH(
     }
 
     if (body.teamId !== undefined && body.teamId !== null) {
-      const team = await db.team.findUnique({
-        where: { id: body.teamId },
-        select: { id: true, workspaceId: true },
+      const team = await db.team.findFirst({
+        where: {
+          id: body.teamId,
+          workspaceId: auth.workspaceId,
+          isArchived: false,
+        },
+        select: { id: true },
       });
-      if (!team || (team.workspaceId && team.workspaceId !== auth.workspaceId)) {
+      if (!team) {
         return NextResponse.json({ error: "Team not found." }, { status: 400 });
       }
     }

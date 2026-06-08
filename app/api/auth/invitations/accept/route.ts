@@ -105,6 +105,34 @@ export async function POST(req: NextRequest) {
       const currentState = invitationState(current);
       if (currentState !== "valid") return { ok: false as const, code: currentState };
 
+      if (current.teamId) {
+        const team = await tx.team.findFirst({
+          where: {
+            id: current.teamId,
+            workspaceId: current.workspaceId,
+            isArchived: false,
+          },
+          select: { id: true },
+        });
+        if (!team) return { ok: false as const, code: "INVALID_TEAM" };
+      }
+
+      const consumed = await tx.workspaceInvitation.updateMany({
+        where: {
+          id: current.id,
+          acceptedAt: null,
+          revokedAt: null,
+          expiresAt: { gt: new Date() },
+        },
+        data: {
+          acceptedAt: new Date(),
+        },
+      });
+
+      if (consumed.count !== 1) {
+        return { ok: false as const, code: "ALREADY_USED" };
+      }
+
       let user = await tx.user.findUnique({
         where: { email: current.email },
         select: { id: true, passwordHash: true },
@@ -154,19 +182,6 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      const consumed = await tx.workspaceInvitation.updateMany({
-        where: {
-          id: current.id,
-          acceptedAt: null,
-          revokedAt: null,
-          expiresAt: { gt: new Date() },
-        },
-        data: {
-          acceptedAt: new Date(),
-        },
-      });
-
-      if (consumed.count !== 1) return { ok: false as const, code: "ALREADY_USED" };
       return { ok: true as const };
     });
 
