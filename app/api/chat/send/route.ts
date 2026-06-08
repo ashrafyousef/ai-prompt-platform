@@ -6,6 +6,13 @@ import { getServerSession } from "next-auth";
 import { authOptions, resolveModelGovernanceRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+  INVALID_IMAGE_REFERENCE_MESSAGE,
+  InvalidImageReferenceError,
+  isBlobImageReference,
+  resolveValidatedLocalUploadPath,
+  validateChatImageReferences,
+} from "@/lib/imageStorage";
+import {
   applyFirstTurnTitleFallback,
   charEstimateFromMessages,
   finalizeAssistantMessage,
@@ -38,9 +45,8 @@ const MIME_MAP: Record<string, string> = {
 };
 
 async function toBase64DataUri(url: string): Promise<string> {
-  if (url.startsWith("data:")) return url;
-  if (url.startsWith("http")) return url;
-  const filePath = path.join(process.cwd(), "public", url);
+  if (isBlobImageReference(url)) return url;
+  const filePath = resolveValidatedLocalUploadPath(url);
   const buffer = await readFile(filePath);
   const ext = path.extname(filePath).slice(1).toLowerCase();
   const mime = MIME_MAP[ext] ?? "image/png";
@@ -218,6 +224,16 @@ export async function POST(req: NextRequest) {
         { error: "You can attach up to 4 images per message." },
         { status: 400 }
       );
+    }
+    if (payload.imageUrls?.length) {
+      try {
+        validateChatImageReferences(payload.imageUrls, userId);
+      } catch (error) {
+        if (error instanceof InvalidImageReferenceError) {
+          return NextResponse.json({ error: INVALID_IMAGE_REFERENCE_MESSAGE }, { status: 400 });
+        }
+        throw error;
+      }
     }
     titleFallbackContext = {
       sessionId: payload.sessionId,
