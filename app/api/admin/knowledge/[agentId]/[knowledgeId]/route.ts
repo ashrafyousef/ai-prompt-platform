@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import { requireWorkspaceMemberManagerContext, formatAdminRouteError } from "@/lib/adminAuth";
 import { normalizeAgentInputSchema } from "@/lib/agentConfig";
-import { canManageKnowledgeForActor } from "@/lib/knowledgeScope";
+import { assertCanManageAgentForActor, assertAdminAgentTeamContext } from "@/lib/agentScope";
+import { assertCanMutateKnowledgeForActor } from "@/lib/knowledgeScope";
 
 const schema = z.object({
   isActive: z.boolean(),
@@ -16,6 +17,7 @@ export async function PATCH(
 ) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const body = schema.parse(await req.json());
     const agent = await db.agentConfig.findUnique({
       where: { id: params.agentId },
@@ -31,15 +33,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
 
-    const actor = {
-      workspaceId: auth.workspaceId,
-      workspaceRole: auth.workspaceRole,
-      platformRole: auth.platformRole,
-      teamId: auth.teamId,
-    };
-    if (!canManageKnowledgeForActor(actor, agent)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    assertCanManageAgentForActor(auth, agent);
 
     const link = await db.agentKnowledge.findFirst({
       where: {
@@ -54,6 +48,19 @@ export async function PATCH(
 
     let legacyMatchId: string | null = null;
     if (link) {
+      const allLinks = await db.agentKnowledge.findMany({
+        where: { knowledgeId: link.knowledgeId },
+        select: {
+          agent: {
+            select: { workspaceId: true, scope: true, teamId: true },
+          },
+        },
+      });
+      assertCanMutateKnowledgeForActor(
+        auth,
+        allLinks.map((entry) => entry.agent)
+      );
+
       await db.knowledgeItem.update({
         where: { id: link.knowledgeId },
         data: { isActive: body.isActive },
@@ -95,13 +102,7 @@ export async function PATCH(
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message =
-      error instanceof z.ZodError
-        ? "Invalid knowledge update input."
-        : error instanceof Error
-          ? error.message
-          : "Failed to update knowledge.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to update knowledge.");
+    return NextResponse.json(body, { status });
   }
 }

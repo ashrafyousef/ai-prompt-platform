@@ -1,5 +1,6 @@
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
+import { z } from "zod";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { resolveWorkspaceAccessForUser } from "@/lib/workspaceAccess";
@@ -14,6 +15,15 @@ export class TeamContextRequiredError extends Error {
   constructor() {
     super(TEAM_CONTEXT_REQUIRED_MESSAGE);
     this.name = "TeamContextRequiredError";
+  }
+}
+
+export const TEAM_SCOPE_REQUIRES_TEAM_MESSAGE = "TEAM scoped agents require a team.";
+
+export class AdminValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AdminValidationError";
   }
 }
 
@@ -107,9 +117,24 @@ export function formatAdminRouteError(
       body: { error: TEAM_CONTEXT_REQUIRED_CODE, message: TEAM_CONTEXT_REQUIRED_MESSAGE },
     };
   }
+  if (error instanceof z.ZodError) {
+    return { status: 400, body: { error: "Invalid input." } };
+  }
+  if (error instanceof AdminValidationError) {
+    return { status: 400, body: { error: error.message } };
+  }
   const message = error instanceof Error ? error.message : fallbackMessage;
-  const status =
-    message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
+  if (message === TEAM_SCOPE_REQUIRES_TEAM_MESSAGE) {
+    return { status: 400, body: { error: message } };
+  }
+  const isForbidden =
+    message === "Forbidden" ||
+    message.startsWith("Workspace admins can only manage") ||
+    message.startsWith("You can only manage");
+  const status = message === "Unauthorized" ? 401 : isForbidden ? 403 : 500;
+  if (status === 403 && message !== "Forbidden") {
+    return { status, body: { error: "Forbidden", message } };
+  }
   return { status, body: { error: message } };
 }
 

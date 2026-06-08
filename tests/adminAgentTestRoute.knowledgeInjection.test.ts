@@ -2,7 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const requireWorkspaceMemberManagerContext = vi.fn();
 const createChatCompletion = vi.fn();
-const canManageAgentForActor = vi.fn();
+const assertCanManageAgentForActor = vi.fn();
+const assertAdminAgentTeamContext = vi.fn();
 const logJson = vi.fn();
 
 const db = {
@@ -13,6 +14,10 @@ const db = {
 
 vi.mock("@/lib/adminAuth", () => ({
   requireWorkspaceMemberManagerContext,
+  formatAdminRouteError: vi.fn((error: unknown, fallback: string) => ({
+    status: 500,
+    body: { error: error instanceof Error ? error.message : fallback },
+  })),
 }));
 
 vi.mock("@/lib/openai/client", () => ({
@@ -20,7 +25,8 @@ vi.mock("@/lib/openai/client", () => ({
 }));
 
 vi.mock("@/lib/agentScope", () => ({
-  canManageAgentForActor,
+  assertCanManageAgentForActor,
+  assertAdminAgentTeamContext,
 }));
 
 vi.mock("@/lib/logger", () => ({
@@ -45,6 +51,7 @@ vi.mock("next/server", () => ({
 describe("admin agent test route knowledge telemetry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    assertAdminAgentTeamContext.mockImplementation(() => undefined);
   });
 
   it("propagates standardized knowledge injection metadata in logs and response", async () => {
@@ -54,7 +61,7 @@ describe("admin agent test route knowledge telemetry", () => {
       platformRole: "ADMIN",
       teamId: null,
     });
-    canManageAgentForActor.mockReturnValue(true);
+    assertCanManageAgentForActor.mockImplementation(() => undefined);
     db.agentConfig.findUnique.mockResolvedValue({
       id: "agent-1",
       name: "Helper",
@@ -112,7 +119,7 @@ describe("admin agent test route knowledge telemetry", () => {
       platformRole: "ADMIN",
       teamId: null,
     });
-    canManageAgentForActor.mockReturnValue(true);
+    assertCanManageAgentForActor.mockImplementation(() => undefined);
     db.agentConfig.findUnique.mockResolvedValue({
       id: "agent-2",
       name: "No Knowledge",

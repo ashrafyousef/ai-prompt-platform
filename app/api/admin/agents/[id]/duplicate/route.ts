@@ -1,20 +1,19 @@
 import { NextResponse } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
-import { canManageAgentForActor } from "@/lib/agentScope";
+import { requireWorkspaceMemberManagerContext, formatAdminRouteError } from "@/lib/adminAuth";
+import { assertCanManageAgentForActor, assertAdminAgentTeamContext } from "@/lib/agentScope";
 import { replaceAgentKnowledgeFromInputSchema } from "@/lib/knowledgeRepository";
 
 export async function POST(_req: Request, { params }: { params: { id: string } }) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const orig = await db.agentConfig.findUnique({ where: { id: params.id } });
     if (!orig) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
-    if (!canManageAgentForActor(auth, orig)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    assertCanManageAgentForActor(auth, orig);
 
     const base = `${orig.slug}-copy`;
     let slug = base;
@@ -68,8 +67,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       agent: { ...created, updatedAt: created.updatedAt.toISOString() },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Duplicate failed.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Duplicate failed.");
+    return NextResponse.json(body, { status });
   }
 }

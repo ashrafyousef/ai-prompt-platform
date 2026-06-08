@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { AgentScope, type AgentStatus, type Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
-import { assertCanAssignScopeForActor } from "@/lib/agentScope";
+import { requireWorkspaceMemberManagerContext, formatAdminRouteError } from "@/lib/adminAuth";
+import {
+  buildAdminAgentListWhere,
+  assertCanAssignScopeForActor,
+  assertAdminAgentTeamContext,
+} from "@/lib/agentScope";
 import { replaceAgentKnowledgeFromInputSchema } from "@/lib/knowledgeRepository";
 
 /* ------------------------------------------------------------------ */
@@ -91,6 +95,7 @@ function toKnowledgeItems(
 export async function POST(req: NextRequest) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const body = createSchema.parse(await req.json());
     if (body.teamId) {
       const team = await db.team.findUnique({
@@ -226,10 +231,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ agent: created }, { status: 201 });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Create failed.";
-    const status =
-      message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 400;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Create failed.");
+    return NextResponse.json(body, { status });
   }
 }
 
@@ -240,6 +243,7 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const { searchParams } = req.nextUrl;
     const q = searchParams.get("q")?.trim() ?? "";
     const status = searchParams.get("status");
@@ -247,40 +251,7 @@ export async function GET(req: NextRequest) {
     const teamId = searchParams.get("teamId");
     const sort = searchParams.get("sort") ?? "updatedAt_desc";
 
-    const where: Prisma.AgentConfigWhereInput = {
-      workspaceId: auth.workspaceId,
-    };
-
-    const scopedToTeam =
-      auth.workspaceRole === "ADMIN" && auth.platformRole !== "ADMIN";
-    if (scopedToTeam) {
-      where.OR = [
-        { scope: AgentScope.GLOBAL },
-        ...(auth.teamId ? [{ scope: AgentScope.TEAM, teamId: auth.teamId }] : []),
-      ];
-    }
-    if (q.length > 0) {
-      const searchOr: Prisma.AgentConfigWhereInput[] = [
-        { name: { contains: q, mode: "insensitive" } },
-        { description: { contains: q, mode: "insensitive" } },
-        { slug: { contains: q, mode: "insensitive" } },
-      ];
-      if (where.OR && Array.isArray(where.OR)) {
-        where.AND = [{ OR: where.OR }, { OR: searchOr }];
-        delete where.OR;
-      } else {
-        where.OR = searchOr;
-      }
-    }
-    if (status && status !== "ALL") {
-      where.status = status as AgentStatus;
-    }
-    if (scope && scope !== "ALL") {
-      where.scope = scope as AgentScope;
-    }
-    if (teamId && teamId !== "ALL") {
-      where.teamId = teamId === "none" ? null : teamId;
-    }
+    const where = buildAdminAgentListWhere(auth, { q, status, scope, teamId });
 
     let orderBy: Prisma.AgentConfigOrderByWithRelationInput = { updatedAt: "desc" };
     if (sort === "createdAt_desc") orderBy = { createdAt: "desc" };
@@ -311,8 +282,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ agents });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load agents.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to load agents.");
+    return NextResponse.json(body, { status });
   }
 }

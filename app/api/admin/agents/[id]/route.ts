@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import { requireWorkspaceMemberManagerContext, formatAdminRouteError } from "@/lib/adminAuth";
 import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
-import { assertCanAssignScopeForActor, canManageAgentForActor } from "@/lib/agentScope";
+import {
+  assertCanAssignScopeForActor,
+  assertCanManageAgentForActor,
+  assertAdminAgentTeamContext,
+} from "@/lib/agentScope";
 import { replaceAgentKnowledgeFromInputSchema } from "@/lib/knowledgeRepository";
 
 /* ------------------------------------------------------------------ */
@@ -14,6 +18,7 @@ import { replaceAgentKnowledgeFromInputSchema } from "@/lib/knowledgeRepository"
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const agent = await db.agentConfig.findUnique({
       where: { id: params.id },
       include: {
@@ -47,9 +52,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
-    if (!canManageAgentForActor(auth, agent)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    assertCanManageAgentForActor(auth, agent);
     return NextResponse.json({
       agent: {
         ...agent,
@@ -59,9 +62,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load agent.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to load agent.");
+    return NextResponse.json(body, { status });
   }
 }
 
@@ -87,6 +89,7 @@ const patchSchema = z.object({
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const body = patchSchema.parse(await req.json());
     const id = params.id;
 
@@ -102,9 +105,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (!existing) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
-    if (!canManageAgentForActor(auth, existing)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    assertCanManageAgentForActor(auth, existing);
 
     const data = Object.fromEntries(
       Object.entries(body).filter(([, v]) => v !== undefined)
@@ -190,13 +191,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Update failed.";
-    const status =
-      message === "Unauthorized" ? 401
-      : message === "Forbidden" ? 403
-      : message.includes("Record") ? 404
-      : 400;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Update failed.");
+    return NextResponse.json(body, { status });
   }
 }
 
@@ -207,6 +203,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const existing = await db.agentConfig.findUnique({
       where: { id: params.id },
       select: { id: true, workspaceId: true, scope: true, teamId: true },
@@ -214,14 +211,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     if (!existing) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
-    if (!canManageAgentForActor(auth, existing)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    assertCanManageAgentForActor(auth, existing);
     await db.agentConfig.delete({ where: { id: params.id } });
     return NextResponse.json({ ok: true });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Delete failed.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Delete failed.");
+    return NextResponse.json(body, { status });
   }
 }

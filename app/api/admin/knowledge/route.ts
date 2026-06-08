@@ -1,16 +1,16 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import { requireWorkspaceMemberManagerContext, formatAdminRouteError } from "@/lib/adminAuth";
 import { normalizeAgentInputSchema } from "@/lib/agentConfig";
+import { adminAgentScopeWhere, assertAdminAgentTeamContext, toAgentActorContext } from "@/lib/agentScope";
 import { canViewKnowledgeForActor } from "@/lib/knowledgeScope";
 
 export async function GET() {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const rows = await db.agentConfig.findMany({
-      where: {
-        workspaceId: auth.workspaceId,
-      },
+      where: adminAgentScopeWhere(auth),
       orderBy: { updatedAt: "desc" },
       select: {
         id: true,
@@ -39,12 +39,7 @@ export async function GET() {
       },
     });
 
-    const actor = {
-      workspaceId: auth.workspaceId,
-      workspaceRole: auth.workspaceRole,
-      platformRole: auth.platformRole,
-      teamId: auth.teamId,
-    };
+    const actor = toAgentActorContext(auth);
 
     const knowledge = rows
       .filter((agent) => canViewKnowledgeForActor(actor, agent))
@@ -86,8 +81,7 @@ export async function GET() {
 
     return NextResponse.json({ knowledge });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load knowledge.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to load knowledge.");
+    return NextResponse.json(body, { status });
   }
 }

@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import { requireWorkspaceMemberManagerContext, formatAdminRouteError } from "@/lib/adminAuth";
 import { createChatCompletion } from "@/lib/openai/client";
 import { buildEffectiveAgentConfig } from "@/lib/agentEffectiveConfig";
 import type { AgentOutputConfig } from "@/lib/agentConfig";
-import { canManageAgentForActor } from "@/lib/agentScope";
+import { assertCanManageAgentForActor, assertAdminAgentTeamContext } from "@/lib/agentScope";
 import { buildInjectedKnowledgeBlock, toKnowledgeInjectionTelemetry } from "@/lib/knowledgeInjection";
 import { logJson } from "@/lib/logger";
 
@@ -50,6 +50,7 @@ function buildOutputInstructions(config: AgentOutputConfig): string {
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const { prompt } = testSchema.parse(await req.json());
 
     const agent = await db.agentConfig.findUnique({
@@ -83,9 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!agent) {
       return NextResponse.json({ error: "Agent not found." }, { status: 404 });
     }
-    if (!canManageAgentForActor(auth, agent)) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    assertCanManageAgentForActor(auth, agent);
 
     const effective = buildEffectiveAgentConfig(agent);
     const knowledgeInjection = buildInjectedKnowledgeBlock(effective.knowledgeItems);
@@ -146,8 +145,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Test failed.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Test failed.");
+    return NextResponse.json(body, { status });
   }
 }

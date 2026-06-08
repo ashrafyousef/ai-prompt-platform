@@ -1,11 +1,25 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import {
+  requireWorkspaceMemberManagerContext,
+  formatAdminRouteError,
+  isTeamScopedWorkspaceAdmin,
+} from "@/lib/adminAuth";
+import {
+  adminAgentScopeWhere,
+  assertAdminAgentTeamContext,
+  filterManageableAgentLinks,
+  toAgentActorContext,
+} from "@/lib/agentScope";
 
 export async function GET() {
   try {
     const auth = await requireWorkspaceMemberManagerContext();
+    assertAdminAgentTeamContext(auth);
     const workspaceId = auth.workspaceId;
+    const agentWhere = adminAgentScopeWhere(auth);
+    const teamScopedAdmin = isTeamScopedWorkspaceAdmin(auth);
+    const actor = toAgentActorContext(auth);
 
     const [
       total,
@@ -23,24 +37,47 @@ export async function GET() {
       draftAgentsRaw,
       archivedAgentsRaw,
     ] = await Promise.all([
-      db.agentConfig.count({ where: { workspaceId } }),
-      db.agentConfig.count({ where: { workspaceId, status: "PUBLISHED" } }),
-      db.agentConfig.count({ where: { workspaceId, status: "DRAFT" } }),
-      db.agentConfig.count({ where: { workspaceId, status: "ARCHIVED" } }),
-      db.agentConfig.count({ where: { workspaceId, scope: "GLOBAL" } }),
-      db.agentConfig.count({ where: { workspaceId, scope: "TEAM" } }),
+      db.agentConfig.count({ where: agentWhere }),
+      db.agentConfig.count({ where: { ...agentWhere, status: "PUBLISHED" } }),
+      db.agentConfig.count({ where: { ...agentWhere, status: "DRAFT" } }),
+      db.agentConfig.count({ where: { ...agentWhere, status: "ARCHIVED" } }),
+      teamScopedAdmin
+        ? Promise.resolve(0)
+        : db.agentConfig.count({ where: { workspaceId, scope: "GLOBAL" } }),
+      db.agentConfig.count({ where: { ...agentWhere, scope: "TEAM" } }),
       db.team.findMany({
-        where: { workspaceId },
+        where: teamScopedAdmin && auth.teamId
+          ? { workspaceId, id: auth.teamId }
+          : { workspaceId },
         orderBy: { name: "asc" },
         include: { _count: { select: { agents: true, workspaceMembers: true } } },
       }),
-      db.workspaceMember.count({ where: { workspaceId } }),
-      db.workspaceMember.count({ where: { workspaceId, isActive: true } }),
-      db.knowledgeItem.count({ where: { workspaceId } }),
-      db.knowledgeItem.count({ where: { workspaceId, isActive: true } }),
+      teamScopedAdmin
+        ? db.workspaceMember.count({ where: { workspaceId, teamId: auth.teamId! } })
+        : db.workspaceMember.count({ where: { workspaceId } }),
+      teamScopedAdmin
+        ? db.workspaceMember.count({ where: { workspaceId, teamId: auth.teamId!, isActive: true } })
+        : db.workspaceMember.count({ where: { workspaceId, isActive: true } }),
+      teamScopedAdmin && auth.teamId
+        ? db.knowledgeItem.count({
+            where: {
+              workspaceId,
+              agentLinks: { some: { agent: { scope: "TEAM", teamId: auth.teamId } } },
+            },
+          })
+        : db.knowledgeItem.count({ where: { workspaceId } }),
+      teamScopedAdmin && auth.teamId
+        ? db.knowledgeItem.count({
+            where: {
+              workspaceId,
+              isActive: true,
+              agentLinks: { some: { agent: { scope: "TEAM", teamId: auth.teamId } } },
+            },
+          })
+        : db.knowledgeItem.count({ where: { workspaceId, isActive: true } }),
       db.agentConfig.findMany({
         take: 8,
-        where: { workspaceId },
+        where: agentWhere,
         orderBy: { updatedAt: "desc" },
         select: {
           id: true,
@@ -51,7 +88,7 @@ export async function GET() {
         },
       }),
       db.agentConfig.findMany({
-        where: { workspaceId, status: "DRAFT" },
+        where: { ...agentWhere, status: "DRAFT" },
         orderBy: { updatedAt: "desc" },
         take: 5,
         select: {
@@ -62,7 +99,7 @@ export async function GET() {
         },
       }),
       db.agentConfig.findMany({
-        where: { workspaceId, status: "ARCHIVED" },
+        where: { ...agentWhere, status: "ARCHIVED" },
         orderBy: { updatedAt: "desc" },
         take: 5,
         select: {
@@ -81,7 +118,9 @@ export async function GET() {
     }));
 
     const archivedTeams = teams.filter((team) => team.isArchived).length;
-    const unassigned = await db.agentConfig.count({ where: { workspaceId, teamId: null } });
+    const unassigned = teamScopedAdmin
+      ? 0
+      : await db.agentConfig.count({ where: { workspaceId, teamId: null } });
     if (unassigned > 0) {
       byTeam.push({
         teamId: null,
@@ -121,14 +160,21 @@ export async function GET() {
       where: {
         workspaceId,
         isActive: false,
+        ...(teamScopedAdmin && auth.teamId
+          ? { agentLinks: { some: { agent: { scope: "TEAM", teamId: auth.teamId } } } }
+          : {}),
       },
       select: {
         agentLinks: {
+          ...(teamScopedAdmin ? { where: { agent: agentWhere } } : {}),
           select: {
             agent: {
               select: {
                 id: true,
                 name: true,
+                workspaceId: true,
+                scope: true,
+                teamId: true,
                 team: { select: { name: true } },
               },
             },
@@ -142,7 +188,7 @@ export async function GET() {
       { agentId: string; agentName: string; teamName: string | null; inactiveCount: number }
     >();
     for (const item of inactiveKnowledgeItems) {
-      for (const link of item.agentLinks) {
+      for (const link of filterManageableAgentLinks(actor, item.agentLinks)) {
         const key = link.agent.id;
         const prev = inactiveKnowledgeMap.get(key);
         if (prev) {
@@ -226,8 +272,7 @@ export async function GET() {
       recent,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to load overview.";
-    const status = message === "Unauthorized" ? 401 : message === "Forbidden" ? 403 : 500;
-    return NextResponse.json({ error: message }, { status });
+    const { status, body } = formatAdminRouteError(error, "Failed to load overview.");
+    return NextResponse.json(body, { status });
   }
 }
