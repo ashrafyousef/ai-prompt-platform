@@ -73,7 +73,6 @@ export async function POST(req: NextRequest) {
           email,
           name,
           passwordHash,
-          role: "ADMIN",
         },
       });
       const workspace = await tx.workspace.create({
