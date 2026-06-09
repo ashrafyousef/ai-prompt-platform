@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getServerSession = vi.fn();
 const checkRateLimit = vi.fn();
@@ -75,6 +75,7 @@ vi.mock("@/lib/models", () => ({
 }));
 
 vi.mock("@/lib/openai/client", () => ({
+  LlmRequestFailedError: class extends Error {},
   streamChatCompletion,
 }));
 
@@ -98,9 +99,7 @@ vi.mock("@/lib/db", () => ({
 describe("chat send route knowledge telemetry propagation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    (globalThis as any).crypto = {
-      randomUUID: () => "turn-1",
-    };
+    vi.spyOn(globalThis.crypto, "randomUUID").mockReturnValue("turn-1");
     (globalThis as any).ReadableStream = class {
       _source: {
         start?: (controller: { enqueue: (chunk: unknown) => void; close: () => void }) => unknown;
@@ -129,6 +128,10 @@ describe("chat send route knowledge telemetry propagation", () => {
         this.headers = init?.headers ?? {};
       }
     };
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   function setupBaseSendMocks() {
