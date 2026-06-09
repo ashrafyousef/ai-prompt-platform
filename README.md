@@ -17,6 +17,10 @@ Monolithic Next.js + PostgreSQL app for team AI workflows with:
 
 ## Setup
 
+Requires Node 20 LTS or Node 22. Node 20 LTS is the recommended default. Run `nvm use`
+before installing dependencies or running the app. Node 16 is unsupported because
+Vite and Vitest require a newer runtime.
+
 1. Copy environment file:
    - `cp .env.example .env.local`
 2. Update values in `.env.local`.
