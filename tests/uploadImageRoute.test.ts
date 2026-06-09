@@ -53,10 +53,15 @@ function webpBytes(): Buffer {
   return bytes;
 }
 
-function makeFile(params: { type: string; bytes: Buffer; name?: string }): File {
+function makeFile(params: {
+  type: string;
+  bytes: Buffer;
+  name?: string;
+  size?: number;
+}): File {
   return {
     type: params.type,
-    size: params.bytes.length,
+    size: params.size ?? params.bytes.length,
     name: params.name ?? "image.bin",
     async arrayBuffer() {
       return params.bytes.buffer.slice(
@@ -99,6 +104,48 @@ describe("upload image route magic-byte validation", () => {
       expect(res.status).toBe(200);
     }
     expect(saveChatImage).toHaveBeenCalledTimes(4);
+  });
+
+  it("accepts an image exactly at the 4MB boundary", async () => {
+    const res = await upload(
+      makeFile({
+        type: "image/jpeg",
+        bytes: jpegBytes(),
+        size: 4 * 1024 * 1024,
+      })
+    );
+
+    expect(res.status).toBe(200);
+    expect(saveChatImage).toHaveBeenCalledOnce();
+  });
+
+  it("rejects an image above the 4MB boundary", async () => {
+    const res = await upload(
+      makeFile({
+        type: "image/jpeg",
+        bytes: jpegBytes(),
+        size: 4 * 1024 * 1024 + 1,
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("4 MB or smaller");
+    expect(saveChatImage).not.toHaveBeenCalled();
+  });
+
+  it("rejects unsupported claimed MIME types", async () => {
+    const res = await upload(
+      makeFile({
+        type: "image/heic",
+        bytes: jpegBytes(),
+      })
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toContain("Invalid file type");
+    expect(saveChatImage).not.toHaveBeenCalled();
   });
 
   it("rejects spoofed MIME/content mismatches", async () => {

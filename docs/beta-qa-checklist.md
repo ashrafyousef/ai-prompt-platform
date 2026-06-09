@@ -15,7 +15,7 @@ Record pass/fail, browser/device, and notes in the sign-off section at the botto
 - [ ] For production image uploads: confirm Vercel Blob is configured and `BLOB_READ_WRITE_TOKEN` is present.
 - [ ] Optional: note `CHAT_ENABLED_MODEL_IDS`, `CHAT_DEFAULT_MODEL_ID`, and `TOKEN_SOFT_LIMIT` if overridden from defaults.
 - [ ] Use a modern browser (Chrome, Safari, or Edge). Keep one incognito/private session for fresh sign-up tests.
-- [ ] Have a small test image ready (JPEG/PNG, under ~2 MB) and one larger image (5–10 MB) for limit checks.
+- [ ] Have a small test image ready (JPEG/PNG, under ~2 MB) and one image just over 4 MB for limit checks.
 
 ---
 
@@ -64,6 +64,7 @@ Nur is the primary creative assistant. Display name comes from admin/DB; interna
 ## Nur image upload and image analysis
 
 - [ ] **Attach image (composer +)** — preview appears; image sends with the message.
+- [ ] **Upload limit** — an image over 4 MB is rejected with clear copy and the draft/attachment remains available.
 - [ ] **Production upload** — uploaded image URL is a Vercel Blob (or expected public URL), not a broken `/uploads/` path on Vercel.
 - [ ] **Local dev (optional)** — with `IMAGE_UPLOAD_LOCAL=1`, uploads land under `public/uploads` and display in-thread.
 - [ ] **Vision model** — with an image attached, a vision-capable model is selected (or composer warns if model lacks vision).

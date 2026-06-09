@@ -63,7 +63,7 @@ GPT-5 models omit custom **temperature** in API requests (provider rejects non-d
 
 ### Large images may hit platform or server limits
 
-Images are compressed client-side before upload, but very large files or slow networks can still fail upload or provider vision fetch. Prefer images under ~2 MB for reliable beta testing. Failures may show a specific “could not read the attached image” message after recent error-handling improvements.
+Images are limited to 4 MB each and compressed client-side before upload. Slow networks or provider vision fetches can still fail, so images under ~2 MB remain preferable for reliable beta testing. Failures may show a specific “could not read the attached image” message after recent error-handling improvements.
 
 ### Conversation context trimming
 

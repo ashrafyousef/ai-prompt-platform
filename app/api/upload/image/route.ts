@@ -9,6 +9,10 @@ import {
   saveChatImage,
   shouldUseLocalImageStorage,
 } from "@/lib/imageStorage";
+import {
+  IMAGE_TOO_LARGE_MESSAGE,
+  MAX_IMAGE_FILE_SIZE_BYTES,
+} from "@/lib/imageUploadLimits";
 
 const UPLOAD_GENERIC_FAILURE_MESSAGE =
   "Image upload failed. Please try again or contact support if this persists.";
@@ -33,7 +37,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: IMAGE_UPLOAD_UNAVAILABLE_MESSAGE }, { status: 503 });
     }
 
-    const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
     const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"]);
 
     const formData = await req.formData();
@@ -50,9 +53,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
       return NextResponse.json(
-        { error: "File too large. Maximum size is 10 MB." },
+        { error: IMAGE_TOO_LARGE_MESSAGE },
         { status: 400 }
       );
     }

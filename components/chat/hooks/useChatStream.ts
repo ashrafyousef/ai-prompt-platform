@@ -3,14 +3,17 @@ import type { UiGenerationState, UiMessage } from "@/lib/types";
 import { parseSSEStream } from "@/lib/streaming/parseStream";
 import { classifyChatError } from "@/lib/chatErrorTaxonomy";
 import { selectVisibleChatMessages } from "@/lib/chatVisibleMessages";
+import {
+  IMAGE_TOO_LARGE_MESSAGE,
+  MAX_IMAGES_PER_MESSAGE,
+  MAX_IMAGE_FILE_SIZE_BYTES,
+  MAX_TOTAL_IMAGE_SIZE_BYTES,
+} from "@/lib/imageUploadLimits";
 
 /** Used when the user attaches images but leaves the composer text empty. */
 export const IMAGE_ONLY_DEFAULT_PROMPT =
   "Analyze the attached image and suggest a stronger creative direction.";
 
-const MAX_IMAGES_PER_MESSAGE = 4;
-const MAX_IMAGE_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
-const MAX_TOTAL_IMAGE_SIZE_BYTES = 25 * 1024 * 1024; // 25 MB
 const IMAGE_UPLOAD_TIMEOUT_MS = 30_000;
 
 const IMAGE_UPLOAD_TIMEOUT_MESSAGE =
@@ -28,11 +31,11 @@ export function validateImageUploadBatch(files?: File[]): string | null {
     return "You can attach up to 4 images per message.";
   }
   if (files.some((file) => file.size > MAX_IMAGE_FILE_SIZE_BYTES)) {
-    return "Each image must be 10 MB or smaller.";
+    return "Each image must be 4 MB or smaller.";
   }
   const totalSize = files.reduce((sum, file) => sum + file.size, 0);
   if (totalSize > MAX_TOTAL_IMAGE_SIZE_BYTES) {
-    return "Total image size must be 25 MB or smaller.";
+    return "Total image size must be 16 MB or smaller.";
   }
   return null;
 }
@@ -48,6 +51,25 @@ export type ChatRouteMeta = {
 };
 
 const UPLOAD_INTERNAL_ERROR_RE = /ENOENT|EPERM|EACCES|mkdir|writeFile/i;
+
+export function resolveImageUploadErrorMessage(status: number, data: unknown): string {
+  const body =
+    typeof data === "object" && data !== null && "error" in data
+      ? String((data as { error?: unknown }).error ?? "").trim()
+      : typeof data === "string"
+      ? data.trim().slice(0, 400)
+      : "";
+  if (
+    status === 413 ||
+    /FUNCTION_PAYLOAD_TOO_LARGE|payload too large|request entity too large/i.test(body)
+  ) {
+    return IMAGE_TOO_LARGE_MESSAGE;
+  }
+
+  return sanitizeUploadErrorMessage(
+    body || `Image upload failed (${status}). Please try again.`
+  );
+}
 
 function sanitizeUploadErrorMessage(message: string): string {
   const trimmed = message.trim();
@@ -65,6 +87,17 @@ function isAbortLikeError(error: unknown): boolean {
   }
   const message = error instanceof Error ? error.message : String(error ?? "");
   return message === "UPLOAD_ABORTED" || message.toLowerCase().includes("abort");
+}
+
+export async function prepareImageForUpload(
+  file: File,
+  compress: (input: File) => Promise<File>
+): Promise<File> {
+  const compressed = await compress(file);
+  if (compressed.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+    throw new Error(IMAGE_TOO_LARGE_MESSAGE);
+  }
+  return compressed;
 }
 
 /** Secondary toast when the thread already shows full failure copy. */
@@ -130,7 +163,10 @@ export function useChatStream({
           else resolve(file);
         }, "image/jpeg", 0.7);
       };
-      img.onerror = () => resolve(file);
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        resolve(file);
+      };
       img.src = url;
     });
   };
@@ -139,7 +175,7 @@ export function useChatStream({
     if (!files || files.length === 0) return undefined;
     const urls: string[] = [];
     for (const file of files) {
-      const compressed = await compressImage(file);
+      const compressed = await prepareImageForUpload(file, compressImage);
       const formData = new FormData();
       formData.append("image", compressed);
       const requestController = new AbortController();
@@ -179,21 +215,14 @@ export function useChatStream({
       try {
         data = ct.includes("application/json") ? await res.json() : await res.text();
       } catch {
+        if (res.status === 413) {
+          throw new Error(IMAGE_TOO_LARGE_MESSAGE);
+        }
         throw new Error(`Image upload failed (${res.status}). Could not read the server response.`);
       }
 
       if (!res.ok) {
-        const body =
-          typeof data === "object" && data !== null && "error" in data
-            ? String((data as { error?: unknown }).error ?? "").trim()
-            : typeof data === "string"
-            ? data.trim().slice(0, 400)
-            : "";
-        throw new Error(
-          sanitizeUploadErrorMessage(
-            body || `Image upload failed (${res.status}). Please try again.`
-          )
-        );
+        throw new Error(resolveImageUploadErrorMessage(res.status, data));
       }
 
       const url =
