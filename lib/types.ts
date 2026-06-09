@@ -32,6 +32,9 @@ export type UiMessage = {
   completedAt?: string | null;
   failedAt?: string | null;
   generation?: UiGenerationState;
+  /** Persisted agent for assistant attribution (assistant messages only in UI). */
+  agentConfigId?: string | null;
+  agentName?: string | null;
 };
 
 export type UiStarterPrompt = {

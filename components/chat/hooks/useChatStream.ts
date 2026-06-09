@@ -109,6 +109,7 @@ export type ChatStreamErrorOptions = {
 export function useChatStream({
   sessionId,
   agentId,
+  agentName,
   onMessageAdded,
   modelVersion,
   modelRoutingMode = "manual",
@@ -116,6 +117,7 @@ export function useChatStream({
 }: {
   sessionId?: string;
   agentId: string;
+  agentName?: string;
   onMessageAdded?: () => void;
   modelVersion?: string;
   modelRoutingMode?: "manual" | "auto" | "suggested";
@@ -409,6 +411,7 @@ export function useChatStream({
                 // Keep prior response visible while regenerate is pending.
                 content: m.content,
                 turnId,
+                agentName: agentName?.trim() || m.agentName,
                 generation: streaming,
                 createdAt: new Date().toISOString(),
               }
@@ -431,6 +434,7 @@ export function useChatStream({
           role: "assistant" as const,
           turnId,
           content: "",
+          agentName: agentName?.trim() || undefined,
           createdAt: new Date().toISOString(),
           generation: { status: "streaming" },
         },
@@ -581,6 +585,7 @@ export function useChatStream({
                 ...m,
                 id: newAssistantId,
                 content: "",
+                agentName: agentName?.trim() || m.agentName,
                 generation: { status: "streaming" },
                 createdAt: new Date().toISOString(),
               }
@@ -694,6 +699,7 @@ export function useChatStream({
     [
       sessionId,
       agentId,
+      agentName,
       loading,
       messages,
       modelVersion,

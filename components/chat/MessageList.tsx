@@ -309,6 +309,7 @@ const MessageBubble = memo(function MessageBubble({
 
   const failedGen = gen?.status === "failed" ? gen : null;
   const alignment = message.role === "user" ? "justify-end" : "justify-start";
+  const assistantLabel = message.role === "assistant" ? message.agentName?.trim() : "";
 
   return (
     <div className="group w-full min-w-0 max-w-full md:mx-auto md:max-w-3xl">
@@ -320,6 +321,13 @@ const MessageBubble = memo(function MessageBubble({
               : "border border-zinc-200/80 bg-white text-zinc-900 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 md:max-w-[49rem]"
           }`}
         >
+        {assistantLabel ? (
+          <div className="mb-2">
+            <span className="inline-flex max-w-full items-center rounded-full border border-zinc-200/80 bg-zinc-50 px-2 py-0.5 text-[11px] font-medium leading-4 text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900/80 dark:text-zinc-300">
+              <span className="truncate">{assistantLabel}</span>
+            </span>
+          </div>
+        ) : null}
         {images && images.length > 0 ? (
           <div className="mb-3 flex min-w-0 max-w-full flex-wrap gap-2">
             {images.map((url, i) => (

@@ -52,9 +52,15 @@ export function ChatClient() {
 
   const { toast } = useToast();
 
+  const activeAgent = useMemo(
+    () => agents.find((a) => a.id === activeAgentId),
+    [agents, activeAgentId]
+  );
+
   const { messages, loading, send, regenerate, retryTurn, cancel, loadMessages, lastRouteMeta } = useChatStream({
     sessionId: activeSessionId,
     agentId: activeAgentId,
+    agentName: activeAgent?.name,
     onMessageAdded: refreshSessions,
     modelVersion: selectedModelId,
     modelRoutingMode,
@@ -66,11 +72,6 @@ export function ChatClient() {
       }
     },
   });
-
-  const activeAgent = useMemo(
-    () => agents.find((a) => a.id === activeAgentId),
-    [agents, activeAgentId]
-  );
 
   const composerPlaceholder = useMemo(() => {
     if (!agentSelectionReady) {

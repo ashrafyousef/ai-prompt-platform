@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
+import { serializeChatHistoryMessage } from "@/lib/chatHistoryMessages";
 import { selectVisibleChatMessages } from "@/lib/chatVisibleMessages";
 
 export async function GET(req: NextRequest) {
@@ -35,8 +36,13 @@ export async function GET(req: NextRequest) {
     const messages = await db.message.findMany({
       where: { sessionId, userId },
       orderBy: { createdAt: "asc" },
+      include: {
+        agentConfig: { select: { id: true, name: true } },
+      },
     });
-    return NextResponse.json({ messages: selectVisibleChatMessages(messages) });
+    return NextResponse.json({
+      messages: selectVisibleChatMessages(messages).map(serializeChatHistoryMessage),
+    });
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to get history." },
