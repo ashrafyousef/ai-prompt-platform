@@ -3,6 +3,7 @@ import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 import { checkRateLimit } from "@/lib/rateLimit";
 import {
   IMAGE_UPLOAD_UNAVAILABLE_MESSAGE,
+  BlobUploadError,
   detectImageTypeFromBytes,
   isBlobStorageConfigured,
   normalizeClaimedImageMime,
@@ -96,6 +97,19 @@ export async function POST(req: NextRequest) {
 
     if (error instanceof Error && error.message === "BLOB_STORAGE_NOT_CONFIGURED") {
       return NextResponse.json({ error: IMAGE_UPLOAD_UNAVAILABLE_MESSAGE }, { status: 503 });
+    }
+
+    if (error instanceof BlobUploadError) {
+      console.error("[upload/image] blob upload failed", {
+        message: error.message,
+        status: error.diagnostics.status,
+        responseBody: error.diagnostics.responseBody,
+        hasReadWriteToken: error.diagnostics.hasReadWriteToken,
+        hasStoreId: error.diagnostics.hasStoreId,
+        contentType: error.diagnostics.contentType,
+        byteLength: error.diagnostics.byteLength,
+      });
+      return NextResponse.json({ error: UPLOAD_GENERIC_FAILURE_MESSAGE }, { status: 500 });
     }
 
     console.error("[upload/image]", error);

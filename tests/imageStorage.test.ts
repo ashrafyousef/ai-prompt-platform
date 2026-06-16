@@ -1,8 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const putMock = vi.fn();
+
+vi.mock("@vercel/blob", () => ({
+  put: (...args: unknown[]) => putMock(...args),
+}));
+
 import {
   INVALID_IMAGE_REFERENCE_MESSAGE,
   InvalidImageReferenceError,
   detectImageTypeFromBytes,
+  isBlobStorageConfigured,
   normalizeClaimedImageMime,
   resolveValidatedLocalUploadPath,
   saveChatImage,
@@ -94,21 +102,15 @@ describe("saveChatImage blob response contract", () => {
   beforeEach(() => {
     vi.stubEnv("VERCEL", "1");
     vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_legacytokenid_suffix");
+    putMock.mockReset();
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
-    vi.unstubAllGlobals();
   });
 
   it("returns a provider Blob URL accepted by chat validation", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ url: productionBlobUrl }),
-      })
-    );
+    putMock.mockResolvedValue({ url: productionBlobUrl });
 
     const result = await saveChatImage({
       bytes: Buffer.from([0xff, 0xd8, 0xff]),
@@ -121,18 +123,21 @@ describe("saveChatImage blob response contract", () => {
     expect(() =>
       validateChatImageReference(result.url, productionUserId)
     ).not.toThrow();
+    expect(putMock).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`^chat/${productionUserId}/.+\\.jpg$`)),
+      expect.any(Buffer),
+      expect.objectContaining({
+        access: "public",
+        contentType: "image/jpeg",
+        addRandomSuffix: false,
+      })
+    );
   });
 
   it("rejects an invalid host returned by the Blob provider", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          url: `https://example.com/chat/${productionUserId}/${validUuid}.jpg`,
-        }),
-      })
-    );
+    putMock.mockResolvedValue({
+      url: `https://example.com/chat/${productionUserId}/${validUuid}.jpg`,
+    });
 
     await expect(
       saveChatImage({
@@ -154,6 +159,24 @@ describe("validateChatImageReferences batch", () => {
 
   it("uses a safe user-facing error message", () => {
     expect(INVALID_IMAGE_REFERENCE_MESSAGE).toContain("invalid");
+  });
+});
+
+describe("isBlobStorageConfigured", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("accepts BLOB_READ_WRITE_TOKEN", () => {
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "vercel_blob_rw_store_suffix");
+    vi.stubEnv("BLOB_STORE_ID", "");
+    expect(isBlobStorageConfigured()).toBe(true);
+  });
+
+  it("accepts BLOB_STORE_ID for OIDC-linked stores", () => {
+    vi.stubEnv("BLOB_READ_WRITE_TOKEN", "");
+    vi.stubEnv("BLOB_STORE_ID", "store_abc123");
+    expect(isBlobStorageConfigured()).toBe(true);
   });
 });
 

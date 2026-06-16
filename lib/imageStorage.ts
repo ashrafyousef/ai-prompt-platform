@@ -1,15 +1,13 @@
 import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
+import { put } from "@vercel/blob";
 
 export const IMAGE_UPLOAD_UNAVAILABLE_MESSAGE =
   "Image upload storage is not configured. Add a Vercel Blob store and BLOB_READ_WRITE_TOKEN.";
 
 export const INVALID_IMAGE_REFERENCE_MESSAGE =
   "One or more attached images are invalid. Re-upload and try again.";
-
-const BLOB_API_URL = "https://vercel.com/api/blob";
-const BLOB_API_VERSION = "12";
 
 const LOCAL_UPLOAD_PATH_REGEX =
   /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|jpeg|png|gif|webp)$/i;
@@ -25,6 +23,35 @@ export class InvalidImageReferenceError extends Error {
   }
 }
 
+export type BlobUploadDiagnostics = {
+  status?: number;
+  responseBody?: string;
+  hasReadWriteToken: boolean;
+  hasStoreId: boolean;
+  contentType: string;
+  byteLength: number;
+};
+
+export class BlobUploadError extends Error {
+  readonly diagnostics: BlobUploadDiagnostics;
+
+  constructor(message: string, diagnostics: BlobUploadDiagnostics) {
+    super(message);
+    this.name = "BlobUploadError";
+    this.diagnostics = diagnostics;
+  }
+}
+
+export function getBlobAuthDiagnostics(): Pick<
+  BlobUploadDiagnostics,
+  "hasReadWriteToken" | "hasStoreId"
+> {
+  return {
+    hasReadWriteToken: Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim()),
+    hasStoreId: Boolean(process.env.BLOB_STORE_ID?.trim()),
+  };
+}
+
 export type DetectedImageType = {
   mime: string;
   ext: string;
@@ -38,12 +65,9 @@ export function shouldUseLocalImageStorage(): boolean {
 }
 
 export function isBlobStorageConfigured(): boolean {
-  return Boolean(process.env.BLOB_READ_WRITE_TOKEN?.trim());
-}
-
-export function parseStoreIdFromReadWriteToken(token: string): string {
-  const [, , , storeId = ""] = token.split("_");
-  return storeId;
+  if (process.env.BLOB_READ_WRITE_TOKEN?.trim()) return true;
+  if (process.env.BLOB_STORE_ID?.trim()) return true;
+  return false;
 }
 
 function rejectUnsafeImageReferenceShape(url: string): void {
@@ -173,47 +197,82 @@ export function normalizeClaimedImageMime(mime: string): string | null {
   return null;
 }
 
-async function putBlobViaFetch({
+function safeBlobErrorBody(error: unknown): string | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const candidate = error as {
+    message?: unknown;
+    cause?: unknown;
+    status?: unknown;
+    statusCode?: unknown;
+  };
+  const parts: string[] = [];
+  if (typeof candidate.message === "string" && candidate.message.trim()) {
+    parts.push(candidate.message.trim());
+  }
+  if (candidate.cause && typeof candidate.cause === "object") {
+    const cause = candidate.cause as { message?: unknown };
+    if (typeof cause.message === "string" && cause.message.trim()) {
+      parts.push(cause.message.trim());
+    }
+  }
+  if (!parts.length) return undefined;
+  return parts.join(" | ").slice(0, 300);
+}
+
+function blobErrorStatus(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  const candidate = error as { status?: unknown; statusCode?: unknown };
+  if (typeof candidate.status === "number") return candidate.status;
+  if (typeof candidate.statusCode === "number") return candidate.statusCode;
+  return undefined;
+}
+
+async function putBlobViaSdk({
   pathname,
   bytes,
   contentType,
-  token,
   userId,
 }: {
   pathname: string;
   bytes: Buffer;
   contentType: string;
-  token: string;
   userId: string;
 }): Promise<{ url: string }> {
-  const storeId = parseStoreIdFromReadWriteToken(token);
-  const params = new URLSearchParams({ pathname });
+  const diagnostics: BlobUploadDiagnostics = {
+    ...getBlobAuthDiagnostics(),
+    contentType,
+    byteLength: bytes.byteLength,
+  };
 
-  const response = await fetch(`${BLOB_API_URL}/?${params.toString()}`, {
-    method: "PUT",
-    headers: {
-      authorization: `Bearer ${token}`,
-      "x-api-version": BLOB_API_VERSION,
-      "x-vercel-blob-store-id": storeId,
-      "x-vercel-blob-access": "public",
-      "x-content-type": contentType,
-      "x-add-random-suffix": "0",
-      "x-content-length": String(bytes.byteLength),
-    },
-    body: new Uint8Array(bytes),
-  });
+  try {
+    const blob = await put(pathname, bytes, {
+      access: "public",
+      contentType,
+      addRandomSuffix: false,
+    });
 
-  if (!response.ok) {
-    throw new Error("BLOB_UPLOAD_FAILED");
+    if (!blob.url) {
+      throw new BlobUploadError("BLOB_UPLOAD_FAILED", {
+        ...diagnostics,
+        responseBody: "Blob SDK returned no url",
+      });
+    }
+
+    validateBlobImageReference(blob.url, userId);
+    return { url: blob.url };
+  } catch (error) {
+    if (error instanceof BlobUploadError) throw error;
+    if (error instanceof InvalidImageReferenceError) throw error;
+
+    throw new BlobUploadError(
+      error instanceof Error ? error.message : "BLOB_UPLOAD_FAILED",
+      {
+        ...diagnostics,
+        status: blobErrorStatus(error),
+        responseBody: safeBlobErrorBody(error),
+      }
+    );
   }
-
-  const data = (await response.json()) as { url?: string };
-  if (!data.url) {
-    throw new Error("BLOB_UPLOAD_FAILED");
-  }
-
-  validateBlobImageReference(data.url, userId);
-  return { url: data.url };
 }
 
 export async function saveChatImage({
@@ -237,16 +296,14 @@ export async function saveChatImage({
     return { url: `/uploads/${fileName}` };
   }
 
-  const token = process.env.BLOB_READ_WRITE_TOKEN?.trim();
-  if (!token) {
+  if (!isBlobStorageConfigured()) {
     throw new Error("BLOB_STORAGE_NOT_CONFIGURED");
   }
 
-  return putBlobViaFetch({
+  return putBlobViaSdk({
     pathname: `chat/${userId}/${fileName}`,
     bytes,
     contentType,
-    token,
     userId,
   });
 }
