@@ -51,6 +51,12 @@ enum MessageDeliveryStatus {
   CANCELLED
 }
 
+enum ProjectStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -98,6 +104,8 @@ model Workspace {
   teams     Team[]
   agents    AgentConfig[]
   knowledgeItems KnowledgeItem[]
+  clients   Client[]
+  projects  Project[]
 
   @@index([slug])
 }
@@ -159,10 +167,59 @@ model Team {
   invitations WorkspaceInvitation[]
   workspaceMembers WorkspaceMember[]
   knowledgeItems KnowledgeItem[]
+  projectAssignments ProjectTeamAssignment[]
 
   @@index([slug])
   @@index([workspaceId])
   @@index([isArchived])
+}
+
+model Client {
+  id          String    @id @default(cuid())
+  workspaceId String
+  name        String
+  slug        String
+  isArchived  Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  projects    Project[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([isArchived])
+}
+
+model Project {
+  id          String        @id @default(cuid())
+  workspaceId String
+  clientId    String?
+  name        String
+  slug        String
+  status      ProjectStatus @default(DRAFT)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  client      Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
+  teamAssignments ProjectTeamAssignment[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId])
+  @@index([clientId])
+  @@index([status])
+}
+
+model ProjectTeamAssignment {
+  id        String   @id @default(cuid())
+  projectId String
+  teamId    String
+  createdAt DateTime @default(now())
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, teamId])
+  @@index([projectId])
+  @@index([teamId])
 }
 
 model ChatSession {

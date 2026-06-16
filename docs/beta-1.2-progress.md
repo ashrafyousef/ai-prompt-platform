@@ -20,6 +20,10 @@ Lightweight milestone notes for the `next/beta-1.2` branch. Factual checkpoints 
 
 `c9a85ce` — Fix beta Blob image upload (#16)
 
-## Phase 2B — in progress
+## Phase 2B — inspection complete
 
-Task-first domain foundation inspection and planning. See `docs/beta-1.2-domain-foundation.md`.
+Task-first domain foundation planning in `docs/beta-1.2-domain-foundation.md`.
+
+## Phase 2B.1 — in progress
+
+Minimal task-domain schema: `Client`, `Project`, `ProjectTeamAssignment`, `ProjectStatus` enum, migration, and `lib/projectAccess.ts` read helper. No UI or Brief model yet.
