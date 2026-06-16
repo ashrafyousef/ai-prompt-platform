@@ -4,6 +4,8 @@ import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 import { serializeChatHistoryMessage } from "@/lib/chatHistoryMessages";
 import { selectVisibleChatMessages } from "@/lib/chatVisibleMessages";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: NextRequest) {
   try {
     const { userId } = await requireUserIdWithWorkspace();
@@ -46,7 +48,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to get history." },
-      { status: authErrorStatus(error, 401) }
+      { status: authErrorStatus(error, 500) }
     );
   }
 }
@@ -72,7 +74,7 @@ export async function DELETE(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Failed to delete session." },
-      { status: authErrorStatus(error, 400) }
+      { status: authErrorStatus(error, 500) }
     );
   }
 }

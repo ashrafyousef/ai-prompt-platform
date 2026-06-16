@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { readFile } from "fs/promises";
 import path from "path";
-import { getServerSession } from "next-auth";
-import { authOptions, resolveModelGovernanceRole } from "@/lib/auth";
+import { authOptions, getAuthSession, resolveModelGovernanceRole } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   INVALID_IMAGE_REFERENCE_MESSAGE,
@@ -129,6 +128,8 @@ const sendSchema = z.object({
   modelRoutingMode: z.enum(["manual", "auto", "suggested"]).optional(),
 });
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
   const start = Date.now();
   let userIdForLogs = "unknown";
@@ -196,7 +197,7 @@ export async function POST(req: NextRequest) {
     });
   };
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getAuthSession(req);
     if (!session?.user?.id) throw new Error("Unauthorized");
     const userId = session.user.id;
     const userRole = resolveModelGovernanceRole({

@@ -26,6 +26,8 @@ export function ChatClient() {
     agents,
     agentsLoading,
     agentsError,
+    historyError,
+    historyErrorStatus,
     refreshSessions,
     createSession,
     renameSession,
@@ -165,6 +167,15 @@ export function ChatClient() {
   }, [status, session?.user?.id, agents, agentsLoading, agentsError]);
 
   useEffect(() => {
+    if (!historyError) return;
+    if (historyErrorStatus === 401 || historyErrorStatus === 403) {
+      toast("Couldn't load chat history. Please sign in again or refresh the page.", "error");
+      return;
+    }
+    toast(historyError, "error");
+  }, [historyError, historyErrorStatus, toast]);
+
+  useEffect(() => {
     if (status !== "loading") {
       setAuthLoadingTimedOut(false);
       return;
@@ -199,10 +210,17 @@ export function ChatClient() {
   };
 
   const handleCreateSession = async () => {
-    const newSessionId = await createSession();
-    if (newSessionId) {
-      setActiveSessionId(newSessionId);
-      await loadMessages(newSessionId);
+    try {
+      const newSessionId = await createSession();
+      if (newSessionId) {
+        setActiveSessionId(newSessionId);
+        await loadMessages(newSessionId);
+      }
+    } catch (error) {
+      toast(
+        error instanceof Error ? error.message : "Couldn't create a chat session.",
+        "error"
+      );
     }
   };
 
@@ -225,10 +243,20 @@ export function ChatClient() {
   const handleSend = async (text: string, imageFiles?: File[]) => {
     let sid = activeSessionId;
     if (!sid) {
-      const newId = await createSession();
-      if (!newId) return;
-      sid = newId;
-      setActiveSessionId(newId);
+      try {
+        const newId = await createSession();
+        if (!newId) {
+          throw new Error("Chat session was not created.");
+        }
+        sid = newId;
+        setActiveSessionId(newId);
+      } catch (error) {
+        toast(
+          error instanceof Error ? error.message : "Couldn't start a chat session.",
+          "error"
+        );
+        throw error;
+      }
     }
     await send(text, imageFiles, undefined, editTarget?.id, regenOfId, sid !== activeSessionId ? sid : undefined);
     setEditTarget(null);

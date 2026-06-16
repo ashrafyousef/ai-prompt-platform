@@ -1,5 +1,8 @@
-import { getServerSession, NextAuthOptions } from "next-auth";
+import { getServerSession, type Session, NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
+import { getToken } from "next-auth/jwt";
+import { headers } from "next/headers";
+import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import type { UserRole } from "@/lib/models";
@@ -126,8 +129,83 @@ export const authOptions: NextAuthOptions = {
   },
 };
 
+function isHttpsRequest(req: NextRequest): boolean {
+  return (
+    req.nextUrl.protocol === "https:" ||
+    req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() === "https"
+  );
+}
+
+function requestFromHeaders(): NextRequest {
+  const headerStore = headers();
+  const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "localhost";
+  const proto =
+    headerStore.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    (host.includes("localhost") ? "http" : "https");
+  const cookie = headerStore.get("cookie") ?? "";
+  return new NextRequest(`${proto}://${host}/`, {
+    headers: cookie ? { cookie } : undefined,
+  });
+}
+
+async function resolveAuthToken(req?: NextRequest) {
+  const secret = process.env.NEXTAUTH_SECRET;
+  if (!secret) return null;
+
+  const request = req ?? requestFromHeaders();
+  const secureCookie = isHttpsRequest(request);
+
+  let token = await getToken({ req: request, secret, secureCookie });
+  if (!token && secureCookie) {
+    token = await getToken({
+      req: request,
+      secret,
+      secureCookie: true,
+      cookieName: "__Secure-next-auth.session-token",
+    });
+  }
+
+  return token;
+}
+
+function sessionFromToken(token: NonNullable<Awaited<ReturnType<typeof getToken>>>): Session {
+  const r = token.role;
+  const role = r === "USER" || r === "TEAM_LEAD" || r === "ADMIN" ? r : undefined;
+  const wr = token.workspaceRole;
+  const workspaceRole =
+    wr === "OWNER" || wr === "ADMIN" || wr === "MEMBER" ? wr : null;
+
+  return {
+    user: {
+      id: token.sub as string,
+      email: typeof token.email === "string" ? token.email : undefined,
+      name: typeof token.name === "string" ? token.name : undefined,
+      role,
+      teamId: (token.teamId as string | null | undefined) ?? null,
+      workspaceId: (token.workspaceId as string | undefined) ?? null,
+      workspaceRole,
+    },
+    expires:
+      typeof token.exp === "number"
+        ? new Date(token.exp * 1000).toISOString()
+        : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  };
+}
+
+/**
+ * Resolve the current session in App Router route handlers.
+ * Mirrors middleware secure-cookie handling, then falls back to getServerSession.
+ */
+export async function getAuthSession(req?: NextRequest): Promise<Session | null> {
+  const token = await resolveAuthToken(req);
+  if (token?.sub) {
+    return sessionFromToken(token);
+  }
+  return getServerSession(authOptions);
+}
+
 export async function requireUserId(): Promise<string> {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
   }
@@ -155,7 +233,7 @@ export async function requireUserIdWithWorkspace(): Promise<{
   workspaceId: string;
   workspaceRole: "OWNER" | "ADMIN" | "MEMBER";
 }> {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
   }
@@ -189,7 +267,7 @@ export type AuthorizedUserContext = {
  * - User.role remains compatibility input for existing platform-level gates
  */
 export async function requireAuthorizedUserContext(): Promise<AuthorizedUserContext> {
-  const session = await getServerSession(authOptions);
+  const session = await getAuthSession();
   if (!session?.user?.id) {
     throw new Error("Unauthorized");
   }
