@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   canViewProjectForActor,
   isWorkspaceWideProjectViewer,
+  buildAdminProjectListWhere,
 } from "@/lib/projectAccess";
 
 const workspaceId = "ws-1";
@@ -192,5 +193,54 @@ describe("canViewProjectForActor", () => {
         project({ assignedTeamIds: [], status: "ARCHIVED" })
       )
     ).toBe(true);
+  });
+});
+
+describe("buildAdminProjectListWhere", () => {
+  it("scopes team-scoped ADMIN to assigned team projects", () => {
+    const where = buildAdminProjectListWhere(
+      {
+        workspaceId,
+        workspaceRole: "ADMIN",
+        platformRole: "USER",
+        teamId: teamA,
+      },
+      {}
+    );
+    expect(where).toEqual({
+      workspaceId,
+      status: { not: "ARCHIVED" },
+      teamAssignments: { some: { teamId: teamA } },
+    });
+  });
+
+  it("allows workspace-wide viewers to list all non-archived projects", () => {
+    const where = buildAdminProjectListWhere(
+      {
+        workspaceId,
+        workspaceRole: "OWNER",
+        platformRole: "USER",
+        teamId: null,
+      },
+      { clientId: "client-1" }
+    );
+    expect(where).toEqual({
+      workspaceId,
+      status: { not: "ARCHIVED" },
+      clientId: "client-1",
+    });
+  });
+
+  it("includes archived projects when requested", () => {
+    const where = buildAdminProjectListWhere(
+      {
+        workspaceId,
+        workspaceRole: "OWNER",
+        platformRole: "USER",
+        teamId: null,
+      },
+      { includeArchived: true }
+    );
+    expect(where).toEqual({ workspaceId });
   });
 });

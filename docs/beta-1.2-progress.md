@@ -24,6 +24,10 @@ Lightweight milestone notes for the `next/beta-1.2` branch. Factual checkpoints 
 
 Task-first domain foundation planning in `docs/beta-1.2-domain-foundation.md`.
 
-## Phase 2B.1 — in progress
+## Phase 2B.1 — complete
 
-Minimal task-domain schema: `Client`, `Project`, `ProjectTeamAssignment`, `ProjectStatus` enum, migration, and `lib/projectAccess.ts` read helper. No UI or Brief model yet.
+Minimal task-domain schema: `Client`, `Project`, `ProjectTeamAssignment`, `ProjectStatus` enum, migration, and `lib/projectAccess.ts` read helper. Beta migration applied.
+
+## Phase 2B.2 — in progress
+
+Admin API foundation: `/api/admin/clients` and `/api/admin/projects` (GET/POST). No UI yet.

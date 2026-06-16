@@ -1,5 +1,7 @@
 import type { ProjectStatus } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import type { AuthorizedUserContext } from "@/lib/auth";
+import type { WorkspaceMemberManagerContext } from "@/lib/adminAuth";
 
 export type ProjectActorContext = {
   workspaceId: string;
@@ -34,6 +36,45 @@ export function toProjectActorContext(auth: AuthorizedUserContext): ProjectActor
     platformRole: auth.role,
     teamId: auth.teamId,
   };
+}
+
+export function toProjectActorContextFromManager(
+  auth: WorkspaceMemberManagerContext
+): ProjectActorContext {
+  return {
+    workspaceId: auth.workspaceId,
+    workspaceRole: auth.workspaceRole,
+    platformRole: auth.platformRole,
+    teamId: auth.teamId,
+  };
+}
+
+/** Admin project list filter aligned with {@link canViewProjectForActor}. */
+export function buildAdminProjectListWhere(
+  actor: ProjectActorContext,
+  options: { includeArchived?: boolean; clientId?: string | null }
+): Prisma.ProjectWhereInput {
+  const where: Prisma.ProjectWhereInput = {
+    workspaceId: actor.workspaceId,
+  };
+
+  if (!options.includeArchived) {
+    where.status = { not: "ARCHIVED" };
+  }
+
+  if (options.clientId) {
+    where.clientId = options.clientId;
+  }
+
+  if (!isWorkspaceWideProjectViewer(actor)) {
+    if (!actor.teamId) {
+      where.id = { in: [] };
+    } else {
+      where.teamAssignments = { some: { teamId: actor.teamId } };
+    }
+  }
+
+  return where;
 }
 
 /**
