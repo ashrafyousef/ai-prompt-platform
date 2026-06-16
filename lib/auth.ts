@@ -2,7 +2,7 @@ import { getServerSession, type Session, NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { getToken } from "next-auth/jwt";
 import { headers } from "next/headers";
-import type { NextRequest } from "next/server";
+import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/password";
 import type { UserRole } from "@/lib/models";
