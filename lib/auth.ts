@@ -1,6 +1,6 @@
 import { getServerSession, type Session, NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { getToken } from "next-auth/jwt";
+import { getToken, type JWT } from "next-auth/jwt";
 import { headers } from "next/headers";
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db";
@@ -168,7 +168,7 @@ async function resolveAuthToken(req?: NextRequest) {
   return token;
 }
 
-function sessionFromToken(token: NonNullable<Awaited<ReturnType<typeof getToken>>>): Session {
+function sessionFromToken(token: JWT): Session {
   const r = token.role;
   const role = r === "USER" || r === "TEAM_LEAD" || r === "ADMIN" ? r : undefined;
   const wr = token.workspaceRole;
@@ -198,10 +198,10 @@ function sessionFromToken(token: NonNullable<Awaited<ReturnType<typeof getToken>
  */
 export async function getAuthSession(req?: NextRequest): Promise<Session | null> {
   const token = await resolveAuthToken(req);
-  if (token?.sub) {
-    return sessionFromToken(token);
+  if (!token || typeof token === "string" || !token.sub) {
+    return getServerSession(authOptions);
   }
-  return getServerSession(authOptions);
+  return sessionFromToken(token);
 }
 
 export async function requireUserId(): Promise<string> {
