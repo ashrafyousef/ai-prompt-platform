@@ -28,6 +28,10 @@ Task-first domain foundation planning in `docs/beta-1.2-domain-foundation.md`.
 
 Minimal task-domain schema: `Client`, `Project`, `ProjectTeamAssignment`, `ProjectStatus` enum, migration, and `lib/projectAccess.ts` read helper. Beta migration applied.
 
-## Phase 2B.2 — in progress
+## Phase 2B.2 — complete
 
-Admin API foundation: `/api/admin/clients` and `/api/admin/projects` (GET/POST). No UI yet.
+Admin API foundation: `/api/admin/clients` and `/api/admin/projects` (GET/POST).
+
+## Phase 2B.3 — in progress
+
+Admin UI: `/admin/clients` and `/admin/projects` list + create forms.
