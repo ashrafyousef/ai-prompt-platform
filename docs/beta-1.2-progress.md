@@ -32,6 +32,10 @@ Minimal task-domain schema: `Client`, `Project`, `ProjectTeamAssignment`, `Proje
 
 Admin API foundation: `/api/admin/clients` and `/api/admin/projects` (GET/POST).
 
-## Phase 2B.3 — in progress
+## Phase 2B.3 — complete
 
 Admin UI: `/admin/clients` and `/admin/projects` list + create forms.
+
+## Phase 2B.4 — complete
+
+Brief domain foundation: `BriefStatus`, `Brief` model, migration, `lib/briefAccess.ts`, `GET/POST /api/admin/briefs`, tests, Brief Specialist draft baseline in seed definitions. No Brief UI yet.
