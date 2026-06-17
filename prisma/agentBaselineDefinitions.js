@@ -18,6 +18,9 @@ Stay practical, specific, and production-oriented. Do not add meta commentary ab
 const NUR_CREATIVE_DIRECTOR_PLACEHOLDER_PROMPT =
   "You are Nur, Creative Director. This agent is a reserved placeholder for upcoming Beta 1.2 workflow features. Do not use for production creative tasks yet.";
 
+const BRIEF_SPECIALIST_PLACEHOLDER_PROMPT =
+  "You are Brief Specialist, a workflow-facing assistant reserved for form-based brief intake and clarification. This agent is not active yet. Do not use for general chat or production creative tasks until Brief Intake ships.";
+
 function buildInputSchema({
   starterPrompts,
   category,
@@ -117,10 +120,37 @@ const NUR_CREATIVE_DIRECTOR_BASELINE = {
   }),
 };
 
-const BETA_AGENT_BASELINES = [VISUAL_DIRECTOR_BASELINE, NUR_CREATIVE_DIRECTOR_BASELINE];
+const BRIEF_SPECIALIST_BASELINE = {
+  slug: "brief-specialist",
+  name: "Brief Specialist",
+  description:
+    "Reserved workflow agent for form-based brief intake and clarification (placeholder; not active yet).",
+  systemPrompt: BRIEF_SPECIALIST_PLACEHOLDER_PROMPT,
+  outputFormat: "markdown",
+  temperature: 0.3,
+  maxTokens: 800,
+  status: "DRAFT",
+  isEnabled: false,
+  scope: "GLOBAL",
+  teamId: null,
+  inputSchema: buildInputSchema({
+    category: "workflow",
+    starterPrompts: [],
+    modelPreferences: {
+      notes: "Placeholder agent — enable when Brief Intake UI ships.",
+    },
+  }),
+};
+
+const BETA_AGENT_BASELINES = [
+  VISUAL_DIRECTOR_BASELINE,
+  NUR_CREATIVE_DIRECTOR_BASELINE,
+  BRIEF_SPECIALIST_BASELINE,
+];
 
 module.exports = {
   BETA_AGENT_BASELINES,
   VISUAL_DIRECTOR_BASELINE,
   NUR_CREATIVE_DIRECTOR_BASELINE,
+  BRIEF_SPECIALIST_BASELINE,
 };
