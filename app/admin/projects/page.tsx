@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
@@ -312,7 +313,12 @@ export default function AdminProjectsPage() {
               key={`mobile-project-${project.id}`}
               className="rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
             >
-              <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">{project.name}</p>
+              <Link
+                href={`/admin/projects/${project.id}`}
+                className="text-sm font-medium text-zinc-900 hover:text-violet-700 dark:text-zinc-100 dark:hover:text-violet-400"
+              >
+                {project.name}
+              </Link>
               <div className="mt-2 grid gap-1 text-xs text-zinc-500 dark:text-zinc-400">
                 <p>
                   <span className="font-medium text-zinc-700 dark:text-zinc-300">Slug:</span>{" "}
@@ -361,7 +367,14 @@ export default function AdminProjectsPage() {
             ) : (
               projects.map((project) => (
                 <tr key={project.id}>
-                  <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{project.name}</td>
+                  <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">
+                    <Link
+                      href={`/admin/projects/${project.id}`}
+                      className="hover:text-violet-700 dark:hover:text-violet-400"
+                    >
+                      {project.name}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{project.slug}</td>
                   <td className="px-4 py-3">{project.status}</td>
                   <td className="px-4 py-3">{project.client?.name ?? "—"}</td>
