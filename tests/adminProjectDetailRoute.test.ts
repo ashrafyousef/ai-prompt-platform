@@ -64,6 +64,7 @@ function projectRow(overrides: {
     projectId: string;
     title: string;
     status: string;
+    responsesJson?: unknown;
     submittedAt: Date | null;
     createdAt: Date;
     updatedAt: Date;
@@ -164,6 +165,7 @@ describe("admin project detail route", () => {
       projectId,
       title: "Campaign Brief",
       status: "ARCHIVED",
+      responsesJson: { objective: "Legacy field" },
       submittedAt: null,
       createdAt: new Date("2026-01-03T00:00:00.000Z"),
       updatedAt: new Date("2026-01-04T00:00:00.000Z"),
@@ -181,8 +183,13 @@ describe("admin project detail route", () => {
       title: "Campaign Brief",
       status: "ARCHIVED",
       submittedAt: null,
+      responsesJson: {
+        version: 1,
+        fields: expect.objectContaining({
+          objective: "Legacy field",
+        }),
+      },
     });
-    expect(body.project.brief).not.toHaveProperty("responsesJson");
   });
 
   it("includes archived project status on detail response", async () => {

@@ -1,4 +1,4 @@
-import type { Prisma } from "@prisma/client";
+import type { BriefStatus, Prisma, ProjectStatus } from "@prisma/client";
 import type { WorkspaceMemberManagerContext } from "@/lib/adminAuth";
 import {
   buildAdminProjectListWhere,
@@ -46,4 +46,14 @@ export function buildAdminBriefListWhere(
   }
 
   return where;
+}
+
+/** Whether brief intake responses may be edited in admin UI/API. */
+export function canEditBriefResponses(
+  briefStatus: BriefStatus,
+  projectStatus: ProjectStatus
+): boolean {
+  if (projectStatus === "ARCHIVED") return false;
+  if (briefStatus === "ARCHIVED") return false;
+  return briefStatus === "DRAFT";
 }

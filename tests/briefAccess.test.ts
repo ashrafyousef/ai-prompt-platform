@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAdminBriefListWhere,
+  canEditBriefResponses,
   canViewBriefForActor,
 } from "@/lib/briefAccess";
 
@@ -38,6 +39,16 @@ describe("canViewBriefForActor", () => {
     };
     expect(canViewBriefForActor(teamAdmin, project({ assignedTeamIds: [teamA] }))).toBe(true);
     expect(canViewBriefForActor(teamAdmin, project({ assignedTeamIds: [teamB] }))).toBe(false);
+  });
+});
+
+describe("canEditBriefResponses", () => {
+  it("allows edit only for DRAFT brief on non-archived project", () => {
+    expect(canEditBriefResponses("DRAFT", "ACTIVE")).toBe(true);
+    expect(canEditBriefResponses("DRAFT", "DRAFT")).toBe(true);
+    expect(canEditBriefResponses("SUBMITTED", "ACTIVE")).toBe(false);
+    expect(canEditBriefResponses("DRAFT", "ARCHIVED")).toBe(false);
+    expect(canEditBriefResponses("ARCHIVED", "ACTIVE")).toBe(false);
   });
 });
 
