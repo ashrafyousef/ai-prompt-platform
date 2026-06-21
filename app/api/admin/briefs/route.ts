@@ -44,13 +44,12 @@ const briefSelect = {
 
 type BriefRow = Prisma.BriefGetPayload<{ select: typeof briefSelect }>;
 
-function serializeBrief(brief: BriefRow) {
-  return {
+function serializeBrief(brief: BriefRow, options: { includeResponsesJson?: boolean } = {}) {
+  const base = {
     id: brief.id,
     projectId: brief.projectId,
     title: brief.title,
     status: brief.status,
-    responsesJson: brief.responsesJson,
     submittedAt: brief.submittedAt?.toISOString() ?? null,
     createdAt: brief.createdAt.toISOString(),
     updatedAt: brief.updatedAt.toISOString(),
@@ -62,6 +61,12 @@ function serializeBrief(brief: BriefRow) {
       client: brief.project.client,
     },
   };
+
+  if (options.includeResponsesJson) {
+    return { ...base, responsesJson: brief.responsesJson };
+  }
+
+  return base;
 }
 
 function isBriefProjectIdUniqueViolation(error: unknown): boolean {
@@ -103,7 +108,7 @@ export async function GET(req: NextRequest) {
         platformRole: auth.platformRole,
         teamId: auth.teamId,
       },
-      briefs: briefs.map(serializeBrief),
+      briefs: briefs.map((brief) => serializeBrief(brief)),
     });
   } catch (error) {
     const { status, body } = formatAdminRouteError(error, "Failed to load briefs.");
@@ -173,7 +178,7 @@ export async function POST(req: NextRequest) {
       select: briefSelect,
     });
 
-    return NextResponse.json({ brief: serializeBrief(created) });
+    return NextResponse.json({ brief: serializeBrief(created, { includeResponsesJson: false }) });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid brief input." }, { status: 400 });

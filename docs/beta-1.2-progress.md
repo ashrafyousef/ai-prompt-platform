@@ -43,3 +43,7 @@ Brief domain foundation: `BriefStatus`, `Brief` model, migration, `lib/briefAcce
 ## Phase 2B.5 — complete
 
 Minimal project detail + brief visibility: `GET /api/admin/projects/[projectId]`, `/admin/projects/[projectId]` with project metadata and read-only brief panel, create-brief action via existing POST API, project list links. No brief intake or edit UI.
+
+## Phase 2C — complete
+
+Brief intake form foundation: `lib/briefIntake.ts` v1 schema, `PATCH /api/admin/briefs/[briefId]`, intake form on project detail, save draft and submit to `SUBMITTED`, `responsesJson` exposed only on project detail GET. No chat or agent handoff.

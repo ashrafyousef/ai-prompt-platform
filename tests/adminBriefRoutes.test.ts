@@ -112,12 +112,34 @@ describe("admin briefs route", () => {
 
   it("lists briefs for OWNER with archived excluded by default", async () => {
     requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
-    db.brief.findMany.mockResolvedValue([]);
+    db.brief.findMany.mockResolvedValue([
+      {
+        id: "brief-1",
+        projectId,
+        title: "Brief",
+        status: "DRAFT",
+        responsesJson: { version: 1, fields: { objective: "hidden" } },
+        submittedAt: null,
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+        project: {
+          id: projectId,
+          name: "Campaign",
+          slug: "campaign",
+          status: "ACTIVE",
+          workspaceId,
+          client: null,
+          teamAssignments: [{ teamId: teamA }],
+        },
+      },
+    ]);
 
     const { GET } = await import("@/app/api/admin/briefs/route");
     const res = await GET(request("http://localhost/api/admin/briefs") as any);
+    const body = await res.json();
 
     expect(res.status).toBe(200);
+    expect(body.briefs[0]).not.toHaveProperty("responsesJson");
     expect(db.brief.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({

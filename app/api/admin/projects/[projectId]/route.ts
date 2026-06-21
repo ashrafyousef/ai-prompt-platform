@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { formatAdminRouteError, requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
+import { parseBriefResponsesJson } from "@/lib/briefIntake";
 import {
   canViewProjectForActor,
   toProjectActorContextFromManager,
@@ -28,6 +29,7 @@ const projectDetailSelect = {
       projectId: true,
       title: true,
       status: true,
+      responsesJson: true,
       submittedAt: true,
       createdAt: true,
       updatedAt: true,
@@ -53,6 +55,7 @@ function serializeProjectDetail(
       projectId: string;
       title: string;
       status: string;
+      responsesJson: unknown;
       submittedAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
@@ -85,6 +88,7 @@ function serializeProjectDetail(
           projectId: project.brief.projectId,
           title: project.brief.title,
           status: project.brief.status,
+          responsesJson: parseBriefResponsesJson(project.brief.responsesJson),
           submittedAt: project.brief.submittedAt?.toISOString() ?? null,
           createdAt: project.brief.createdAt.toISOString(),
           updatedAt: project.brief.updatedAt.toISOString(),

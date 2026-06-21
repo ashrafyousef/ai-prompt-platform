@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 import { AgentSummaryCard } from "./AgentSummaryCard";
+import { BriefIntakeForm } from "./BriefIntakeForm";
+import type { BriefIntakeResponsesV1 } from "@/lib/briefIntake";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
@@ -12,6 +14,7 @@ type BriefSummary = {
   projectId: string;
   title: string;
   status: string;
+  responsesJson: BriefIntakeResponsesV1;
   submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -257,6 +260,17 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           </div>
         )}
       </AgentSummaryCard>
+
+      <BriefIntakeForm
+        brief={project.brief}
+        projectStatus={project.status}
+        onSaved={(message) => {
+          setSuccessMessage(message);
+          setError(null);
+          void load();
+        }}
+        onError={(message) => setError(message || null)}
+      />
     </div>
   );
 }
