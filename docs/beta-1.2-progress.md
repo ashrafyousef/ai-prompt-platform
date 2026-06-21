@@ -39,3 +39,7 @@ Admin UI: `/admin/clients` and `/admin/projects` list + create forms.
 ## Phase 2B.4 — complete
 
 Brief domain foundation: `BriefStatus`, `Brief` model, migration, `lib/briefAccess.ts`, `GET/POST /api/admin/briefs`, tests, Brief Specialist draft baseline in seed definitions. No Brief UI yet.
+
+## Phase 2B.5 — complete
+
+Minimal project detail + brief visibility: `GET /api/admin/projects/[projectId]`, `/admin/projects/[projectId]` with project metadata and read-only brief panel, create-brief action via existing POST API, project list links. No brief intake or edit UI.
