@@ -3,7 +3,21 @@ import {
   analyzeRawBriefDeterministic,
   buildDeterministicBriefAnalysis,
   extractProposedFieldsFromRawText,
+  isMeaningfulExtract,
 } from "@/lib/briefAnalyze";
+
+const ABK_RAW_BRIEF = `Client: ABK
+Campaign: Summer rewards campaign
+
+We need a campaign for customers during the summer travel period. The message should focus on rewards, card usage, and travel lifestyle. The campaign will be used across social media and digital channels.
+
+Target customers are existing ABK cardholders and people who may be interested in premium banking benefits.
+
+We need Instagram posts, story formats, banners, and maybe some outdoor adaptations.
+
+The tone should feel premium, simple, trustworthy, and travel-related.
+
+Mandatory: use ABK branding and approved card visuals.`;
 
 describe("briefAnalyze", () => {
   it("flags empty raw brief", () => {
@@ -47,5 +61,33 @@ describe("briefAnalyze", () => {
     expect(analysis.mode).toBe("deterministic");
     expect(analysis.generatedAt).toBeTruthy();
     expect(analysis.proposedFields?.objective).toMatch(/master brief workflow/i);
+  });
+
+  it("rejects meaningless channel extractions", () => {
+    expect(isMeaningfulExtract(".")).toBe(false);
+    expect(isMeaningfulExtract("social media and digital")).toBe(true);
+  });
+
+  it("extracts the ABK summer rewards QA brief", () => {
+    const proposed = extractProposedFieldsFromRawText(ABK_RAW_BRIEF);
+
+    expect(proposed.targetAudience.toLowerCase()).toContain("existing abk cardholders");
+    expect(proposed.deliverables.toLowerCase()).toContain("instagram posts");
+    expect(proposed.channels.toLowerCase()).toContain("social media and digital channels");
+    expect(
+      proposed.mandatoryContent.toLowerCase().includes("abk branding") ||
+        proposed.brandRestrictions.toLowerCase().includes("abk branding")
+    ).toBe(true);
+    expect(proposed.channels).not.toBe(".");
+  });
+
+  it("does not flag missing audience, deliverables, or compliance for the ABK QA brief", () => {
+    const result = analyzeRawBriefDeterministic(ABK_RAW_BRIEF);
+    const codes = result.issues.map((issue) => issue.code);
+
+    expect(codes).not.toContain("missing_target_audience");
+    expect(codes).not.toContain("missing_deliverables");
+    expect(codes).not.toContain("missing_mandatory_compliance");
+    expect(codes).not.toContain("missing_mandatory_content");
   });
 });

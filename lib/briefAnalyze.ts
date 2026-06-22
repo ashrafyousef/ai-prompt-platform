@@ -7,44 +7,38 @@ import {
   type BriefIntakeFields,
 } from "@/lib/briefIntake";
 
-const SECTION_PATTERNS: Record<BriefIntakeFieldKey, RegExp[]> = {
+/** Labeled section headers such as "Objective:" or "Target audience:" */
+const LABELED_SECTION_PATTERNS: Record<BriefIntakeFieldKey, RegExp[]> = {
   objective: [
-    /\b(?:objective|goal|task summary|brief objective|campaign goal)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
-    /^objective[:\s-]*(.+)$/im,
+    /^objective[:\s-]+(.+)$/im,
+    /\b(?:objective|goal|task summary|brief objective|campaign goal)[:\s-]+([^\n]+)/i,
   ],
   clientBackground: [
-    /\b(?:client background|about (?:the )?client|background)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
+    /^client[:\s-]+(.+)$/im,
+    /\b(?:client background|about (?:the )?client|background)[:\s-]+([^\n]+)/i,
   ],
-  campaignType: [
-    /\b(?:campaign type|project type|campaign|project)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
-  ],
+  campaignType: [/^campaign[:\s-]+(.+)$/im, /\b(?:campaign type|project type)[:\s-]+([^\n]+)/i],
   targetAudience: [
-    /\b(?:target audience|audience|who we(?:'|')?re talking to)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
+    /^target audience[:\s-]+(.+)$/im,
+    /^audience[:\s-]+(.+)$/im,
   ],
   keyMessage: [
-    /\b(?:key message|main message|core message|message)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
+    /^key message[:\s-]+(.+)$/im,
+    /\b(?:key message|main message|core message)[:\s-]+([^\n]+)/i,
   ],
-  deliverables: [
-    /\b(?:deliverables|assets needed|what we need)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
-  ],
-  channels: [
-    /\b(?:channels|placements|media channels|where it runs)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
-  ],
+  deliverables: [/^deliverables[:\s-]+(.+)$/im, /\bdeliverables include[:\s-]+([^\n]+)/i],
+  channels: [/^channels[:\s-]+(.+)$/im, /^placements[:\s-]+(.+)$/im],
   timeline: [
-    /\b(?:timeline|deadline|due date|launch date|timing)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
+    /^timeline[:\s-]+(.+)$/im,
+    /\b(?:timeline|deadline|due date|launch date)[:\s-]+([^\n]+)/i,
   ],
   brandRestrictions: [
-    /\b(?:brand restrictions|compliance|legal|brand guidelines|do not|don't)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
+    /^brand restrictions[:\s-]+(.+)$/im,
+    /\b(?:brand restrictions|compliance notes?|brand guidelines)[:\s-]+([^\n]+)/i,
   ],
-  mandatoryContent: [
-    /\b(?:mandatory content|must include|required copy|mandatories)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
-  ],
-  referenceNotes: [
-    /\b(?:references?|links?|inspiration|examples?)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
-  ],
-  openQuestions: [
-    /\b(?:open questions?|missing information|tbd|to be confirmed|unclear)\b[:\s-]*([^\n]+(?:\n(?!\n)[^\n]+)*)/i,
-  ],
+  mandatoryContent: [/^mandatory[:\s-]+(.+)$/im, /\bmandatory content[:\s-]+([^\n]+)/i],
+  referenceNotes: [/^references?[:\s-]+(.+)$/im, /\b(?:reference links?|inspiration)[:\s-]+([^\n]+)/i],
+  openQuestions: [/^open questions?[:\s-]+(.+)$/im],
 };
 
 const ISSUE_CHECKS: Array<{
@@ -112,12 +106,6 @@ const ISSUE_CHECKS: Array<{
     missingMessage: "Timeline or deadline is missing.",
   },
   {
-    code: "missing_mandatory_compliance",
-    field: "brandRestrictions",
-    severity: "info",
-    missingMessage: "Brand restrictions or compliance notes are missing.",
-  },
-  {
     code: "missing_open_questions",
     field: "openQuestions",
     severity: "info",
@@ -125,19 +113,119 @@ const ISSUE_CHECKS: Array<{
   },
 ];
 
+const DELIVERABLE_KEYWORDS =
+  /\b(?:instagram|posts?|story|stories|banner|banners|video|videos|format|formats|outdoor|adaptation|landing page|email|ooh|print|asset|assets|creative|adaptations)\b/i;
+
 function normalizeExtracted(value: string): string {
   return value.replace(/\s+/g, " ").trim().slice(0, 4000);
 }
 
-function extractField(rawText: string, field: BriefIntakeFieldKey): string {
-  for (const pattern of SECTION_PATTERNS[field]) {
-    const match = rawText.match(pattern);
+export function isMeaningfulExtract(value: string): boolean {
+  const normalized = normalizeExtracted(value);
+  if (!normalized) return false;
+  if (/^[.\-,;:!?…]+$/.test(normalized)) return false;
+  if (normalized.length < 3) return false;
+  return /[a-zA-Z0-9]/.test(normalized);
+}
+
+function firstMatch(text: string, patterns: RegExp[]): string {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
     if (match?.[1]) {
       const extracted = normalizeExtracted(match[1]);
-      if (extracted) return extracted;
+      if (isMeaningfulExtract(extracted)) return extracted;
     }
   }
   return "";
+}
+
+function assignField(fields: BriefIntakeFields, key: BriefIntakeFieldKey, value: string): void {
+  const normalized = normalizeExtracted(value);
+  if (!isMeaningfulExtract(normalized)) return;
+  if (!isMeaningfulExtract(fields[key]) || fields[key].length < normalized.length) {
+    fields[key] = normalized;
+  }
+}
+
+function extractLabeledField(rawText: string, field: BriefIntakeFieldKey): string {
+  return firstMatch(rawText, LABELED_SECTION_PATTERNS[field]);
+}
+
+function extractNaturalLanguageFields(rawText: string): Partial<BriefIntakeFields> {
+  const extracted: Partial<BriefIntakeFields> = {};
+
+  const client = firstMatch(rawText, [/^client[:\s-]+(.+)$/im]);
+  if (client) extracted.clientBackground = client;
+
+  const campaign = firstMatch(rawText, [/^campaign[:\s-]+(.+)$/im]);
+  if (campaign) extracted.campaignType = campaign;
+
+  const objectiveSentence = firstMatch(rawText, [
+    /We need a campaign for ([^.]+\.)/i,
+    /We need (?:an? )?campaign[^.]*\./i,
+  ]);
+  if (objectiveSentence) {
+    extracted.objective = objectiveSentence.endsWith(".")
+      ? objectiveSentence
+      : `${objectiveSentence}.`;
+  }
+
+  const keyMessage = firstMatch(rawText, [
+    /The message should (?:focus on|emphasize|highlight)\s+([^.]+)\./i,
+    /The message should be\s+([^.]+)\./i,
+    /Key message is\s+([^.]+)\./i,
+  ]);
+  if (keyMessage) extracted.keyMessage = keyMessage;
+
+  const targetAudience = firstMatch(rawText, [
+    /Target customers are\s+([^.]+)\./i,
+    /Target audience is\s+([^.]+)\./i,
+    /Target audience are\s+([^.]+)\./i,
+    /Our target audience is\s+([^.]+)\./i,
+    /Audience is\s+([^.]+)\./i,
+  ]);
+  if (targetAudience) extracted.targetAudience = targetAudience;
+
+  const deliverablesLine = rawText.match(/^We need\s+(.+)$/im);
+  if (deliverablesLine?.[1] && DELIVERABLE_KEYWORDS.test(deliverablesLine[1])) {
+    extracted.deliverables = normalizeExtracted(deliverablesLine[1].replace(/\.$/, ""));
+  } else {
+    const deliverables = firstMatch(rawText, [
+      /Deliverables include\s+([^.]+)\./i,
+      /We need\s+((?:Instagram|instagram)[^.]+)\./i,
+    ]);
+    if (deliverables) extracted.deliverables = deliverables;
+  }
+
+  const channels = firstMatch(rawText, [
+    /(?:will be )?used across\s+([^.]+)\./i,
+    /(?:will run|runs|running|live)\s+(?:across|on)\s+([^.]+)\./i,
+    /across\s+((?:social media|digital)[^.]*channels?[^.]*)\./i,
+    /(?:channels?|placements?) (?:include|are)\s+([^.]+)\./i,
+  ]);
+  if (channels) {
+    extracted.channels = channels;
+  }
+
+  const tone = firstMatch(rawText, [/The tone should feel\s+([^.]+)\./i, /Tone should be\s+([^.]+)\./i]);
+  if (tone && !extracted.keyMessage) {
+    extracted.keyMessage = tone;
+  }
+
+  const mandatory = firstMatch(rawText, [
+    /^mandatory[:\s-]+(.+)$/im,
+    /Mandatory:\s*(.+)$/im,
+    /Must use\s+([^.]+)\./i,
+    /Must include\s+([^.]+)\./i,
+  ]);
+  if (mandatory) {
+    extracted.mandatoryContent = mandatory;
+    if (/\b(?:brand(?:ing)?|compliance|legal|visuals?|logo|guidelines?)\b/i.test(mandatory)) {
+      extracted.brandRestrictions = mandatory;
+    }
+  }
+
+  return extracted;
 }
 
 function fallbackObjective(rawText: string): string {
@@ -146,7 +234,12 @@ function fallbackObjective(rawText: string): string {
     .map((part) => part.trim())
     .filter(Boolean);
   if (paragraphs.length === 0) return "";
-  return normalizeExtracted(paragraphs[0]);
+
+  const labeledHeader = /^(client|campaign|objective|target audience|deliverables|mandatory)\s*:/i;
+  const substantive = paragraphs.find(
+    (paragraph) => !labeledHeader.test(paragraph) && paragraph.length > 20
+  );
+  return normalizeExtracted(substantive ?? paragraphs[0]);
 }
 
 export function extractProposedFieldsFromRawText(rawText: string): BriefIntakeFields {
@@ -154,20 +247,34 @@ export function extractProposedFieldsFromRawText(rawText: string): BriefIntakeFi
   const trimmed = rawText.trim();
   if (!trimmed) return proposed;
 
+  const naturalLanguage = extractNaturalLanguageFields(trimmed);
   for (const key of BRIEF_INTAKE_FIELD_KEYS) {
-    proposed[key] = extractField(trimmed, key);
+    const value = naturalLanguage[key];
+    if (value) assignField(proposed, key, value);
   }
 
-  if (!proposed.objective.trim()) {
-    proposed.objective = fallbackObjective(trimmed);
+  for (const key of BRIEF_INTAKE_FIELD_KEYS) {
+    const labeled = extractLabeledField(trimmed, key);
+    if (labeled) assignField(proposed, key, labeled);
   }
 
-  if (!proposed.referenceNotes.trim() && /https?:\/\//i.test(trimmed)) {
+  if (!isMeaningfulExtract(proposed.objective)) {
+    const fallback = fallbackObjective(trimmed);
+    if (isMeaningfulExtract(fallback)) proposed.objective = fallback;
+  }
+
+  if (!isMeaningfulExtract(proposed.referenceNotes) && /https?:\/\//i.test(trimmed)) {
     const links = trimmed.match(/https?:\/\/[^\s)]+/gi) ?? [];
     proposed.referenceNotes = links.join("\n").slice(0, 4000);
   }
 
   return proposed;
+}
+
+function hasMandatoryOrComplianceNotes(fields: BriefIntakeFields): boolean {
+  return (
+    isMeaningfulExtract(fields.brandRestrictions) || isMeaningfulExtract(fields.mandatoryContent)
+  );
 }
 
 export function analyzeRawBriefDeterministic(rawText: string): {
@@ -193,7 +300,7 @@ export function analyzeRawBriefDeterministic(rawText: string): {
 
   for (const check of ISSUE_CHECKS) {
     const value = proposedFields[check.field];
-    if (!value.trim()) {
+    if (!isMeaningfulExtract(value)) {
       issues.push({
         code: check.code,
         severity: check.severity,
@@ -211,9 +318,17 @@ export function analyzeRawBriefDeterministic(rawText: string): {
     }
   }
 
-  if (!proposedFields.mandatoryContent.trim()) {
-    const hasMandatoryCue = /\b(must include|mandatory|required copy|legal approval)\b/i.test(trimmed);
+  if (!hasMandatoryOrComplianceNotes(proposedFields)) {
+    const hasMandatoryCue = /\b(?:must include|mandatory|required copy|legal approval|must use)\b/i.test(
+      trimmed
+    );
     if (!hasMandatoryCue) {
+      issues.push({
+        code: "missing_mandatory_compliance",
+        severity: "info",
+        message: "Brand restrictions or compliance notes are missing.",
+      });
+    } else {
       issues.push({
         code: "missing_mandatory_content",
         severity: "info",
