@@ -2,27 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { formatAdminRouteError, requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
-import { canViewBriefForActor, toBriefActorContextFromManager } from "@/lib/briefAccess";
 import {
-  briefDocumentPatchSchema,
-  hasBriefIntakeContent,
+  canAnalyzeBrief,
+  canViewBriefForActor,
+  toBriefActorContextFromManager,
+} from "@/lib/briefAccess";
+import { buildDeterministicBriefAnalysis } from "@/lib/briefAnalyze";
+import {
+  BRIEF_RAW_TEXT_MAX_LENGTH,
   mergeBriefDocument,
   parseBriefDocumentJson,
 } from "@/lib/briefIntake";
 
-const patchSchema = z
-  .object({
-    responsesJson: briefDocumentPatchSchema.optional(),
-    status: z.literal("SUBMITTED").optional(),
-  })
-  .superRefine((body, ctx) => {
-    if (body.responsesJson === undefined && body.status === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "No changes provided.",
-      });
-    }
-  });
+const analyzeSchema = z.object({
+  rawText: z.string().max(BRIEF_RAW_TEXT_MAX_LENGTH).optional(),
+});
 
 const briefPatchSelect = {
   id: true,
@@ -35,7 +29,7 @@ const briefPatchSelect = {
   updatedAt: true,
 } as const;
 
-function serializePatchedBrief(brief: {
+function serializeAnalyzedBrief(brief: {
   id: string;
   projectId: string;
   title: string;
@@ -45,19 +39,20 @@ function serializePatchedBrief(brief: {
   createdAt: Date;
   updatedAt: Date;
 }) {
+  const document = parseBriefDocumentJson(brief.responsesJson);
   return {
     id: brief.id,
     projectId: brief.projectId,
     title: brief.title,
     status: brief.status,
-    responsesJson: parseBriefDocumentJson(brief.responsesJson),
+    responsesJson: document,
     submittedAt: brief.submittedAt?.toISOString() ?? null,
     createdAt: brief.createdAt.toISOString(),
     updatedAt: brief.updatedAt.toISOString(),
   };
 }
 
-export async function PATCH(
+export async function POST(
   req: NextRequest,
   { params }: { params: { briefId: string } }
 ) {
@@ -69,7 +64,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Brief not found." }, { status: 404 });
     }
 
-    const body = patchSchema.parse(await req.json());
+    const body = analyzeSchema.parse(await req.json().catch(() => ({})));
 
     const brief = await db.brief.findFirst({
       where: { id: briefId },
@@ -104,72 +99,59 @@ export async function PATCH(
 
     if (brief.project.status === "ARCHIVED") {
       return NextResponse.json(
-        { error: "Cannot update a brief for an archived project." },
+        { error: "Cannot analyze a brief for an archived project." },
         { status: 400 }
       );
     }
 
     if (brief.status === "ARCHIVED") {
-      return NextResponse.json({ error: "Cannot update an archived brief." }, { status: 400 });
+      return NextResponse.json({ error: "Cannot analyze an archived brief." }, { status: 400 });
     }
 
-    if (body.responsesJson !== undefined && brief.status !== "DRAFT") {
+    if (!canAnalyzeBrief(brief.status, brief.project.status)) {
       return NextResponse.json(
-        { error: "Brief responses can only be edited while the brief is in DRAFT status." },
-        { status: 400 }
-      );
-    }
-
-    if (body.status === "SUBMITTED" && brief.status !== "DRAFT") {
-      return NextResponse.json(
-        { error: "Brief can only be submitted from DRAFT status." },
+        { error: "Brief can only be analyzed while it is in DRAFT status." },
         { status: 400 }
       );
     }
 
     const existingDocument = parseBriefDocumentJson(brief.responsesJson);
-    const nextDocument =
-      body.responsesJson !== undefined
-        ? mergeBriefDocument(existingDocument, body.responsesJson)
-        : existingDocument;
-
-    if (body.status === "SUBMITTED" && !hasBriefIntakeContent(nextDocument)) {
+    const rawText = (body.rawText ?? existingDocument.source?.rawText ?? "").trim();
+    if (!rawText) {
       return NextResponse.json(
-        { error: "Add at least one intake field before submitting the brief." },
+        { error: "Save a raw client brief before running analysis." },
         { status: 400 }
       );
     }
 
-    const updateData: {
-      responsesJson?: typeof nextDocument;
-      status?: "SUBMITTED";
-      submittedAt?: Date;
-    } = {};
-
-    if (body.responsesJson !== undefined) {
-      updateData.responsesJson = nextDocument;
-    }
-
-    if (body.status === "SUBMITTED") {
-      updateData.status = "SUBMITTED";
-      if (!brief.submittedAt) {
-        updateData.submittedAt = new Date();
-      }
-    }
+    const analysis = buildDeterministicBriefAnalysis(rawText);
+    const nextDocument = mergeBriefDocument(existingDocument, {
+      analysis,
+      ...(body.rawText !== undefined
+        ? { source: { rawText, savedAt: new Date().toISOString() } }
+        : {}),
+    });
 
     const updated = await db.brief.update({
       where: { id: brief.id },
-      data: updateData,
+      data: { responsesJson: nextDocument },
       select: briefPatchSelect,
     });
 
-    return NextResponse.json({ brief: serializePatchedBrief(updated) });
+    const document = parseBriefDocumentJson(updated.responsesJson);
+
+    return NextResponse.json({
+      brief: serializeAnalyzedBrief(updated),
+      analysis: document.analysis ?? analysis,
+      proposedFields: document.analysis?.proposedFields ?? analysis.proposedFields,
+      issues: document.analysis?.issues ?? analysis.issues,
+    });
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const message = error.issues[0]?.message ?? "Invalid brief input.";
+      const message = error.issues[0]?.message ?? "Invalid brief analysis input.";
       return NextResponse.json({ error: message }, { status: 400 });
     }
-    const { status, body } = formatAdminRouteError(error, "Failed to update brief.");
+    const { status, body } = formatAdminRouteError(error, "Failed to analyze brief.");
     return NextResponse.json(body, { status: status === 500 ? 400 : status });
   }
 }

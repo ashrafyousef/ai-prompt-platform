@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { formatAdminRouteError, requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
-import { parseBriefResponsesJson } from "@/lib/briefIntake";
+import { parseBriefDocumentJson } from "@/lib/briefIntake";
 import {
   canViewProjectForActor,
   toProjectActorContextFromManager,
@@ -88,7 +88,7 @@ function serializeProjectDetail(
           projectId: project.brief.projectId,
           title: project.brief.title,
           status: project.brief.status,
-          responsesJson: parseBriefResponsesJson(project.brief.responsesJson),
+          responsesJson: parseBriefDocumentJson(project.brief.responsesJson),
           submittedAt: project.brief.submittedAt?.toISOString() ?? null,
           createdAt: project.brief.createdAt.toISOString(),
           updatedAt: project.brief.updatedAt.toISOString(),

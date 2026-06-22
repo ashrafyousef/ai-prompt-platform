@@ -65,23 +65,27 @@ function request(body: Record<string, unknown>) {
   };
 }
 
-function sampleResponses() {
+function sampleFields() {
   return {
-    version: 1 as const,
-    fields: {
-      objective: "Launch summer campaign",
-      clientBackground: "",
-      campaignType: "",
-      targetAudience: "",
-      keyMessage: "",
-      deliverables: "",
-      channels: "",
-      timeline: "",
-      brandRestrictions: "",
-      mandatoryContent: "",
-      referenceNotes: "",
-      openQuestions: "",
-    },
+    objective: "Launch summer campaign",
+    clientBackground: "",
+    campaignType: "",
+    targetAudience: "",
+    keyMessage: "",
+    deliverables: "",
+    channels: "",
+    timeline: "",
+    brandRestrictions: "",
+    mandatoryContent: "",
+    referenceNotes: "",
+    openQuestions: "",
+  };
+}
+
+function sampleDocument() {
+  return {
+    version: 2 as const,
+    fields: sampleFields(),
   };
 }
 
@@ -119,7 +123,7 @@ describe("admin brief PATCH route", () => {
   it("denies unauthenticated access", async () => {
     requireWorkspaceMemberManagerContext.mockRejectedValue(new Error("Unauthorized"));
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const res = await PATCH(request({ responsesJson: sampleResponses() }) as any, {
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
       params: { briefId },
     });
     expect(res.status).toBe(401);
@@ -130,7 +134,7 @@ describe("admin brief PATCH route", () => {
     db.brief.findFirst.mockResolvedValue(null);
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const res = await PATCH(request({ responsesJson: sampleResponses() }) as any, {
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
       params: { briefId },
     });
     expect(res.status).toBe(404);
@@ -141,7 +145,7 @@ describe("admin brief PATCH route", () => {
     db.brief.findFirst.mockResolvedValue(briefRow({ workspaceId: otherWorkspaceId }));
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const res = await PATCH(request({ responsesJson: sampleResponses() }) as any, {
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
       params: { briefId },
     });
     expect(res.status).toBe(404);
@@ -152,7 +156,7 @@ describe("admin brief PATCH route", () => {
     db.brief.findFirst.mockResolvedValue(briefRow({ teamIds: [teamB] }));
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const res = await PATCH(request({ responsesJson: sampleResponses() }) as any, {
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
       params: { briefId },
     });
     expect(res.status).toBe(403);
@@ -163,7 +167,7 @@ describe("admin brief PATCH route", () => {
     db.brief.findFirst.mockResolvedValue(briefRow({ projectStatus: "ARCHIVED" }));
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const res = await PATCH(request({ responsesJson: sampleResponses() }) as any, {
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
       params: { briefId },
     });
     const body = await res.json();
@@ -176,7 +180,7 @@ describe("admin brief PATCH route", () => {
     db.brief.findFirst.mockResolvedValue(briefRow({ briefStatus: "ARCHIVED" }));
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const res = await PATCH(request({ responsesJson: sampleResponses() }) as any, {
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
       params: { briefId },
     });
     const body = await res.json();
@@ -189,7 +193,7 @@ describe("admin brief PATCH route", () => {
     db.brief.findFirst.mockResolvedValue(briefRow({ briefStatus: "SUBMITTED" }));
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const res = await PATCH(request({ responsesJson: sampleResponses() }) as any, {
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
       params: { briefId },
     });
     const body = await res.json();
@@ -203,28 +207,70 @@ describe("admin brief PATCH route", () => {
     db.brief.findFirst.mockResolvedValue(existing);
     db.brief.update.mockResolvedValue({
       ...existing,
-      responsesJson: sampleResponses(),
+      responsesJson: sampleDocument(),
       updatedAt: new Date("2026-01-03T00:00:00.000Z"),
     });
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
-    const responsesJson = sampleResponses();
-    const res = await PATCH(request({ responsesJson }) as any, { params: { briefId } });
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
+      params: { briefId },
+    });
     const body = await res.json();
 
     expect(res.status).toBe(200);
+    expect(body.brief.responsesJson.version).toBe(2);
     expect(body.brief.responsesJson.fields.objective).toBe("Launch summer campaign");
     expect(db.brief.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: briefId },
-        data: { responsesJson },
+        data: {
+          responsesJson: expect.objectContaining({
+            version: 2,
+            fields: expect.objectContaining({ objective: "Launch summer campaign" }),
+          }),
+        },
+      })
+    );
+  });
+
+  it("merges raw source when patching fields only", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    const existing = briefRow({
+      responsesJson: {
+        ...sampleDocument(),
+        source: { rawText: "Client pasted brief" },
+      },
+    });
+    db.brief.findFirst.mockResolvedValue(existing);
+    db.brief.update.mockResolvedValue({
+      ...existing,
+      responsesJson: {
+        ...sampleDocument(),
+        source: { rawText: "Client pasted brief" },
+      },
+    });
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(
+      request({ responsesJson: { fields: sampleFields() } }) as any,
+      { params: { briefId } }
+    );
+
+    expect(res.status).toBe(200);
+    expect(db.brief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          responsesJson: expect.objectContaining({
+            source: { rawText: "Client pasted brief" },
+          }),
+        },
       })
     );
   });
 
   it("submits brief and sets submittedAt", async () => {
     requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
-    const existing = briefRow({ responsesJson: sampleResponses() });
+    const existing = briefRow({ responsesJson: sampleDocument() });
     db.brief.findFirst.mockResolvedValue(existing);
     db.brief.update.mockResolvedValue({
       ...existing,
@@ -234,7 +280,7 @@ describe("admin brief PATCH route", () => {
 
     const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
     const res = await PATCH(
-      request({ responsesJson: sampleResponses(), status: "SUBMITTED" }) as any,
+      request({ responsesJson: { fields: sampleFields() }, status: "SUBMITTED" }) as any,
       { params: { briefId } }
     );
     const body = await res.json();
@@ -266,7 +312,7 @@ describe("admin brief PATCH route", () => {
 
   it("allows submit with existing saved responses only", async () => {
     requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
-    const existing = briefRow({ responsesJson: sampleResponses() });
+    const existing = briefRow({ responsesJson: sampleDocument() });
     db.brief.findFirst.mockResolvedValue(existing);
     db.brief.update.mockResolvedValue({
       ...existing,

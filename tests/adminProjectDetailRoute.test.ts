@@ -184,7 +184,7 @@ describe("admin project detail route", () => {
       status: "ARCHIVED",
       submittedAt: null,
       responsesJson: {
-        version: 1,
+        version: 2,
         fields: expect.objectContaining({
           objective: "Legacy field",
         }),
