@@ -51,3 +51,11 @@ Brief intake form foundation: `lib/briefIntake.ts` v1 schema, `PATCH /api/admin/
 ## Phase 2D — complete
 
 Raw brief intake + deterministic analysis: `responsesJson` v2 document, raw paste panel, `POST /api/admin/briefs/[briefId]/analyze`, analysis review/apply UI, PATCH merge for fields/source/analysis. Master brief form remains structured destination. No AI or file upload yet.
+
+## Phase 2D.1 — complete
+
+Improved deterministic brief extraction for natural-language client briefs (audience, deliverables, channels, mandatory content).
+
+## Phase 2D.2 — complete
+
+Raw brief UX polish: clearer paste/replace instructions, read-only banners and field styling, analyze/apply guidance, raw text character count. UI-only; no API changes.

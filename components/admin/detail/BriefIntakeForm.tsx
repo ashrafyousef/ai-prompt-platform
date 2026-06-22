@@ -13,6 +13,12 @@ import { AgentSummaryCard } from "./AgentSummaryCard";
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
 
+const READ_ONLY_BRIEF_MESSAGE =
+  "This brief is submitted/read-only. Reopen or create a new draft to edit.";
+
+const READ_ONLY_TEXTAREA_CLASS =
+  "read-only:cursor-default read-only:border-zinc-200 read-only:bg-zinc-100 read-only:text-zinc-600 dark:read-only:border-zinc-700 dark:read-only:bg-zinc-900/80 dark:read-only:text-zinc-400";
+
 type BriefIntakeBrief = {
   id: string;
   status: string;
@@ -44,6 +50,7 @@ export function BriefIntakeForm({
   const briefStatus = (brief?.status ?? "DRAFT") as BriefStatus;
   const editable =
     brief !== null && canEditBriefResponses(briefStatus, projectStatus);
+  const isReadOnlyBrief = brief !== null && briefStatus !== "DRAFT" && projectStatus !== "ARCHIVED";
 
   useEffect(() => {
     setFields(brief?.responsesJson.fields ?? emptyBriefIntakeFields());
@@ -135,13 +142,13 @@ export function BriefIntakeForm({
           Create a brief for this project before editing the master brief.
         </p>
       ) : projectStatus === "ARCHIVED" ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+        <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
           This project is archived. The master brief is read-only.
         </p>
-      ) : !editable ? (
-        <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-          This brief has been submitted and the master brief is read-only.
-        </p>
+      ) : isReadOnlyBrief ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+          {READ_ONLY_BRIEF_MESSAGE}
+        </div>
       ) : (
         <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
           Review and refine the structured master brief before submission.
@@ -164,8 +171,10 @@ export function BriefIntakeForm({
                 value={fields[key]}
                 onChange={(e) => updateField(key, e.target.value)}
                 readOnly={!editable}
+                tabIndex={editable ? 0 : -1}
+                aria-readonly={!editable}
                 rows={key === "objective" || key === "openQuestions" ? 4 : 3}
-                className="w-full resize-y rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 read-only:bg-zinc-50 read-only:text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:read-only:bg-zinc-950 dark:read-only:text-zinc-400"
+                className={`w-full resize-y select-text rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 ${READ_ONLY_TEXTAREA_CLASS}`}
               />
             </label>
           ))}

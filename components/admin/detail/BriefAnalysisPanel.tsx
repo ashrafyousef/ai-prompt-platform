@@ -12,6 +12,9 @@ import { AgentSummaryCard } from "./AgentSummaryCard";
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
 
+const READ_ONLY_BRIEF_MESSAGE =
+  "This brief is submitted/read-only. Reopen or create a new draft to edit.";
+
 function adminApiError(data: { error?: string; message?: string }, fallback: string): string {
   if (data.message) return data.message;
   return data.error ?? fallback;
@@ -41,8 +44,10 @@ export function BriefAnalysisPanel({
   const [applying, setApplying] = useState(false);
   const analysis: BriefAnalysis | undefined = document?.analysis;
   const proposedFields = analysis?.proposedFields;
+  const status = briefStatus as BriefStatus;
   const editable =
-    briefId !== null && canEditBriefResponses(briefStatus as BriefStatus, projectStatus);
+    briefId !== null && canEditBriefResponses(status, projectStatus);
+  const isReadOnlyBrief = briefId !== null && status !== "DRAFT" && projectStatus !== "ARCHIVED";
 
   async function onApplyProposed() {
     if (!briefId || !editable || !proposedFields) return;
@@ -95,11 +100,28 @@ export function BriefAnalysisPanel({
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Create a brief and run analysis to see issues and proposed master brief fields.
         </p>
+      ) : isReadOnlyBrief ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+          {READ_ONLY_BRIEF_MESSAGE}
+        </div>
       ) : !analysis ? (
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          No analysis yet. Save a raw client brief and click Analyze brief.
-        </p>
+        <div className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">
+          <p>
+            Save and analyze the raw client brief to generate issues and proposed master brief fields.
+          </p>
+          <p>
+            Analyze creates a proposal only. It will not overwrite the master brief until you click
+            Apply.
+          </p>
+        </div>
       ) : (
+        <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+          Review the analysis below. Apply only when you want to copy the proposal into the master
+          brief form.
+        </p>
+      )}
+
+      {briefId && analysis ? (
         <div className="space-y-5">
           <div>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -141,7 +163,7 @@ export function BriefAnalysisPanel({
                     }`}
                   >
                     <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</p>
-                    <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">
+                    <p className="mt-1 select-text whitespace-pre-wrap text-sm text-zinc-800 dark:text-zinc-200">
                       {proposedFields[key].trim() || "—"}
                     </p>
                   </div>
@@ -150,7 +172,7 @@ export function BriefAnalysisPanel({
             </div>
           ) : null}
         </div>
-      )}
+      ) : null}
     </AgentSummaryCard>
   );
 }
