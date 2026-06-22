@@ -47,3 +47,7 @@ Minimal project detail + brief visibility: `GET /api/admin/projects/[projectId]`
 ## Phase 2C — complete
 
 Brief intake form foundation: `lib/briefIntake.ts` v1 schema, `PATCH /api/admin/briefs/[briefId]`, intake form on project detail, save draft and submit to `SUBMITTED`, `responsesJson` exposed only on project detail GET. No chat or agent handoff.
+
+## Phase 2D — complete
+
+Raw brief intake + deterministic analysis: `responsesJson` v2 document, raw paste panel, `POST /api/admin/briefs/[briefId]/analyze`, analysis review/apply UI, PATCH merge for fields/source/analysis. Master brief form remains structured destination. No AI or file upload yet.

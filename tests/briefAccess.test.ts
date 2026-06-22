@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildAdminBriefListWhere,
+  canAnalyzeBrief,
   canEditBriefResponses,
   canViewBriefForActor,
 } from "@/lib/briefAccess";
@@ -49,6 +50,13 @@ describe("canEditBriefResponses", () => {
     expect(canEditBriefResponses("SUBMITTED", "ACTIVE")).toBe(false);
     expect(canEditBriefResponses("DRAFT", "ARCHIVED")).toBe(false);
     expect(canEditBriefResponses("ARCHIVED", "ACTIVE")).toBe(false);
+  });
+});
+
+describe("canAnalyzeBrief", () => {
+  it("matches edit rules for draft analysis", () => {
+    expect(canAnalyzeBrief("DRAFT", "ACTIVE")).toBe(true);
+    expect(canAnalyzeBrief("SUBMITTED", "ACTIVE")).toBe(false);
   });
 });
 

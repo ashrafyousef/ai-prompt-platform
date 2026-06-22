@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react";
 import {
   BRIEF_INTAKE_FIELD_DEFINITIONS,
+  type BriefDocumentV2,
   type BriefIntakeFieldKey,
-  type BriefIntakeResponsesV1,
-  emptyBriefIntakeResponses,
+  emptyBriefIntakeFields,
 } from "@/lib/briefIntake";
 import { canEditBriefResponses } from "@/lib/briefAccess";
 import { AgentSummaryCard } from "./AgentSummaryCard";
@@ -16,7 +16,7 @@ type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED"
 type BriefIntakeBrief = {
   id: string;
   status: string;
-  responsesJson: BriefIntakeResponsesV1;
+  responsesJson: BriefDocumentV2;
 };
 
 function adminApiError(data: { error?: string; message?: string }, fallback: string): string {
@@ -33,10 +33,10 @@ export function BriefIntakeForm({
   brief: BriefIntakeBrief | null;
   projectStatus: ProjectStatus;
   onSaved: (message: string) => void;
-  onError: (message: string) => void;
+  onError: (message: string | null) => void;
 }) {
-  const [fields, setFields] = useState<BriefIntakeResponsesV1["fields"]>(
-    () => brief?.responsesJson.fields ?? emptyBriefIntakeResponses().fields
+  const [fields, setFields] = useState(
+    () => brief?.responsesJson.fields ?? emptyBriefIntakeFields()
   );
   const [saving, setSaving] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -46,7 +46,7 @@ export function BriefIntakeForm({
     brief !== null && canEditBriefResponses(briefStatus, projectStatus);
 
   useEffect(() => {
-    setFields(brief?.responsesJson.fields ?? emptyBriefIntakeResponses().fields);
+    setFields(brief?.responsesJson.fields ?? emptyBriefIntakeFields());
   }, [brief]);
 
   function updateField(key: BriefIntakeFieldKey, value: string) {
@@ -54,7 +54,7 @@ export function BriefIntakeForm({
   }
 
   async function patchBrief(payload: {
-    responsesJson?: BriefIntakeResponsesV1;
+    responsesJson?: { fields: typeof fields };
     status?: "SUBMITTED";
   }) {
     if (!brief) return;
@@ -72,16 +72,12 @@ export function BriefIntakeForm({
   async function onSaveDraft() {
     if (!brief || !editable) return;
     setSaving(true);
-    onError("");
+    onError(null);
     try {
-      const responsesJson: BriefIntakeResponsesV1 = {
-        version: 1,
-        fields,
-      };
-      await patchBrief({ responsesJson });
-      onSaved("Brief draft saved.");
+      await patchBrief({ responsesJson: { fields } });
+      onSaved("Master brief draft saved.");
     } catch (error) {
-      onError(error instanceof Error ? error.message : "Failed to save brief draft.");
+      onError(error instanceof Error ? error.message : "Failed to save master brief draft.");
     } finally {
       setSaving(false);
     }
@@ -90,21 +86,17 @@ export function BriefIntakeForm({
   async function onSubmitBrief() {
     if (!brief || !editable) return;
     const confirmed = window.confirm(
-      "Submit this brief? You will not be able to edit the intake form after submission."
+      "Submit this master brief? You will not be able to edit it after submission."
     );
     if (!confirmed) return;
 
     setSubmitting(true);
-    onError("");
+    onError(null);
     try {
-      const responsesJson: BriefIntakeResponsesV1 = {
-        version: 1,
-        fields,
-      };
-      await patchBrief({ responsesJson, status: "SUBMITTED" });
-      onSaved("Brief submitted.");
+      await patchBrief({ responsesJson: { fields }, status: "SUBMITTED" });
+      onSaved("Master brief submitted.");
     } catch (error) {
-      onError(error instanceof Error ? error.message : "Failed to submit brief.");
+      onError(error instanceof Error ? error.message : "Failed to submit master brief.");
     } finally {
       setSubmitting(false);
     }
@@ -114,7 +106,7 @@ export function BriefIntakeForm({
 
   return (
     <AgentSummaryCard
-      title="Brief intake"
+      title="Master brief"
       actions={
         editable ? (
           <div className="flex flex-wrap gap-2">
@@ -140,17 +132,21 @@ export function BriefIntakeForm({
     >
       {!brief ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Create a brief for this project before filling out the intake form.
+          Create a brief for this project before editing the master brief.
         </p>
       ) : projectStatus === "ARCHIVED" ? (
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          This project is archived. The brief intake form is read-only.
+          This project is archived. The master brief is read-only.
         </p>
       ) : !editable ? (
         <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
-          This brief has been submitted and can no longer be edited.
+          This brief has been submitted and the master brief is read-only.
         </p>
-      ) : null}
+      ) : (
+        <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
+          Review and refine the structured master brief before submission.
+        </p>
+      )}
 
       {brief ? (
         <div className="grid gap-4 sm:grid-cols-2">

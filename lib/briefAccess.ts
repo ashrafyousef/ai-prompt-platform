@@ -57,3 +57,11 @@ export function canEditBriefResponses(
   if (briefStatus === "ARCHIVED") return false;
   return briefStatus === "DRAFT";
 }
+
+/** Whether raw brief analysis may be run in admin UI/API. */
+export function canAnalyzeBrief(
+  briefStatus: BriefStatus,
+  projectStatus: ProjectStatus
+): boolean {
+  return canEditBriefResponses(briefStatus, projectStatus);
+}

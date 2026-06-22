@@ -5,7 +5,9 @@ import { useCallback, useEffect, useState } from "react";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 import { AgentSummaryCard } from "./AgentSummaryCard";
 import { BriefIntakeForm } from "./BriefIntakeForm";
-import type { BriefIntakeResponsesV1 } from "@/lib/briefIntake";
+import { RawBriefPanel } from "./RawBriefPanel";
+import { BriefAnalysisPanel } from "./BriefAnalysisPanel";
+import type { BriefDocumentV2 } from "@/lib/briefIntake";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
@@ -14,7 +16,7 @@ type BriefSummary = {
   projectId: string;
   title: string;
   status: string;
-  responsesJson: BriefIntakeResponsesV1;
+  responsesJson: BriefDocumentV2;
   submittedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -260,6 +262,37 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           </div>
         )}
       </AgentSummaryCard>
+
+      <RawBriefPanel
+        briefId={project.brief?.id ?? null}
+        briefStatus={project.brief?.status ?? "DRAFT"}
+        projectStatus={project.status}
+        document={project.brief?.responsesJson ?? null}
+        onSaved={(message) => {
+          setSuccessMessage(message);
+          setError(null);
+          void load();
+        }}
+        onAnalyzed={(message) => {
+          setSuccessMessage(message);
+          setError(null);
+          void load();
+        }}
+        onError={(message) => setError(message)}
+      />
+
+      <BriefAnalysisPanel
+        briefId={project.brief?.id ?? null}
+        briefStatus={project.brief?.status ?? "DRAFT"}
+        projectStatus={project.status}
+        document={project.brief?.responsesJson ?? null}
+        onApplied={(message) => {
+          setSuccessMessage(message);
+          setError(null);
+          void load();
+        }}
+        onError={(message) => setError(message)}
+      />
 
       <BriefIntakeForm
         brief={project.brief}
