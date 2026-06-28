@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { canApproveBrief, canReopenBrief } from "@/lib/briefAccess";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
 import { AgentSummaryCard } from "./AgentSummaryCard";
 import { BriefIntakeForm } from "./BriefIntakeForm";
@@ -10,6 +11,7 @@ import { BriefAnalysisPanel } from "./BriefAnalysisPanel";
 import type { BriefDocumentV2 } from "@/lib/briefIntake";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
 
 type BriefSummary = {
   id: string;
@@ -79,6 +81,8 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [creatingBrief, setCreatingBrief] = useState(false);
+  const [reopeningBrief, setReopeningBrief] = useState(false);
+  const [approvingBrief, setApprovingBrief] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -153,6 +157,66 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
     }
   }
 
+  async function onReopenBrief() {
+    if (!project?.brief || project.status === "ARCHIVED") return;
+    const confirmed = window.confirm(
+      "Reopen this brief for editing? The brief will return to Draft status."
+    );
+    if (!confirmed) return;
+
+    setReopeningBrief(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const res = await fetch(`/api/admin/briefs/${encodeURIComponent(project.brief.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "DRAFT" }),
+      });
+      const data = (await res.json()) as { error?: string; message?: string };
+      if (!res.ok) {
+        setError(adminApiError(data, "Failed to reopen brief."));
+        return;
+      }
+      setSuccessMessage("Brief reopened for editing.");
+      await load();
+    } catch {
+      setError("Failed to reopen brief.");
+    } finally {
+      setReopeningBrief(false);
+    }
+  }
+
+  async function onApproveBrief() {
+    if (!project?.brief || project.status === "ARCHIVED") return;
+    const confirmed = window.confirm(
+      "Approve this brief? Approved briefs are locked and ready for downstream work."
+    );
+    if (!confirmed) return;
+
+    setApprovingBrief(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const res = await fetch(`/api/admin/briefs/${encodeURIComponent(project.brief.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "APPROVED" }),
+      });
+      const data = (await res.json()) as { error?: string; message?: string };
+      if (!res.ok) {
+        setError(adminApiError(data, "Failed to approve brief."));
+        return;
+      }
+      setSuccessMessage("Brief approved.");
+      await load();
+    } catch {
+      setError("Failed to approve brief.");
+    } finally {
+      setApprovingBrief(false);
+    }
+  }
+
   if (loading) {
     return <div className="py-10 text-sm text-zinc-500">Loading project...</div>;
   }
@@ -181,6 +245,16 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   }
 
   const canCreateBrief = !project.brief && project.status !== "ARCHIVED";
+  const briefStatus = (project.brief?.status ?? "DRAFT") as BriefStatus;
+  const showReopenBrief =
+    project.brief !== null &&
+    project.status !== "ARCHIVED" &&
+    canReopenBrief(briefStatus, project.status);
+  const showApproveBrief =
+    project.brief !== null &&
+    project.status !== "ARCHIVED" &&
+    canApproveBrief(briefStatus, project.status);
+  const lifecycleBusy = reopeningBrief || approvingBrief;
 
   return (
     <div className="space-y-6">
@@ -226,15 +300,39 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       <AgentSummaryCard
         title="Brief"
         actions={
-          canCreateBrief ? (
-            <button
-              type="button"
-              onClick={() => void onCreateBrief()}
-              disabled={creatingBrief}
-              className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-            >
-              {creatingBrief ? "Creating..." : "Create brief"}
-            </button>
+          canCreateBrief || showReopenBrief || showApproveBrief ? (
+            <div className="flex flex-wrap gap-2">
+              {canCreateBrief ? (
+                <button
+                  type="button"
+                  onClick={() => void onCreateBrief()}
+                  disabled={creatingBrief}
+                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                >
+                  {creatingBrief ? "Creating..." : "Create brief"}
+                </button>
+              ) : null}
+              {showReopenBrief ? (
+                <button
+                  type="button"
+                  onClick={() => void onReopenBrief()}
+                  disabled={lifecycleBusy}
+                  className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                >
+                  {reopeningBrief ? "Reopening..." : "Reopen brief"}
+                </button>
+              ) : null}
+              {showApproveBrief ? (
+                <button
+                  type="button"
+                  onClick={() => void onApproveBrief()}
+                  disabled={lifecycleBusy}
+                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+                >
+                  {approvingBrief ? "Approving..." : "Approve brief"}
+                </button>
+              ) : null}
+            </div>
           ) : null
         }
       >

@@ -1,15 +1,12 @@
 "use client";
 
 import { useEffect, useState, type ClipboardEvent } from "react";
-import { canAnalyzeBrief } from "@/lib/briefAccess";
+import { canAnalyzeBrief, getBriefReadOnlyMessage } from "@/lib/briefAccess";
 import { BRIEF_RAW_TEXT_MAX_LENGTH, type BriefDocumentV2 } from "@/lib/briefIntake";
 import { AgentSummaryCard } from "./AgentSummaryCard";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
-
-const READ_ONLY_BRIEF_MESSAGE =
-  "This brief is submitted/read-only. Reopen or create a new draft to edit.";
 
 const READ_ONLY_TEXTAREA_CLASS =
   "read-only:cursor-default read-only:border-zinc-200 read-only:bg-zinc-100 read-only:text-zinc-600 dark:read-only:border-zinc-700 dark:read-only:bg-zinc-900/80 dark:read-only:text-zinc-400";
@@ -43,7 +40,8 @@ export function RawBriefPanel({
   const status = briefStatus as BriefStatus;
   const editable =
     briefId !== null && canAnalyzeBrief(status, projectStatus);
-  const isReadOnlyBrief = briefId !== null && status !== "DRAFT" && projectStatus !== "ARCHIVED";
+  const readOnlyMessage =
+    briefId !== null ? getBriefReadOnlyMessage(status, projectStatus) : null;
 
   useEffect(() => {
     setRawText(document?.source?.rawText ?? "");
@@ -150,9 +148,9 @@ export function RawBriefPanel({
         <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
           This project is archived. The raw client brief is read-only.
         </p>
-      ) : isReadOnlyBrief ? (
+      ) : readOnlyMessage ? (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-          {READ_ONLY_BRIEF_MESSAGE}
+          {readOnlyMessage}
         </div>
       ) : (
         <div className="mb-4 space-y-2 text-sm text-zinc-500 dark:text-zinc-400">

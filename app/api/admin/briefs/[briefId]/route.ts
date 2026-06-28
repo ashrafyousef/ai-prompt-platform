@@ -13,7 +13,7 @@ import {
 const patchSchema = z
   .object({
     responsesJson: briefDocumentPatchSchema.optional(),
-    status: z.literal("SUBMITTED").optional(),
+    status: z.enum(["SUBMITTED", "DRAFT", "APPROVED"]).optional(),
   })
   .superRefine((body, ctx) => {
     if (body.responsesJson === undefined && body.status === undefined) {
@@ -127,6 +127,36 @@ export async function PATCH(
       );
     }
 
+    if (body.status === "DRAFT") {
+      if (brief.status === "APPROVED") {
+        return NextResponse.json(
+          { error: "Approved briefs cannot be reopened." },
+          { status: 400 }
+        );
+      }
+      if (brief.status !== "SUBMITTED" && brief.status !== "IN_REVIEW") {
+        return NextResponse.json(
+          { error: "Brief can only be reopened from SUBMITTED or IN_REVIEW status." },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (body.status === "APPROVED") {
+      if (brief.status === "DRAFT") {
+        return NextResponse.json(
+          { error: "Brief must be submitted before it can be approved." },
+          { status: 400 }
+        );
+      }
+      if (brief.status !== "SUBMITTED" && brief.status !== "IN_REVIEW") {
+        return NextResponse.json(
+          { error: "Brief can only be approved from SUBMITTED or IN_REVIEW status." },
+          { status: 400 }
+        );
+      }
+    }
+
     const existingDocument = parseBriefDocumentJson(brief.responsesJson);
     const nextDocument =
       body.responsesJson !== undefined
@@ -142,7 +172,7 @@ export async function PATCH(
 
     const updateData: {
       responsesJson?: typeof nextDocument;
-      status?: "SUBMITTED";
+      status?: "SUBMITTED" | "DRAFT" | "APPROVED";
       submittedAt?: Date;
     } = {};
 
@@ -155,6 +185,14 @@ export async function PATCH(
       if (!brief.submittedAt) {
         updateData.submittedAt = new Date();
       }
+    }
+
+    if (body.status === "DRAFT") {
+      updateData.status = "DRAFT";
+    }
+
+    if (body.status === "APPROVED") {
+      updateData.status = "APPROVED";
     }
 
     const updated = await db.brief.update({

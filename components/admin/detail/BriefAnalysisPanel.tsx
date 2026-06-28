@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { canEditBriefResponses } from "@/lib/briefAccess";
+import { canEditBriefResponses, getBriefReadOnlyMessage } from "@/lib/briefAccess";
 import {
   BRIEF_INTAKE_FIELD_DEFINITIONS,
   type BriefAnalysis,
@@ -11,9 +11,6 @@ import { AgentSummaryCard } from "./AgentSummaryCard";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
-
-const READ_ONLY_BRIEF_MESSAGE =
-  "This brief is submitted/read-only. Reopen or create a new draft to edit.";
 
 function adminApiError(data: { error?: string; message?: string }, fallback: string): string {
   if (data.message) return data.message;
@@ -47,7 +44,8 @@ export function BriefAnalysisPanel({
   const status = briefStatus as BriefStatus;
   const editable =
     briefId !== null && canEditBriefResponses(status, projectStatus);
-  const isReadOnlyBrief = briefId !== null && status !== "DRAFT" && projectStatus !== "ARCHIVED";
+  const readOnlyMessage =
+    briefId !== null ? getBriefReadOnlyMessage(status, projectStatus) : null;
 
   async function onApplyProposed() {
     if (!briefId || !editable || !proposedFields) return;
@@ -100,9 +98,9 @@ export function BriefAnalysisPanel({
         <p className="text-sm text-zinc-500 dark:text-zinc-400">
           Create a brief and run analysis to see issues and proposed master brief fields.
         </p>
-      ) : isReadOnlyBrief ? (
+      ) : readOnlyMessage ? (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-          {READ_ONLY_BRIEF_MESSAGE}
+          {readOnlyMessage}
         </div>
       ) : !analysis ? (
         <div className="space-y-2 text-sm text-zinc-500 dark:text-zinc-400">

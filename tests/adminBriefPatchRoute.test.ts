@@ -330,4 +330,221 @@ describe("admin brief PATCH route", () => {
       })
     );
   });
+
+  it("reopens SUBMITTED brief to DRAFT", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    const submittedAt = new Date("2026-01-04T00:00:00.000Z");
+    const existing = briefRow({
+      briefStatus: "SUBMITTED",
+      responsesJson: sampleDocument(),
+      submittedAt,
+    });
+    db.brief.findFirst.mockResolvedValue(existing);
+    db.brief.update.mockResolvedValue({
+      ...existing,
+      status: "DRAFT",
+    });
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ status: "DRAFT" }) as any, { params: { briefId } });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.brief.status).toBe("DRAFT");
+    expect(db.brief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "DRAFT" },
+      })
+    );
+  });
+
+  it("reopens IN_REVIEW brief to DRAFT", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    const existing = briefRow({
+      briefStatus: "IN_REVIEW",
+      responsesJson: sampleDocument(),
+      submittedAt: new Date("2026-01-04T00:00:00.000Z"),
+    });
+    db.brief.findFirst.mockResolvedValue(existing);
+    db.brief.update.mockResolvedValue({
+      ...existing,
+      status: "DRAFT",
+    });
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ status: "DRAFT" }) as any, { params: { briefId } });
+
+    expect(res.status).toBe(200);
+    expect(db.brief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "DRAFT" },
+      })
+    );
+  });
+
+  it("rejects reopen from APPROVED", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    db.brief.findFirst.mockResolvedValue(
+      briefRow({
+        briefStatus: "APPROVED",
+        responsesJson: sampleDocument(),
+        submittedAt: new Date("2026-01-04T00:00:00.000Z"),
+      })
+    );
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ status: "DRAFT" }) as any, { params: { briefId } });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/cannot be reopened/i);
+    expect(db.brief.update).not.toHaveBeenCalled();
+  });
+
+  it("approves SUBMITTED brief", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    const submittedAt = new Date("2026-01-04T00:00:00.000Z");
+    const existing = briefRow({
+      briefStatus: "SUBMITTED",
+      responsesJson: sampleDocument(),
+      submittedAt,
+    });
+    db.brief.findFirst.mockResolvedValue(existing);
+    db.brief.update.mockResolvedValue({
+      ...existing,
+      status: "APPROVED",
+    });
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ status: "APPROVED" }) as any, { params: { briefId } });
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.brief.status).toBe("APPROVED");
+    expect(db.brief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "APPROVED" },
+      })
+    );
+  });
+
+  it("approves IN_REVIEW brief", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    const existing = briefRow({
+      briefStatus: "IN_REVIEW",
+      responsesJson: sampleDocument(),
+      submittedAt: new Date("2026-01-04T00:00:00.000Z"),
+    });
+    db.brief.findFirst.mockResolvedValue(existing);
+    db.brief.update.mockResolvedValue({
+      ...existing,
+      status: "APPROVED",
+    });
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ status: "APPROVED" }) as any, { params: { briefId } });
+
+    expect(res.status).toBe(200);
+    expect(db.brief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "APPROVED" },
+      })
+    );
+  });
+
+  it("rejects approve from DRAFT", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    db.brief.findFirst.mockResolvedValue(briefRow({ responsesJson: sampleDocument() }));
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ status: "APPROVED" }) as any, { params: { briefId } });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/submitted before it can be approved/i);
+    expect(db.brief.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects submit from SUBMITTED", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    db.brief.findFirst.mockResolvedValue(
+      briefRow({
+        briefStatus: "SUBMITTED",
+        responsesJson: sampleDocument(),
+        submittedAt: new Date("2026-01-04T00:00:00.000Z"),
+      })
+    );
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ status: "SUBMITTED" }) as any, { params: { briefId } });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/DRAFT status/i);
+    expect(db.brief.update).not.toHaveBeenCalled();
+  });
+
+  it("preserves submittedAt when reopening and approving", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    const submittedAt = new Date("2026-01-04T00:00:00.000Z");
+
+    const submitted = briefRow({
+      briefStatus: "SUBMITTED",
+      responsesJson: sampleDocument(),
+      submittedAt,
+    });
+    db.brief.findFirst.mockResolvedValue(submitted);
+    db.brief.update.mockResolvedValue({ ...submitted, status: "DRAFT" });
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    await PATCH(request({ status: "DRAFT" }) as any, { params: { briefId } });
+
+    expect(db.brief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "DRAFT" },
+      })
+    );
+    expect(db.brief.update.mock.calls[0][0].data.submittedAt).toBeUndefined();
+
+    vi.clearAllMocks();
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+
+    const inReview = briefRow({
+      briefStatus: "IN_REVIEW",
+      responsesJson: sampleDocument(),
+      submittedAt,
+    });
+    db.brief.findFirst.mockResolvedValue(inReview);
+    db.brief.update.mockResolvedValue({ ...inReview, status: "APPROVED" });
+
+    await PATCH(request({ status: "APPROVED" }) as any, { params: { briefId } });
+
+    expect(db.brief.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { status: "APPROVED" },
+      })
+    );
+    expect(db.brief.update.mock.calls[0][0].data.submittedAt).toBeUndefined();
+  });
+
+  it("still rejects responsesJson edits outside DRAFT", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(ownerContext());
+    db.brief.findFirst.mockResolvedValue(
+      briefRow({
+        briefStatus: "IN_REVIEW",
+        responsesJson: sampleDocument(),
+        submittedAt: new Date("2026-01-04T00:00:00.000Z"),
+      })
+    );
+
+    const { PATCH } = await import("@/app/api/admin/briefs/[briefId]/route");
+    const res = await PATCH(request({ responsesJson: { fields: sampleFields() } }) as any, {
+      params: { briefId },
+    });
+    const body = await res.json();
+
+    expect(res.status).toBe(400);
+    expect(body.error).toMatch(/DRAFT status/i);
+    expect(db.brief.update).not.toHaveBeenCalled();
+  });
 });

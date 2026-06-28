@@ -7,14 +7,11 @@ import {
   type BriefIntakeFieldKey,
   emptyBriefIntakeFields,
 } from "@/lib/briefIntake";
-import { canEditBriefResponses } from "@/lib/briefAccess";
+import { canEditBriefResponses, getBriefReadOnlyMessage } from "@/lib/briefAccess";
 import { AgentSummaryCard } from "./AgentSummaryCard";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
-
-const READ_ONLY_BRIEF_MESSAGE =
-  "This brief is submitted/read-only. Reopen or create a new draft to edit.";
 
 const READ_ONLY_TEXTAREA_CLASS =
   "read-only:cursor-default read-only:border-zinc-200 read-only:bg-zinc-100 read-only:text-zinc-600 dark:read-only:border-zinc-700 dark:read-only:bg-zinc-900/80 dark:read-only:text-zinc-400";
@@ -50,7 +47,10 @@ export function BriefIntakeForm({
   const briefStatus = (brief?.status ?? "DRAFT") as BriefStatus;
   const editable =
     brief !== null && canEditBriefResponses(briefStatus, projectStatus);
-  const isReadOnlyBrief = brief !== null && briefStatus !== "DRAFT" && projectStatus !== "ARCHIVED";
+  const readOnlyMessage =
+    brief !== null
+      ? getBriefReadOnlyMessage(briefStatus, projectStatus, { intakeForm: true })
+      : null;
 
   useEffect(() => {
     setFields(brief?.responsesJson.fields ?? emptyBriefIntakeFields());
@@ -62,7 +62,7 @@ export function BriefIntakeForm({
 
   async function patchBrief(payload: {
     responsesJson?: { fields: typeof fields };
-    status?: "SUBMITTED";
+    status?: "SUBMITTED" | "DRAFT" | "APPROVED";
   }) {
     if (!brief) return;
     const res = await fetch(`/api/admin/briefs/${encodeURIComponent(brief.id)}`, {
@@ -145,9 +145,9 @@ export function BriefIntakeForm({
         <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">
           This project is archived. The master brief is read-only.
         </p>
-      ) : isReadOnlyBrief ? (
+      ) : readOnlyMessage ? (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
-          {READ_ONLY_BRIEF_MESSAGE}
+          {readOnlyMessage}
         </div>
       ) : (
         <p className="mb-4 text-sm text-zinc-500 dark:text-zinc-400">

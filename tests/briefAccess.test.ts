@@ -2,8 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   buildAdminBriefListWhere,
   canAnalyzeBrief,
+  canApproveBrief,
   canEditBriefResponses,
+  canReopenBrief,
   canViewBriefForActor,
+  getBriefReadOnlyMessage,
 } from "@/lib/briefAccess";
 
 const workspaceId = "ws-1";
@@ -57,6 +60,57 @@ describe("canAnalyzeBrief", () => {
   it("matches edit rules for draft analysis", () => {
     expect(canAnalyzeBrief("DRAFT", "ACTIVE")).toBe(true);
     expect(canAnalyzeBrief("SUBMITTED", "ACTIVE")).toBe(false);
+  });
+});
+
+describe("canReopenBrief", () => {
+  it("allows reopen from SUBMITTED or IN_REVIEW on active projects", () => {
+    expect(canReopenBrief("SUBMITTED", "ACTIVE")).toBe(true);
+    expect(canReopenBrief("IN_REVIEW", "ACTIVE")).toBe(true);
+  });
+
+  it("denies reopen for DRAFT, APPROVED, ARCHIVED, or archived projects", () => {
+    expect(canReopenBrief("DRAFT", "ACTIVE")).toBe(false);
+    expect(canReopenBrief("APPROVED", "ACTIVE")).toBe(false);
+    expect(canReopenBrief("ARCHIVED", "ACTIVE")).toBe(false);
+    expect(canReopenBrief("SUBMITTED", "ARCHIVED")).toBe(false);
+  });
+});
+
+describe("canApproveBrief", () => {
+  it("allows approve from SUBMITTED or IN_REVIEW on active projects", () => {
+    expect(canApproveBrief("SUBMITTED", "ACTIVE")).toBe(true);
+    expect(canApproveBrief("IN_REVIEW", "ACTIVE")).toBe(true);
+  });
+
+  it("denies approve for DRAFT, APPROVED, ARCHIVED, or archived projects", () => {
+    expect(canApproveBrief("DRAFT", "ACTIVE")).toBe(false);
+    expect(canApproveBrief("APPROVED", "ACTIVE")).toBe(false);
+    expect(canApproveBrief("ARCHIVED", "ACTIVE")).toBe(false);
+    expect(canApproveBrief("SUBMITTED", "ARCHIVED")).toBe(false);
+  });
+});
+
+describe("getBriefReadOnlyMessage", () => {
+  it("returns intake-form lifecycle messages", () => {
+    expect(getBriefReadOnlyMessage("SUBMITTED", "ACTIVE", { intakeForm: true })).toMatch(
+      /ready for review/i
+    );
+    expect(getBriefReadOnlyMessage("IN_REVIEW", "ACTIVE", { intakeForm: true })).toMatch(
+      /in review/i
+    );
+    expect(getBriefReadOnlyMessage("APPROVED", "ACTIVE", { intakeForm: true })).toMatch(
+      /approved and locked/i
+    );
+  });
+
+  it("returns panel lifecycle messages", () => {
+    expect(getBriefReadOnlyMessage("SUBMITTED", "ACTIVE")).toMatch(/ready for review/i);
+    expect(getBriefReadOnlyMessage("APPROVED", "ACTIVE")).toMatch(/approved and locked/i);
+  });
+
+  it("returns null for DRAFT", () => {
+    expect(getBriefReadOnlyMessage("DRAFT", "ACTIVE")).toBeNull();
   });
 });
 
