@@ -8,6 +8,7 @@ import { AgentSummaryCard } from "./AgentSummaryCard";
 import { BriefIntakeForm } from "./BriefIntakeForm";
 import { RawBriefPanel } from "./RawBriefPanel";
 import { BriefAnalysisPanel } from "./BriefAnalysisPanel";
+import { ApprovedBriefHandoffPanel } from "./ApprovedBriefHandoffPanel";
 import type { BriefDocumentV2 } from "@/lib/briefIntake";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
@@ -402,6 +403,10 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
         }}
         onError={(message) => setError(message || null)}
       />
+
+      {project.brief && briefStatus === "APPROVED" ? (
+        <ApprovedBriefHandoffPanel document={project.brief.responsesJson} />
+      ) : null}
     </div>
   );
 }
