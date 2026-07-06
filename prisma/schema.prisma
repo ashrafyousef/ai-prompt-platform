@@ -65,6 +65,12 @@ enum BriefStatus {
   ARCHIVED
 }
 
+enum StrategyStatus {
+  DRAFT
+  READY_FOR_CREATIVE
+  ARCHIVED
+}
+
 model User {
   id           String        @id @default(cuid())
   email        String        @unique
@@ -211,6 +217,7 @@ model Project {
   client      Client?       @relation(fields: [clientId], references: [id], onDelete: SetNull)
   teamAssignments ProjectTeamAssignment[]
   brief       Brief?
+  strategy    Strategy?
 
   @@unique([workspaceId, slug])
   @@index([workspaceId])
@@ -241,9 +248,26 @@ model Brief {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   project       Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  strategies    Strategy[]
 
   @@index([status])
   @@index([createdAt])
+}
+
+model Strategy {
+  id            String         @id @default(cuid())
+  projectId     String         @unique
+  sourceBriefId String
+  status        StrategyStatus @default(DRAFT)
+  responsesJson Json?
+  readyAt       DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  project       Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sourceBrief   Brief          @relation(fields: [sourceBriefId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([sourceBriefId])
 }
 
 model ChatSession {
