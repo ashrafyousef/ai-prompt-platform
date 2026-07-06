@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { formatAdminRouteError, requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
 import { parseBriefDocumentJson } from "@/lib/briefIntake";
+import { parseStrategyDocumentJson } from "@/lib/strategyDocument";
 import {
   canViewProjectForActor,
   toProjectActorContextFromManager,
@@ -35,6 +36,18 @@ const projectDetailSelect = {
       updatedAt: true,
     },
   },
+  strategy: {
+    select: {
+      id: true,
+      projectId: true,
+      sourceBriefId: true,
+      status: true,
+      responsesJson: true,
+      readyAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  },
 } as const;
 
 function serializeProjectDetail(
@@ -57,6 +70,16 @@ function serializeProjectDetail(
       status: string;
       responsesJson: unknown;
       submittedAt: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+    } | null;
+    strategy: {
+      id: string;
+      projectId: string;
+      sourceBriefId: string;
+      status: string;
+      responsesJson: unknown;
+      readyAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
     } | null;
@@ -92,6 +115,18 @@ function serializeProjectDetail(
           submittedAt: project.brief.submittedAt?.toISOString() ?? null,
           createdAt: project.brief.createdAt.toISOString(),
           updatedAt: project.brief.updatedAt.toISOString(),
+        }
+      : null,
+    strategy: project.strategy
+      ? {
+          id: project.strategy.id,
+          projectId: project.strategy.projectId,
+          sourceBriefId: project.strategy.sourceBriefId,
+          status: project.strategy.status,
+          readyAt: project.strategy.readyAt?.toISOString() ?? null,
+          createdAt: project.strategy.createdAt.toISOString(),
+          updatedAt: project.strategy.updatedAt.toISOString(),
+          responsesJson: parseStrategyDocumentJson(project.strategy.responsesJson),
         }
       : null,
   };
