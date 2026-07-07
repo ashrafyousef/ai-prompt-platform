@@ -9,7 +9,10 @@ import { BriefIntakeForm } from "./BriefIntakeForm";
 import { RawBriefPanel } from "./RawBriefPanel";
 import { BriefAnalysisPanel } from "./BriefAnalysisPanel";
 import { ApprovedBriefHandoffPanel } from "./ApprovedBriefHandoffPanel";
+import { StrategyDirectionPanel } from "./StrategyDirectionPanel";
+import { StrategyWorkflowSpine } from "./StrategyWorkflowSpine";
 import type { BriefDocumentV2 } from "@/lib/briefIntake";
+import type { StrategyDocumentV1 } from "@/lib/strategyDocument";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
@@ -25,6 +28,17 @@ type BriefSummary = {
   updatedAt: string;
 };
 
+type StrategySummary = {
+  id: string;
+  projectId: string;
+  sourceBriefId: string;
+  status: "DRAFT" | "READY_FOR_CREATIVE" | "ARCHIVED";
+  responsesJson: StrategyDocumentV1;
+  readyAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 type ProjectDetail = {
   id: string;
   name: string;
@@ -36,6 +50,7 @@ type ProjectDetail = {
   client: { id: string; name: string; slug: string } | null;
   teams: Array<{ id: string; name: string; slug: string }>;
   brief: BriefSummary | null;
+  strategy: StrategySummary | null;
 };
 
 function adminApiError(data: { error?: string; message?: string }, fallback: string): string {
@@ -405,7 +420,17 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       />
 
       {project.brief && briefStatus === "APPROVED" ? (
-        <ApprovedBriefHandoffPanel document={project.brief.responsesJson} />
+        <>
+          <StrategyWorkflowSpine
+            briefApproved={true}
+            strategyStatus={project.strategy?.status ?? null}
+          />
+          <ApprovedBriefHandoffPanel document={project.brief.responsesJson} />
+          <StrategyDirectionPanel
+            projectId={project.id}
+            initialStrategy={project.strategy}
+          />
+        </>
       ) : null}
     </div>
   );
