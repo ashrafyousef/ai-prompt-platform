@@ -8,6 +8,13 @@ import {
   type StrategyDocumentV1,
   type StrategyFieldKey,
 } from "@/lib/strategyDocument";
+import {
+  STRATEGY_MARK_READY_CONFIRM_MESSAGE,
+  STRATEGY_PREFILLED_BADGE_LABEL,
+  areStrategyFieldsDirty,
+  formatStrategyReadOnlyValue,
+  isStrategyPrefilledField,
+} from "@/lib/strategyUi";
 
 type StrategyStatus = "DRAFT" | "READY_FOR_CREATIVE" | "ARCHIVED";
 
@@ -36,6 +43,49 @@ function formatDateTime(iso: string): string {
   });
 }
 
+function PrefilledBadge() {
+  return (
+    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-300">
+      {STRATEGY_PREFILLED_BADGE_LABEL}
+    </span>
+  );
+}
+
+function FieldLabel({ label, prefilled }: { label: string; prefilled: boolean }) {
+  return (
+    <div className="mb-1 flex flex-wrap items-center gap-2">
+      <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400">{label}</span>
+      {prefilled ? <PrefilledBadge /> : null}
+    </div>
+  );
+}
+
+function ReadOnlyStrategyField({
+  label,
+  value,
+  prefilled,
+}: {
+  label: string;
+  value: string;
+  prefilled: boolean;
+}) {
+  return (
+    <div className="py-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="text-xs font-medium uppercase tracking-wide text-zinc-400">{label}</div>
+        {prefilled ? <PrefilledBadge /> : null}
+      </div>
+      <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-700 dark:text-zinc-300">
+        {formatStrategyReadOnlyValue(value)}
+      </p>
+    </div>
+  );
+}
+
+function syncFieldsFromStrategy(strategy: StrategySummary | null): StrategyDocumentV1["fields"] {
+  return strategy?.responsesJson.fields ?? emptyStrategyDocument().fields;
+}
+
 export function StrategyDirectionPanel({
   projectId,
   initialStrategy,
@@ -45,7 +95,10 @@ export function StrategyDirectionPanel({
 }) {
   const [strategy, setStrategy] = useState<StrategySummary | null>(initialStrategy);
   const [fields, setFields] = useState<StrategyDocumentV1["fields"]>(
-    initialStrategy?.responsesJson.fields ?? emptyStrategyDocument().fields
+    syncFieldsFromStrategy(initialStrategy)
+  );
+  const [savedFields, setSavedFields] = useState<StrategyDocumentV1["fields"]>(
+    syncFieldsFromStrategy(initialStrategy)
   );
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -54,10 +107,16 @@ export function StrategyDirectionPanel({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const applyStrategy = useCallback((next: StrategySummary | null) => {
+    const nextFields = syncFieldsFromStrategy(next);
+    setStrategy(next);
+    setFields(nextFields);
+    setSavedFields(nextFields);
+  }, []);
+
   useEffect(() => {
-    setStrategy(initialStrategy);
-    setFields(initialStrategy?.responsesJson.fields ?? emptyStrategyDocument().fields);
-  }, [initialStrategy]);
+    applyStrategy(initialStrategy);
+  }, [initialStrategy, applyStrategy]);
 
   const loadStrategy = useCallback(async () => {
     setLoading(true);
@@ -66,27 +125,39 @@ export function StrategyDirectionPanel({
       const res = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}/strategy`);
       const data = (await res.json()) as { error?: string; message?: string; strategy?: StrategySummary };
       if (res.status === 404) {
-        setStrategy(null);
-        setFields(emptyStrategyDocument().fields);
+        applyStrategy(null);
         return;
       }
       if (!res.ok || !data.strategy) {
         setError(apiError(data, "Failed to load strategy."));
         return;
       }
-      setStrategy(data.strategy);
-      setFields(data.strategy.responsesJson.fields);
+      applyStrategy(data.strategy);
     } catch {
       setError("Failed to load strategy.");
     } finally {
       setLoading(false);
     }
-  }, [projectId]);
+  }, [projectId, applyStrategy]);
 
   useEffect(() => {
     if (initialStrategy) return;
     void loadStrategy();
   }, [initialStrategy, loadStrategy]);
+
+  const isDraft = strategy?.status === "DRAFT";
+  const readOnly = strategy?.status === "READY_FOR_CREATIVE" || strategy?.status === "ARCHIVED";
+  const dirty = isDraft && areStrategyFieldsDirty(savedFields, fields);
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   async function onCreateStrategy() {
     setCreating(true);
@@ -106,8 +177,7 @@ export function StrategyDirectionPanel({
         setError(apiError(data, "Failed to create strategy."));
         return;
       }
-      setStrategy(data.strategy);
-      setFields(data.strategy.responsesJson.fields);
+      applyStrategy(data.strategy);
       setSuccess("Strategy direction created.");
     } catch {
       setError("Failed to create strategy.");
@@ -134,8 +204,7 @@ export function StrategyDirectionPanel({
         setError(apiError(data, "Failed to save strategy draft."));
         return;
       }
-      setStrategy(data.strategy);
-      setFields(data.strategy.responsesJson.fields);
+      applyStrategy(data.strategy);
       setSuccess("Strategy draft saved.");
     } catch {
       setError("Failed to save strategy draft.");
@@ -146,6 +215,8 @@ export function StrategyDirectionPanel({
 
   async function onMarkReady() {
     if (!strategy) return;
+    if (!window.confirm(STRATEGY_MARK_READY_CONFIRM_MESSAGE)) return;
+
     setMarkingReady(true);
     setError(null);
     setSuccess(null);
@@ -160,8 +231,7 @@ export function StrategyDirectionPanel({
         setError(apiError(data, "Failed to mark strategy ready."));
         return;
       }
-      setStrategy(data.strategy);
-      setFields(data.strategy.responsesJson.fields);
+      applyStrategy(data.strategy);
       setSuccess("Strategy marked ready for creative.");
     } catch {
       setError("Failed to mark strategy ready.");
@@ -180,18 +250,21 @@ export function StrategyDirectionPanel({
     return Array.from(map.entries());
   }, []);
 
-  const readOnly = strategy?.status === "READY_FOR_CREATIVE" || strategy?.status === "ARCHIVED";
-
   return (
     <AgentSummaryCard
       title="Strategy Direction"
       actions={
-        strategy && !readOnly ? (
-          <div className="flex flex-wrap gap-2">
+        strategy && isDraft ? (
+          <div className="flex flex-wrap items-center gap-2">
+            {dirty ? (
+              <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                Unsaved changes
+              </span>
+            ) : null}
             <button
               type="button"
               onClick={() => void onSaveDraft()}
-              disabled={saving || markingReady}
+              disabled={saving || markingReady || !dirty}
               className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
             >
               {saving ? "Saving..." : "Save Draft"}
@@ -199,7 +272,7 @@ export function StrategyDirectionPanel({
             <button
               type="button"
               onClick={() => void onMarkReady()}
-              disabled={saving || markingReady}
+              disabled={saving || markingReady || dirty}
               className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
             >
               {markingReady ? "Marking..." : "Mark Ready for Creative"}
@@ -258,27 +331,41 @@ export function StrategyDirectionPanel({
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
                   {groupName}
                 </h3>
-                <div className="space-y-3">
-                  {defs.map((def) => (
-                    <label key={def.key} className="block">
-                      <div className="mb-1 text-xs font-medium text-zinc-500 dark:text-zinc-400">
-                        {def.label}
-                      </div>
-                      <textarea
+                {readOnly ? (
+                  <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+                    {defs.map((def) => (
+                      <ReadOnlyStrategyField
+                        key={def.key}
+                        label={def.label}
                         value={fields[def.key as StrategyFieldKey]}
-                        onChange={(event) =>
-                          setFields((prev) => ({
-                            ...prev,
-                            [def.key]: event.target.value,
-                          }))
-                        }
-                        disabled={readOnly || saving || markingReady}
-                        rows={4}
-                        className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 disabled:bg-zinc-100 disabled:text-zinc-500 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100 dark:disabled:bg-zinc-900/60 dark:disabled:text-zinc-500"
+                        prefilled={isStrategyPrefilledField(def.key)}
                       />
-                    </label>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {defs.map((def) => (
+                      <label key={def.key} className="block">
+                        <FieldLabel
+                          label={def.label}
+                          prefilled={isStrategyPrefilledField(def.key)}
+                        />
+                        <textarea
+                          value={fields[def.key as StrategyFieldKey]}
+                          onChange={(event) =>
+                            setFields((prev) => ({
+                              ...prev,
+                              [def.key]: event.target.value,
+                            }))
+                          }
+                          disabled={saving || markingReady}
+                          rows={4}
+                          className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-800 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-100"
+                        />
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </>

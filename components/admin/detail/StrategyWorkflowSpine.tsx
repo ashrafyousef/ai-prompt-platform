@@ -20,22 +20,21 @@ function StagePill({ label, tone }: { label: string; tone: "done" | "active" | "
   );
 }
 
+/** Rendered only on approved-brief project pages. */
 export function StrategyWorkflowSpine({
-  briefApproved,
   strategyStatus,
 }: {
-  briefApproved: boolean;
   strategyStatus: StrategyStatus | null;
 }) {
   const strategyReady = strategyStatus === "READY_FOR_CREATIVE";
-  const strategyTone = strategyReady ? "done" : briefApproved ? "active" : "locked";
+  const strategyTone = strategyReady ? "done" : "active";
   const readyTone = strategyReady ? "done" : "locked";
 
   return (
     <section className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
       <h2 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">Workflow</h2>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <StagePill label="Brief Approved" tone={briefApproved ? "done" : "active"} />
+        <StagePill label="Brief Approved" tone="done" />
         <span className="text-zinc-400">→</span>
         <StagePill label="Strategy Direction" tone={strategyTone} />
         <span className="text-zinc-400">→</span>

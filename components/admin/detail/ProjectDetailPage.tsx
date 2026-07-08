@@ -421,10 +421,7 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
 
       {project.brief && briefStatus === "APPROVED" ? (
         <>
-          <StrategyWorkflowSpine
-            briefApproved={true}
-            strategyStatus={project.strategy?.status ?? null}
-          />
+          <StrategyWorkflowSpine strategyStatus={project.strategy?.status ?? null} />
           <ApprovedBriefHandoffPanel document={project.brief.responsesJson} />
           <StrategyDirectionPanel
             projectId={project.id}
