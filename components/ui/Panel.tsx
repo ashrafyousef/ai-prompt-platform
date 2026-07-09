@@ -10,6 +10,7 @@ export type PanelProps = {
   padding?: PanelPadding;
   children: React.ReactNode;
   className?: string;
+  id?: string;
 };
 
 const bodyPaddingClasses: Record<PanelPadding, string> = {
@@ -26,11 +27,12 @@ export function Panel({
   padding = "md",
   children,
   className,
+  id,
 }: PanelProps) {
   const hasHeader = Boolean(title || description || actions);
 
   return (
-    <Card padding="none" className={className}>
+    <Card padding="none" id={id} className={className}>
       {hasHeader ? (
         <div className="flex flex-col gap-2 border-b border-zinc-200 px-4 py-3 dark:border-zinc-800 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">

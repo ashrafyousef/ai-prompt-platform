@@ -5,97 +5,24 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { canApproveBrief, canReopenBrief } from "@/lib/briefAccess";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
-import { AgentSummaryCard } from "./AgentSummaryCard";
-import { BriefIntakeForm } from "./BriefIntakeForm";
-import { RawBriefPanel } from "./RawBriefPanel";
-import { BriefAnalysisPanel } from "./BriefAnalysisPanel";
-import { ApprovedBriefHandoffPanel } from "./ApprovedBriefHandoffPanel";
-import { StrategyDirectionPanel } from "./StrategyDirectionPanel";
-import { StrategyWorkflowSpine } from "./StrategyWorkflowSpine";
-import type { BriefDocumentV2 } from "@/lib/briefIntake";
-import type { StrategyDocumentV1 } from "@/lib/strategyDocument";
-
-type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
-type BriefStatus = "DRAFT" | "SUBMITTED" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
-
-type BriefSummary = {
-  id: string;
-  projectId: string;
-  title: string;
-  status: string;
-  responsesJson: BriefDocumentV2;
-  submittedAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type StrategySummary = {
-  id: string;
-  projectId: string;
-  sourceBriefId: string;
-  status: "DRAFT" | "READY_FOR_CREATIVE" | "ARCHIVED";
-  responsesJson: StrategyDocumentV1;
-  readyAt: string | null;
-  createdAt: string;
-  updatedAt: string;
-};
-
-type ProjectChatSession = {
-  id: string;
-  title: string;
-  updatedAt: string;
-  summary: string | null;
-};
-
-type ProjectDetail = {
-  id: string;
-  name: string;
-  slug: string;
-  status: ProjectStatus;
-  clientId: string | null;
-  createdAt: string;
-  updatedAt: string;
-  client: { id: string; name: string; slug: string } | null;
-  teams: Array<{ id: string; name: string; slug: string }>;
-  brief: BriefSummary | null;
-  strategy: StrategySummary | null;
-};
+import { PageShell, Panel } from "@/components/ui";
+import { uiTokens } from "@/lib/ui/tokens";
+import {
+  ProjectBriefPanel,
+  ProjectChatsPanel,
+  ProjectContextPanel,
+  ProjectKnowledgePanel,
+  ProjectNextActions,
+  ProjectStrategyPanel,
+  ProjectWorkspaceHeader,
+  type BriefStatus,
+  type ProjectChatSession,
+  type ProjectDetail,
+} from "@/components/projects";
 
 function adminApiError(data: { error?: string; message?: string }, fallback: string): string {
   if (data.message) return data.message;
   return data.error ?? fallback;
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-function formatTeams(teams: ProjectDetail["teams"]): string {
-  if (teams.length === 0) return "—";
-  return teams.map((team) => team.name).join(", ");
-}
-
-function MetadataRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 py-1.5">
-      <span className="text-xs text-zinc-400">{label}</span>
-      <span className="text-right text-xs font-medium text-zinc-700 dark:text-zinc-300">{value}</span>
-    </div>
-  );
 }
 
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
@@ -309,7 +236,7 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
 
   if (loadFailed || !project) {
     return (
-      <div className="space-y-6">
+      <PageShell>
         <AdminBreadcrumbs
           crumbs={[
             { label: "Admin", href: "/admin" },
@@ -317,16 +244,14 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
             { label: "Project" },
           ]}
         />
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-          {error ?? "Project not found."}
-        </div>
+        <div className={uiTokens.alert.danger}>{error ?? "Project not found."}</div>
         <Link
           href="/admin/projects"
           className="inline-block text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
         >
           ← Back to projects
         </Link>
-      </div>
+      </PageShell>
     );
   }
 
@@ -343,7 +268,7 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const lifecycleBusy = reopeningBrief || approvingBrief;
 
   return (
-    <div className="space-y-6">
+    <PageShell>
       <AdminBreadcrumbs
         crumbs={[
           { label: "Admin", href: "/admin" },
@@ -352,18 +277,13 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
         ]}
       />
 
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">{project.name}</h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Project details and linked brief status.
-        </p>
-      </div>
+      <ProjectWorkspaceHeader
+        project={project}
+        creatingProjectChat={creatingProjectChat}
+        onNewProjectChat={() => void onNewProjectChat()}
+      />
 
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-          {error}
-        </div>
-      ) : null}
+      {error ? <div className={uiTokens.alert.danger}>{error}</div> : null}
 
       {successMessage ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:text-emerald-300">
@@ -371,170 +291,70 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
         </div>
       ) : null}
 
-      <AgentSummaryCard title="Project metadata">
-        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-          <MetadataRow label="Name" value={project.name} />
-          <MetadataRow label="Slug" value={project.slug} />
-          <MetadataRow label="Status" value={project.status} />
-          <MetadataRow label="Client" value={project.client?.name ?? "—"} />
-          <MetadataRow label="Teams" value={formatTeams(project.teams)} />
-          <MetadataRow label="Created" value={formatDate(project.createdAt)} />
-          <MetadataRow label="Updated" value={formatDate(project.updatedAt)} />
-        </div>
-      </AgentSummaryCard>
-
-      <AgentSummaryCard
-        title="My project chats"
-        actions={
-          <button
-            type="button"
-            onClick={() => void onNewProjectChat()}
-            disabled={creatingProjectChat}
-            className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-          >
-            {creatingProjectChat ? "Creating..." : "New chat"}
-          </button>
-        }
-      >
-        {projectChatsLoading ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading chats...</p>
-        ) : projectChats.length === 0 ? (
-          <p className="text-sm text-zinc-500 dark:text-zinc-400">
-            No chats linked to this project yet.
-          </p>
-        ) : (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            {projectChats.map((chat) => (
-              <div key={chat.id} className="flex items-baseline justify-between gap-4 py-1.5">
-                <Link
-                  href={`/chat?sessionId=${encodeURIComponent(chat.id)}`}
-                  className="text-xs font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
-                >
-                  {chat.title}
-                </Link>
-                <span className="shrink-0 text-xs text-zinc-400">{formatDateTime(chat.updatedAt)}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </AgentSummaryCard>
-
-      <AgentSummaryCard
-        title="Brief"
-        actions={
-          canCreateBrief || showReopenBrief || showApproveBrief ? (
-            <div className="flex flex-wrap gap-2">
-              {canCreateBrief ? (
-                <button
-                  type="button"
-                  onClick={() => void onCreateBrief()}
-                  disabled={creatingBrief}
-                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  {creatingBrief ? "Creating..." : "Create brief"}
-                </button>
-              ) : null}
-              {showReopenBrief ? (
-                <button
-                  type="button"
-                  onClick={() => void onReopenBrief()}
-                  disabled={lifecycleBusy}
-                  className="rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-xs font-medium text-zinc-800 disabled:opacity-60 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
-                >
-                  {reopeningBrief ? "Reopening..." : "Reopen brief"}
-                </button>
-              ) : null}
-              {showApproveBrief ? (
-                <button
-                  type="button"
-                  onClick={() => void onApproveBrief()}
-                  disabled={lifecycleBusy}
-                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-                >
-                  {approvingBrief ? "Approving..." : "Approve brief"}
-                </button>
-              ) : null}
-            </div>
-          ) : null
-        }
-      >
-        {project.brief ? (
-          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-            <MetadataRow label="Title" value={project.brief.title} />
-            <MetadataRow label="Status" value={project.brief.status} />
-            <MetadataRow label="Created" value={formatDate(project.brief.createdAt)} />
-            <MetadataRow label="Updated" value={formatDate(project.brief.updatedAt)} />
-            <MetadataRow
-              label="Submitted"
-              value={project.brief.submittedAt ? formatDateTime(project.brief.submittedAt) : "—"}
-            />
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <p className="text-sm text-zinc-500 dark:text-zinc-400">
-              No brief linked to this project yet.
-            </p>
-            {project.status === "ARCHIVED" ? (
-              <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                Briefs cannot be created for archived projects.
-              </p>
-            ) : null}
-          </div>
-        )}
-      </AgentSummaryCard>
-
-      <RawBriefPanel
-        briefId={project.brief?.id ?? null}
-        briefStatus={project.brief?.status ?? "DRAFT"}
-        projectStatus={project.status}
-        document={project.brief?.responsesJson ?? null}
-        onSaved={(message) => {
-          setSuccessMessage(message);
-          setError(null);
-          void load();
-        }}
-        onAnalyzed={(message) => {
-          setSuccessMessage(message);
-          setError(null);
-          void load();
-        }}
-        onError={(message) => setError(message)}
-      />
-
-      <BriefAnalysisPanel
-        briefId={project.brief?.id ?? null}
-        briefStatus={project.brief?.status ?? "DRAFT"}
-        projectStatus={project.status}
-        document={project.brief?.responsesJson ?? null}
-        onApplied={(message) => {
-          setSuccessMessage(message);
-          setError(null);
-          void load();
-        }}
-        onError={(message) => setError(message)}
-      />
-
-      <BriefIntakeForm
-        brief={project.brief}
-        projectStatus={project.status}
-        onSaved={(message) => {
-          setSuccessMessage(message);
-          setError(null);
-          void load();
-        }}
-        onError={(message) => setError(message || null)}
-      />
-
-      {project.brief && briefStatus === "APPROVED" ? (
-        <>
-          <StrategyWorkflowSpine strategyStatus={project.strategy?.status ?? null} />
-          <ApprovedBriefHandoffPanel document={project.brief.responsesJson} />
-          <StrategyDirectionPanel
-            projectId={project.id}
-            initialStrategy={project.strategy}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <ProjectChatsPanel
+            sessions={projectChats}
+            loading={projectChatsLoading}
+            creating={creatingProjectChat}
+            onNewProjectChat={() => void onNewProjectChat()}
           />
-        </>
-      ) : null}
-    </div>
+
+          <ProjectBriefPanel
+            project={project}
+            briefStatus={briefStatus}
+            canCreateBrief={canCreateBrief}
+            showReopenBrief={showReopenBrief}
+            showApproveBrief={showApproveBrief}
+            creatingBrief={creatingBrief}
+            reopeningBrief={reopeningBrief}
+            approvingBrief={approvingBrief}
+            lifecycleBusy={lifecycleBusy}
+            onCreateBrief={() => void onCreateBrief()}
+            onReopenBrief={() => void onReopenBrief()}
+            onApproveBrief={() => void onApproveBrief()}
+            onSaved={(message) => {
+              setSuccessMessage(message);
+              setError(null);
+              void load();
+            }}
+            onAnalyzed={(message) => {
+              setSuccessMessage(message);
+              setError(null);
+              void load();
+            }}
+            onApplied={(message) => {
+              setSuccessMessage(message);
+              setError(null);
+              void load();
+            }}
+            onError={(message) => setError(message)}
+          />
+
+          <ProjectStrategyPanel project={project} briefStatus={briefStatus} />
+        </div>
+
+        <div className="space-y-6">
+          <ProjectContextPanel />
+          <ProjectKnowledgePanel />
+          <ProjectNextActions
+            project={project}
+            briefStatus={briefStatus}
+            sessions={projectChats}
+            onNewProjectChat={() => void onNewProjectChat()}
+            onCreateBrief={() => void onCreateBrief()}
+          />
+          <Panel
+            title="Files / References"
+            description="Uploaded references and project files will appear here in a later phase."
+            padding="md"
+          >
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              File upload management is not available yet. Use project chats and brief intake for now.
+            </p>
+          </Panel>
+        </div>
+      </div>
+    </PageShell>
   );
 }
