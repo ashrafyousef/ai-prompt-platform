@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { canApproveBrief, canReopenBrief } from "@/lib/briefAccess";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
@@ -37,6 +38,13 @@ type StrategySummary = {
   readyAt: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+type ProjectChatSession = {
+  id: string;
+  title: string;
+  updatedAt: string;
+  summary: string | null;
 };
 
 type ProjectDetail = {
@@ -91,6 +99,7 @@ function MetadataRow({ label, value }: { label: string; value: string }) {
 }
 
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
+  const router = useRouter();
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -99,6 +108,9 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const [creatingBrief, setCreatingBrief] = useState(false);
   const [reopeningBrief, setReopeningBrief] = useState(false);
   const [approvingBrief, setApprovingBrief] = useState(false);
+  const [projectChats, setProjectChats] = useState<ProjectChatSession[]>([]);
+  const [projectChatsLoading, setProjectChatsLoading] = useState(false);
+  const [creatingProjectChat, setCreatingProjectChat] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -137,9 +149,38 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
     }
   }, [projectId]);
 
+  const loadProjectChats = useCallback(async () => {
+    setProjectChatsLoading(true);
+    try {
+      const res = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}/chats`);
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        sessions?: ProjectChatSession[];
+      };
+
+      if (!res.ok || !Array.isArray(data.sessions)) {
+        setProjectChats([]);
+        return;
+      }
+
+      setProjectChats(data.sessions);
+    } catch {
+      setProjectChats([]);
+    } finally {
+      setProjectChatsLoading(false);
+    }
+  }, [projectId]);
+
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (project) {
+      void loadProjectChats();
+    }
+  }, [project, loadProjectChats]);
 
   async function onCreateBrief() {
     if (!project || project.brief || project.status === "ARCHIVED") return;
@@ -233,6 +274,35 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
     }
   }
 
+  async function onNewProjectChat() {
+    if (!project) return;
+    setCreatingProjectChat(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/chat/new", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: project.id }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        session?: { id: string };
+      };
+
+      if (!res.ok || !data.session?.id) {
+        setError(adminApiError(data, "Failed to create chat."));
+        return;
+      }
+
+      router.push(`/chat?sessionId=${encodeURIComponent(data.session.id)}`);
+    } catch {
+      setError("Failed to create chat.");
+    } finally {
+      setCreatingProjectChat(false);
+    }
+  }
+
   if (loading) {
     return <div className="py-10 text-sm text-zinc-500">Loading project...</div>;
   }
@@ -311,6 +381,42 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
           <MetadataRow label="Created" value={formatDate(project.createdAt)} />
           <MetadataRow label="Updated" value={formatDate(project.updatedAt)} />
         </div>
+      </AgentSummaryCard>
+
+      <AgentSummaryCard
+        title="My project chats"
+        actions={
+          <button
+            type="button"
+            onClick={() => void onNewProjectChat()}
+            disabled={creatingProjectChat}
+            className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            {creatingProjectChat ? "Creating..." : "New chat"}
+          </button>
+        }
+      >
+        {projectChatsLoading ? (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading chats...</p>
+        ) : projectChats.length === 0 ? (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            No chats linked to this project yet.
+          </p>
+        ) : (
+          <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+            {projectChats.map((chat) => (
+              <div key={chat.id} className="flex items-baseline justify-between gap-4 py-1.5">
+                <Link
+                  href={`/chat?sessionId=${encodeURIComponent(chat.id)}`}
+                  className="text-xs font-medium text-zinc-700 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-zinc-100"
+                >
+                  {chat.title}
+                </Link>
+                <span className="shrink-0 text-xs text-zinc-400">{formatDateTime(chat.updatedAt)}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </AgentSummaryCard>
 
       <AgentSummaryCard
