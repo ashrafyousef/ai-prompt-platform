@@ -1,6 +1,19 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import {
+  Button,
+  Card,
+  Input,
+  PageHeader,
+  PageShell,
+  Panel,
+  SectionStack,
+  StatusChip,
+  invitationStatusToChipStatus,
+} from "@/components/ui";
+import { uiTokens } from "@/lib/ui/tokens";
+import { cn } from "@/lib/ui/cn";
 
 type Member = {
   id: string;
@@ -42,6 +55,13 @@ type Invitation = {
   invitedByName: string | null;
   invitedByEmail: string;
 };
+
+function invitationStatus(inv: Invitation): string {
+  if (inv.revokedAt) return "Revoked";
+  if (inv.acceptedAt) return "Accepted";
+  if (new Date(inv.expiresAt).getTime() <= Date.now()) return "Expired";
+  return "Pending";
+}
 
 export default function AdminMembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -253,38 +273,34 @@ export default function AdminMembersPage() {
     return <div className="py-10 text-sm text-zinc-500">Loading members...</div>;
   }
 
+  const selectClassName = cn("min-w-0", uiTokens.control.base, uiTokens.focusRing);
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Members</h2>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Manage workspace members, role level, status, and team assignment with controlled rules.
-        </p>
-      </div>
-      {error ? (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-300">
-          {error}
-        </div>
-      ) : null}
-      <section className="rounded-2xl border border-zinc-200/80 bg-white p-4 shadow-sm dark:border-zinc-800 dark:bg-zinc-950">
-        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">Invite member</h3>
-        <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-          Workspace owners or platform admins can invite OWNER/ADMIN/MEMBER. Team-scoped workspace admins can invite
-          MEMBER only.
-        </p>
-        <div className="mt-3 grid gap-3 md:grid-cols-4">
-          <input
+    <PageShell>
+      <PageHeader
+        title="Members"
+        description="Manage workspace members, role level, status, and team assignment with controlled rules."
+      />
+
+      {error ? <div className={uiTokens.alert.danger}>{error}</div> : null}
+
+      <Panel
+        title="Invite member"
+        description="Workspace owners or platform admins can invite OWNER/ADMIN/MEMBER. Team-scoped workspace admins can invite MEMBER only."
+        padding="md"
+      >
+        <div className="grid gap-3 md:grid-cols-4">
+          <Input
             type="email"
             value={inviteEmail}
             onChange={(e) => setInviteEmail(e.target.value)}
             placeholder="member@example.com"
-            className="min-w-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
           />
           <select
             value={inviteRole}
             onChange={(e) => setInviteRole(e.target.value as "OWNER" | "ADMIN" | "MEMBER")}
             disabled={!canChooseInviteRole}
-            className="min-w-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className={selectClassName}
           >
             <option value="MEMBER">MEMBER</option>
             <option value="ADMIN">ADMIN</option>
@@ -293,7 +309,7 @@ export default function AdminMembersPage() {
           <select
             value={inviteTeamId}
             onChange={(e) => setInviteTeamId(e.target.value)}
-            className="min-w-0 rounded-md border border-zinc-300 bg-white px-3 py-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+            className={selectClassName}
           >
             {canCrossAssignTeams ? <option value="">No team</option> : null}
             {teams.map((team) => (
@@ -302,34 +318,28 @@ export default function AdminMembersPage() {
               </option>
             ))}
           </select>
-          <button
-            type="button"
-            onClick={() => void createInvite()}
-            disabled={creatingInvite}
-            className="min-w-0 rounded-md bg-zinc-900 px-3 py-2 text-sm font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
-          >
+          <Button type="button" onClick={() => void createInvite()} disabled={creatingInvite} className="min-w-0">
             {creatingInvite ? "Creating..." : "Create invite"}
-          </button>
+          </Button>
         </div>
         {inviteError ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{inviteError}</p> : null}
-        {inviteMessage ? <p className="mt-2 text-sm text-emerald-700 dark:text-emerald-400">{inviteMessage}</p> : null}
+        {inviteMessage ? <p className={cn("mt-2", uiTokens.alert.success)}>{inviteMessage}</p> : null}
         {inviteLink ? (
           <p className="mt-1 break-all text-xs text-zinc-500 dark:text-zinc-400">Dev invite link: {inviteLink}</p>
         ) : null}
-      </section>
+      </Panel>
 
-      <section className="space-y-3 md:hidden">
+      <SectionStack className="md:hidden">
         <h3 className="px-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Members</h3>
         {sortedMembers.map((member) => {
           const draft = drafts[member.id];
           const editable = canEditMember(member);
           return (
-            <article
-              key={`mobile-member-${member.id}`}
-              className="rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
-            >
+            <Card key={`mobile-member-${member.id}`} padding="sm">
               <div className="mb-2">
-                <p className="break-words text-sm font-medium text-zinc-900 dark:text-zinc-100">{member.name || "Unnamed user"}</p>
+                <p className="break-words text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                  {member.name || "Unnamed user"}
+                </p>
                 <p className="break-all text-xs text-zinc-500 dark:text-zinc-400">{member.email}</p>
               </div>
               <div className="grid gap-2">
@@ -351,7 +361,7 @@ export default function AdminMembersPage() {
                         },
                       }))
                     }
-                    className="min-w-0 rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                    className={cn(selectClassName, "px-2 py-2 text-xs")}
                   >
                     <option value="OWNER">OWNER</option>
                     <option value="ADMIN">ADMIN</option>
@@ -376,7 +386,7 @@ export default function AdminMembersPage() {
                         },
                       }))
                     }
-                    className="min-w-0 rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                    className={cn(selectClassName, "px-2 py-2 text-xs")}
                   >
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -400,7 +410,7 @@ export default function AdminMembersPage() {
                         },
                       }))
                     }
-                    className="min-w-0 rounded-md border border-zinc-300 bg-white px-2 py-2 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                    className={cn(selectClassName, "px-2 py-2 text-xs")}
                   >
                     {canCrossAssignTeams ? <option value="">No team</option> : null}
                     {teams.map((team) => (
@@ -418,21 +428,21 @@ export default function AdminMembersPage() {
                     new Date(member.joinedAt)
                   )}
                 </p>
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   onClick={() => void saveMember(member)}
                   disabled={!editable || savingMemberId === member.id}
-                  className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
                 >
                   {savingMemberId === member.id ? "Saving..." : "Save"}
-                </button>
+                </Button>
               </div>
-            </article>
+            </Card>
           );
         })}
-      </section>
+      </SectionStack>
 
-      <div className="hidden overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 md:block">
+      <Card padding="none" className="hidden overflow-x-auto md:block">
         <table className="min-w-full divide-y divide-zinc-200 dark:divide-zinc-800">
           <thead className="bg-zinc-50 dark:bg-zinc-900">
             <tr className="text-left text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
@@ -473,7 +483,7 @@ export default function AdminMembersPage() {
                           },
                         }))
                       }
-                      className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                      className={cn(uiTokens.control.compact, uiTokens.focusRing)}
                     >
                       <option value="OWNER">OWNER</option>
                       <option value="ADMIN">ADMIN</option>
@@ -497,7 +507,7 @@ export default function AdminMembersPage() {
                           },
                         }))
                       }
-                      className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                      className={cn(uiTokens.control.compact, uiTokens.focusRing)}
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
@@ -520,7 +530,7 @@ export default function AdminMembersPage() {
                           },
                         }))
                       }
-                      className="rounded-md border border-zinc-300 bg-white px-2 py-1 text-xs dark:border-zinc-700 dark:bg-zinc-900"
+                      className={cn(uiTokens.control.compact, uiTokens.focusRing)}
                     >
                       {canCrossAssignTeams ? <option value="">No team</option> : null}
                       {teams.map((team) => (
@@ -536,47 +546,41 @@ export default function AdminMembersPage() {
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <button
+                    <Button
                       type="button"
+                      size="sm"
                       onClick={() => void saveMember(member)}
                       disabled={!editable || savingMemberId === member.id}
-                      className="rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
                     >
                       {savingMemberId === member.id ? "Saving..." : "Save"}
-                    </button>
+                    </Button>
                   </td>
                 </tr>
               );
             })}
           </tbody>
         </table>
-      </div>
-      <section className="space-y-3 md:hidden">
+      </Card>
+
+      <SectionStack className="md:hidden">
         <h3 className="px-1 text-sm font-semibold text-zinc-900 dark:text-zinc-100">Invitations</h3>
         {invitations.length === 0 ? (
-          <article className="rounded-2xl border border-zinc-200/80 bg-white p-3 text-sm text-zinc-500 shadow-sm dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-400">
+          <Card padding="sm" className="text-sm text-zinc-500 dark:text-zinc-400">
             No invitations yet.
-          </article>
+          </Card>
         ) : (
           invitations.map((inv) => {
-            const status = inv.revokedAt
-              ? "Revoked"
-              : inv.acceptedAt
-                ? "Accepted"
-                : new Date(inv.expiresAt).getTime() <= Date.now()
-                  ? "Expired"
-                  : "Pending";
+            const status = invitationStatus(inv);
             const canRevoke = status === "Pending";
             return (
-              <article
-                key={`mobile-invite-${inv.id}`}
-                className="rounded-2xl border border-zinc-200/80 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
-              >
+              <Card key={`mobile-invite-${inv.id}`} padding="sm">
                 <p className="break-all text-sm font-medium text-zinc-900 dark:text-zinc-100">{inv.email}</p>
                 <div className="mt-2 grid gap-2 text-xs text-zinc-500 dark:text-zinc-400 min-[430px]:grid-cols-2">
                   <p>Role: {inv.role}</p>
                   <p>Team: {inv.teamName ?? "None"}</p>
-                  <p>Status: {status}</p>
+                  <p className="flex items-center gap-2">
+                    Status: <StatusChip status={invitationStatusToChipStatus(status)} label={status} />
+                  </p>
                   <p>
                     Expires{" "}
                     {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
@@ -585,22 +589,23 @@ export default function AdminMembersPage() {
                   </p>
                 </div>
                 <div className="mt-3">
-                  <button
+                  <Button
                     type="button"
+                    variant="outline"
+                    size="sm"
                     disabled={!canRevoke}
                     onClick={() => void revokeInvite(inv.id)}
-                    className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-700"
                   >
                     Revoke
-                  </button>
+                  </Button>
                 </div>
-              </article>
+              </Card>
             );
           })
         )}
-      </section>
+      </SectionStack>
 
-      <section className="hidden overflow-x-auto rounded-2xl border border-zinc-200/80 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-950 md:block">
+      <Card padding="none" className="hidden overflow-x-auto md:block">
         <div className="border-b border-zinc-200 px-4 py-3 text-sm font-semibold text-zinc-900 dark:border-zinc-800 dark:text-zinc-100">
           Invitations
         </div>
@@ -624,34 +629,31 @@ export default function AdminMembersPage() {
               </tr>
             ) : (
               invitations.map((inv) => {
-                const status = inv.revokedAt
-                  ? "Revoked"
-                  : inv.acceptedAt
-                    ? "Accepted"
-                    : new Date(inv.expiresAt).getTime() <= Date.now()
-                      ? "Expired"
-                      : "Pending";
+                const status = invitationStatus(inv);
                 const canRevoke = status === "Pending";
                 return (
                   <tr key={inv.id}>
                     <td className="px-4 py-3 text-zinc-900 dark:text-zinc-100">{inv.email}</td>
                     <td className="px-4 py-3">{inv.role}</td>
                     <td className="px-4 py-3">{inv.teamName ?? "None"}</td>
-                    <td className="px-4 py-3">{status}</td>
+                    <td className="px-4 py-3">
+                      <StatusChip status={invitationStatusToChipStatus(status)} label={status} />
+                    </td>
                     <td className="px-4 py-3 text-zinc-600 dark:text-zinc-400">
                       {new Intl.DateTimeFormat(undefined, { dateStyle: "medium" }).format(
                         new Date(inv.expiresAt)
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <button
+                      <Button
                         type="button"
+                        variant="outline"
+                        size="sm"
                         disabled={!canRevoke}
                         onClick={() => void revokeInvite(inv.id)}
-                        className="rounded-md border border-zinc-300 px-2 py-1 text-xs disabled:opacity-50 dark:border-zinc-700"
                       >
                         Revoke
-                      </button>
+                      </Button>
                     </td>
                   </tr>
                 );
@@ -659,11 +661,12 @@ export default function AdminMembersPage() {
             )}
           </tbody>
         </table>
-      </section>
+      </Card>
+
       <p className="text-xs text-zinc-500 dark:text-zinc-400">
         Owners can change roles and status. Admins can manage member status/team for MEMBER entries only. The last
         active owner cannot be removed or deactivated.
       </p>
-    </div>
+    </PageShell>
   );
 }

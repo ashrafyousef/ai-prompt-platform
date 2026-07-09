@@ -10,6 +10,7 @@ import {
   MODEL_CAPABILITY_LABELS,
   PROVIDER_DISPLAY,
 } from "@/lib/modelUiLabels";
+import { Badge } from "@/components/ui";
 
 function pickTriggerCapability(
   model: UiModelSummary,
@@ -123,24 +124,17 @@ export function ModelSelector({
             >
               {model.displayName}
             </span>
-            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-              {PROVIDER_DISPLAY[model.provider]}
-            </span>
-            <span className="shrink-0 rounded-full bg-zinc-100/90 px-1.5 py-px text-[9px] font-medium text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400">
-              {COST_TIER_DISPLAY[model.costTier]}
-            </span>
+            <Badge size="sm">{PROVIDER_DISPLAY[model.provider]}</Badge>
+            <Badge size="sm">{COST_TIER_DISPLAY[model.costTier]}</Badge>
           </div>
           <p className="mt-0.5 line-clamp-2 min-w-0 break-words text-[11px] leading-snug text-zinc-600 dark:text-zinc-400">
             {model.shortDescription}
           </p>
           <div className="mt-1.5 flex flex-wrap gap-1">
             {model.capabilities.filter((c): c is UiModelCapability => MODEL_CAPABILITY_CHIP_SET.has(c)).map((capability) => (
-              <span
-                key={`${model.id}-${capability}`}
-                className="max-w-full break-words rounded-full bg-zinc-100/85 px-1.5 py-px text-[9px] font-medium text-zinc-600/90 dark:bg-zinc-800 dark:text-zinc-400"
-              >
+              <Badge key={`${model.id}-${capability}`} size="sm">
                 {MODEL_CAPABILITY_LABELS[capability]}
-              </span>
+              </Badge>
             ))}
           </div>
           {imageIncompatible ? (
@@ -307,16 +301,16 @@ export function ModelSelector({
       >
         <Sparkles className="h-3.5 w-3.5 shrink-0 text-violet-500" />
         <span className="min-w-0 flex-1 truncate">{selected.displayName}</span>
-        <span className="hidden shrink-0 rounded-full bg-zinc-100 px-1.5 py-px text-[10px] font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 sm:inline">
+        <Badge size="md" className="hidden sm:inline">
           {PROVIDER_DISPLAY[selected.provider]}
-        </span>
-        <span className="hidden shrink-0 rounded-full bg-zinc-100 px-1.5 py-px text-[10px] font-medium text-zinc-700 dark:bg-zinc-700 dark:text-zinc-300 sm:inline">
+        </Badge>
+        <Badge size="md" className="hidden sm:inline">
           {COST_TIER_DISPLAY[selected.costTier]}
-        </span>
+        </Badge>
         {triggerCapability ? (
-          <span className="hidden shrink-0 rounded-full bg-violet-100/80 px-1.5 py-px text-[10px] font-medium text-violet-800 dark:bg-violet-950/50 dark:text-violet-200 sm:inline">
+          <Badge variant="brand" size="md" className="hidden sm:inline">
             {MODEL_CAPABILITY_LABELS[triggerCapability]}
-          </span>
+          </Badge>
         ) : null}
         <ChevronDown className={`h-3 w-3 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
