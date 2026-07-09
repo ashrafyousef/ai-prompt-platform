@@ -6,6 +6,8 @@ import {
   toProjectActorContextFromManager,
 } from "@/lib/projectAccess";
 
+export const dynamic = "force-dynamic";
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: { projectId: string } }
@@ -57,7 +59,10 @@ export async function GET(
       },
     });
 
-    return NextResponse.json({ sessions });
+    return NextResponse.json(
+      { sessions },
+      { headers: { "Cache-Control": "no-store" } }
+    );
   } catch (error) {
     const { status, body } = formatAdminRouteError(error, "Failed to load project chats.");
     return NextResponse.json(body, { status });

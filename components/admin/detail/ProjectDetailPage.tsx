@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { canApproveBrief, canReopenBrief } from "@/lib/briefAccess";
 import { AdminBreadcrumbs } from "./AdminBreadcrumbs";
@@ -27,6 +27,8 @@ function adminApiError(data: { error?: string; message?: string }, fallback: str
 
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const projectPath = `/admin/projects/${projectId}`;
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -79,7 +81,9 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const loadProjectChats = useCallback(async () => {
     setProjectChatsLoading(true);
     try {
-      const res = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}/chats`);
+      const res = await fetch(`/api/admin/projects/${encodeURIComponent(projectId)}/chats`, {
+        cache: "no-store",
+      });
       const data = (await res.json()) as {
         error?: string;
         message?: string;
@@ -104,10 +108,26 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
   }, [load]);
 
   useEffect(() => {
-    if (project) {
-      void loadProjectChats();
-    }
-  }, [project, loadProjectChats]);
+    if (!project || pathname !== projectPath) return;
+
+    void loadProjectChats();
+
+    const refreshChats = () => {
+      if (document.visibilityState === "visible") {
+        void loadProjectChats();
+      }
+    };
+
+    window.addEventListener("focus", refreshChats);
+    document.addEventListener("visibilitychange", refreshChats);
+    window.addEventListener("pageshow", refreshChats);
+
+    return () => {
+      window.removeEventListener("focus", refreshChats);
+      document.removeEventListener("visibilitychange", refreshChats);
+      window.removeEventListener("pageshow", refreshChats);
+    };
+  }, [project, pathname, projectPath, loadProjectChats]);
 
   async function onCreateBrief() {
     if (!project || project.brief || project.status === "ARCHIVED") return;
