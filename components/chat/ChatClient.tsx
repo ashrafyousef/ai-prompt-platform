@@ -7,6 +7,7 @@ import { MessageList } from "@/components/chat/MessageList";
 import { ChatLayout } from "@/components/chat/ChatLayout";
 import { SavedPromptsPanel } from "@/components/chat/SavedPromptsPanel";
 import Link from "next/link";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useChatSession } from "@/components/chat/hooks/useChatSession";
 import { useChatStream } from "@/components/chat/hooks/useChatStream";
@@ -18,8 +19,16 @@ import {
   resolveChatDefaultAgentId,
 } from "@/lib/chatDefaultAgent";
 
+function chatSessionHref(sessionId: string): string {
+  return `/chat?sessionId=${encodeURIComponent(sessionId)}`;
+}
+
 export function ChatClient() {
   const { status, data: session } = useSession();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlSessionId = searchParams.get("sessionId")?.trim() || undefined;
 
   const {
     sessions,
@@ -51,6 +60,16 @@ export function ChatClient() {
   const [authLoadingTimedOut, setAuthLoadingTimedOut] = useState(false);
   const [composerBottomInset, setComposerBottomInset] = useState(260);
   const composerDockRef = useRef<HTMLDivElement | null>(null);
+  const hydratedUrlSessionRef = useRef<string | null>(null);
+
+  function syncSessionInUrl(sessionId: string | undefined) {
+    if (typeof window === "undefined") return;
+    if (pathname !== "/chat") return;
+    const nextHref = sessionId ? chatSessionHref(sessionId) : "/chat";
+    const currentHref = `${pathname}${window.location.search}`;
+    if (currentHref === nextHref || (currentHref === "/chat" && nextHref === "/chat")) return;
+    router.replace(nextHref, { scroll: false });
+  }
 
   const { toast } = useToast();
 
@@ -203,9 +222,28 @@ export function ChatClient() {
     };
   }, [status]);
 
+  // Open the exact existing session when arriving via /chat?sessionId=...
+  // (e.g. Project Chats links and "New project chat" navigation).
+  useEffect(() => {
+    if (status !== "authenticated") return;
+    if (!urlSessionId) {
+      hydratedUrlSessionRef.current = null;
+      return;
+    }
+    if (hydratedUrlSessionRef.current === urlSessionId) return;
+
+    hydratedUrlSessionRef.current = urlSessionId;
+    setActiveSessionId(urlSessionId);
+    setMobileSidebarOpen(false);
+    void loadMessages(urlSessionId, true);
+    void refreshSessions();
+  }, [status, urlSessionId, loadMessages, refreshSessions]);
+
   const handleSelectSession = async (sessionId: string) => {
     setActiveSessionId(sessionId);
     setMobileSidebarOpen(false);
+    hydratedUrlSessionRef.current = sessionId;
+    syncSessionInUrl(sessionId);
     await loadMessages(sessionId);
   };
 
@@ -214,6 +252,8 @@ export function ChatClient() {
       const newSessionId = await createSession();
       if (newSessionId) {
         setActiveSessionId(newSessionId);
+        hydratedUrlSessionRef.current = newSessionId;
+        syncSessionInUrl(newSessionId);
         await loadMessages(newSessionId);
       }
     } catch (error) {
@@ -250,6 +290,8 @@ export function ChatClient() {
         }
         sid = newId;
         setActiveSessionId(newId);
+        hydratedUrlSessionRef.current = newId;
+        syncSessionInUrl(newId);
       } catch (error) {
         toast(
           error instanceof Error ? error.message : "Couldn't start a chat session.",
@@ -320,7 +362,11 @@ export function ChatClient() {
           onRename={renameSession}
           onDelete={async (id) => {
             await deleteSession(id);
-            if (activeSessionId === id) setActiveSessionId(undefined);
+            if (activeSessionId === id) {
+              setActiveSessionId(undefined);
+              hydratedUrlSessionRef.current = null;
+              syncSessionInUrl(undefined);
+            }
           }}
           onShare={shareSession}
           collapsed={sidebarCollapsed}
