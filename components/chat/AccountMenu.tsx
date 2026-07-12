@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Ellipsis, LogOut, Shield, User } from "lucide-react";
+import { Ellipsis, FolderKanban, LogOut, Shield, User } from "lucide-react";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 
 type AccountMenuProps = {
@@ -64,14 +64,24 @@ function AccountActions({
         Profile
       </Link>
       {isAdmin ? (
-        <Link
-          href="/admin"
-          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-          onClick={onClose}
-        >
-          <Shield className="h-4 w-4" />
-          Admin
-        </Link>
+        <>
+          <Link
+            href="/projects"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            onClick={onClose}
+          >
+            <FolderKanban className="h-4 w-4" />
+            Projects
+          </Link>
+          <Link
+            href="/admin"
+            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+            onClick={onClose}
+          >
+            <Shield className="h-4 w-4" />
+            Admin
+          </Link>
+        </>
       ) : null}
       <div className="my-1.5 h-px bg-zinc-300 dark:bg-zinc-700" />
       <SignOutButton

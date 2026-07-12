@@ -28,7 +28,7 @@ function adminApiError(data: { error?: string; message?: string }, fallback: str
 export function ProjectDetailPage({ projectId }: { projectId: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const projectPath = `/admin/projects/${projectId}`;
+  const projectPath = `/projects/${projectId}`;
   const [project, setProject] = useState<ProjectDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
@@ -259,14 +259,13 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
       <PageShell>
         <AdminBreadcrumbs
           crumbs={[
-            { label: "Admin", href: "/admin" },
-            { label: "Projects", href: "/admin/projects" },
+            { label: "Projects", href: "/projects" },
             { label: "Project" },
           ]}
         />
         <div className={uiTokens.alert.danger}>{error ?? "Project not found."}</div>
         <Link
-          href="/admin/projects"
+          href="/projects"
           className="inline-block text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
         >
           ← Back to projects
@@ -291,8 +290,7 @@ export function ProjectDetailPage({ projectId }: { projectId: string }) {
     <PageShell>
       <AdminBreadcrumbs
         crumbs={[
-          { label: "Admin", href: "/admin" },
-          { label: "Projects", href: "/admin/projects" },
+          { label: "Projects", href: "/projects" },
           { label: project.name },
         ]}
       />

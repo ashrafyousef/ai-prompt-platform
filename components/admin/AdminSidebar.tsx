@@ -135,6 +135,12 @@ export function AdminSidebar({
             My profile
           </Link>
           <Link
+            href="/projects"
+            className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            Project workspaces
+          </Link>
+          <Link
             href="/chat"
             className="text-xs font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
           >

@@ -21,12 +21,14 @@ export async function middleware(request: NextRequest) {
   }
 
   const { pathname } = request.nextUrl;
+  const isProjectsPath = pathname === "/projects" || pathname.startsWith("/projects/");
   const isProtected =
     pathname === "/chat" ||
     pathname.startsWith("/chat/") ||
     pathname === "/profile" ||
     pathname.startsWith("/profile/") ||
-    pathname.startsWith("/admin");
+    pathname.startsWith("/admin") ||
+    isProjectsPath;
 
   if (isProtected && !token) {
     const signIn = new URL("/sign-in", request.url);
@@ -39,12 +41,17 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(noWorkspace);
   }
 
-  // Align with server admin gates: workspace OWNER/ADMIN may access /admin, not only User.role=ADMIN.
+  // Align with server admin gates: workspace OWNER/ADMIN may access /admin and /projects,
+  // not only User.role=ADMIN. Phase 4A keeps /projects manager-gated (MEMBER denied until 4B).
   const workspaceRole = token?.workspaceRole as string | undefined;
   const isWorkspaceAdmin =
     workspaceRole === "OWNER" || workspaceRole === "ADMIN";
   const isPlatformAdmin = token?.role === "ADMIN";
-  if (pathname.startsWith("/admin") && !isWorkspaceAdmin && !isPlatformAdmin) {
+  if (
+    (pathname.startsWith("/admin") || isProjectsPath) &&
+    !isWorkspaceAdmin &&
+    !isPlatformAdmin
+  ) {
     const unauthorized = new URL("/unauthorized", request.url);
     return NextResponse.redirect(unauthorized);
   }
@@ -53,5 +60,14 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/chat", "/chat/:path*", "/profile", "/profile/:path*", "/admin", "/admin/:path*"],
+  matcher: [
+    "/chat",
+    "/chat/:path*",
+    "/profile",
+    "/profile/:path*",
+    "/admin",
+    "/admin/:path*",
+    "/projects",
+    "/projects/:path*",
+  ],
 };
