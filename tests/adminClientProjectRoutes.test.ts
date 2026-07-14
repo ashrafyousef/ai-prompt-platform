@@ -201,6 +201,7 @@ describe("admin clients route", () => {
 describe("admin projects route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.team.findMany.mockResolvedValue([]);
   });
 
   it("denies unauthenticated access", async () => {
@@ -223,14 +224,66 @@ describe("admin projects route", () => {
 
     const { GET } = await import("@/app/api/admin/projects/route");
     const res = await GET(request("http://localhost/api/admin/projects") as any);
+    const body = await res.json();
 
     expect(res.status).toBe(200);
+    expect(body.assignmentTeams).toEqual([]);
     expect(db.project.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           workspaceId,
           status: { not: "ARCHIVED" },
         }),
+      })
+    );
+  });
+
+  it("returns full workspace assignmentTeams for teamless workspace ADMIN", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue({
+      userId: "admin-teamless",
+      workspaceId,
+      workspaceRole: "ADMIN" as const,
+      platformRole: "USER" as const,
+      teamId: null,
+    });
+    db.project.findMany.mockResolvedValue([]);
+    db.team.findMany.mockResolvedValue([
+      { id: teamA, name: "Team A", slug: "team-a", isArchived: false },
+    ]);
+
+    const { GET } = await import("@/app/api/admin/projects/route");
+    const res = await GET(request("http://localhost/api/admin/projects") as any);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.assignmentTeams).toEqual([
+      { id: teamA, name: "Team A", slug: "team-a", isArchived: false },
+    ]);
+    expect(db.team.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { workspaceId, isArchived: false },
+      })
+    );
+  });
+
+  it("scopes assignmentTeams to own team for team-scoped ADMIN", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(teamAdminContext());
+    db.project.findMany.mockResolvedValue([]);
+    db.team.findMany.mockResolvedValue([
+      { id: teamA, name: "Team A", slug: "team-a", isArchived: false },
+    ]);
+
+    const { GET } = await import("@/app/api/admin/projects/route");
+    const res = await GET(request("http://localhost/api/admin/projects") as any);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.assignmentTeams).toEqual([
+      { id: teamA, name: "Team A", slug: "team-a", isArchived: false },
+    ]);
+    expect(db.team.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { workspaceId, isArchived: false, id: teamA },
       })
     );
   });

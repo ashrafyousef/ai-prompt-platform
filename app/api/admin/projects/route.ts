@@ -3,7 +3,6 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import {
   formatAdminRouteError,
-  isTeamScopedWorkspaceAdmin,
   requireWorkspaceMemberManagerContext,
 } from "@/lib/adminAuth";
 import {
@@ -17,6 +16,11 @@ import {
   buildAdminProjectListWhere,
   toProjectActorContextFromManager,
 } from "@/lib/projectAccess";
+import {
+  INVALID_PROJECT_TEAMS_MESSAGE,
+  loadAssignmentTeamCatalog,
+  resolveProjectTeamIdsForManager,
+} from "@/lib/projectTeamAssignment";
 
 const createSchema = z.object({
   name: z.string().trim().min(1).max(160),
@@ -94,11 +98,14 @@ export async function GET(req: NextRequest) {
     const includeArchived = parseIncludeArchivedParam(searchParams);
     const clientId = searchParams.get("clientId")?.trim() || null;
 
-    const projects = await db.project.findMany({
-      where: buildAdminProjectListWhere(actor, { includeArchived, clientId }),
-      orderBy: { updatedAt: "desc" },
-      select: projectSelect,
-    });
+    const [projects, assignmentTeams] = await Promise.all([
+      db.project.findMany({
+        where: buildAdminProjectListWhere(actor, { includeArchived, clientId }),
+        orderBy: { updatedAt: "desc" },
+        select: projectSelect,
+      }),
+      loadAssignmentTeamCatalog(auth),
+    ]);
 
     return NextResponse.json({
       viewer: {
@@ -106,6 +113,7 @@ export async function GET(req: NextRequest) {
         platformRole: auth.platformRole,
         teamId: auth.teamId,
       },
+      assignmentTeams,
       projects: projects.map(serializeProject),
     });
   } catch (error) {
@@ -119,18 +127,11 @@ export async function POST(req: NextRequest) {
     const auth = await requireWorkspaceMemberManagerContext();
     const body = createSchema.parse(await req.json());
     const slug = body.slug ?? slugifyWorkspaceEntityName(body.name);
-    let teamIds = Array.from(new Set(body.teamIds ?? []));
-
-    if (isTeamScopedWorkspaceAdmin(auth) && auth.teamId) {
-      if (teamIds.length === 0) {
-        teamIds = [auth.teamId];
-      } else if (teamIds.some((teamId) => teamId !== auth.teamId)) {
-        return NextResponse.json(
-          { error: "Workspace admins can only assign projects to their own team." },
-          { status: 403 }
-        );
-      }
+    const resolvedTeams = resolveProjectTeamIdsForManager(auth, body.teamIds);
+    if (!resolvedTeams.ok) {
+      return NextResponse.json({ error: resolvedTeams.error }, { status: resolvedTeams.status });
     }
+    const teamIds = resolvedTeams.teamIds;
 
     const existing = await db.project.findUnique({
       where: {
@@ -175,10 +176,7 @@ export async function POST(req: NextRequest) {
         select: { id: true },
       });
       if (teams.length !== teamIds.length) {
-        return NextResponse.json(
-          { error: "One or more teams were not found in this workspace or are archived." },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: INVALID_PROJECT_TEAMS_MESSAGE }, { status: 400 });
       }
     }
 

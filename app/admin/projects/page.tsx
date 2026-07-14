@@ -2,6 +2,16 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  classifyProjectTeamAssignments,
+  formatInvalidAssignmentLabel,
+  getProjectAssignmentEditorPolicy,
+  initialEditableTeamIds,
+  invalidAssignmentWarning,
+  selectableTeamsForEditor,
+  toggleEditableTeamId,
+  type ProjectAssignmentViewer,
+} from "@/lib/adminProjectTeamEditor";
 
 type ProjectStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
 
@@ -52,6 +62,7 @@ export default function AdminProjectsPage() {
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [clients, setClients] = useState<ClientOption[]>([]);
   const [teams, setTeams] = useState<TeamOption[]>([]);
+  const [viewer, setViewer] = useState<ProjectAssignmentViewer | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadFailed, setLoadFailed] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -62,33 +73,39 @@ export default function AdminProjectsPage() {
   const [createStatus, setCreateStatus] = useState<ProjectStatus>("DRAFT");
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [editTeamIds, setEditTeamIds] = useState<string[]>([]);
+  const [savingTeams, setSavingTeams] = useState(false);
 
   const activeTeams = useMemo(() => teams.filter((t) => !t.isArchived), [teams]);
+  const policy = useMemo(
+    () =>
+      getProjectAssignmentEditorPolicy(
+        viewer ?? { workspaceRole: null, platformRole: null, teamId: null }
+      ),
+    [viewer]
+  );
 
   async function load() {
     setLoading(true);
     setError(null);
     setLoadFailed(false);
     try {
-      const [projectsRes, clientsRes, teamsRes] = await Promise.all([
+      const [projectsRes, clientsRes] = await Promise.all([
         fetch("/api/admin/projects"),
         fetch("/api/admin/clients"),
-        fetch("/api/admin/teams"),
       ]);
       const projectsData = (await projectsRes.json()) as {
         error?: string;
         message?: string;
         projects?: ProjectRow[];
+        viewer?: ProjectAssignmentViewer;
+        assignmentTeams?: TeamOption[];
       };
       const clientsData = (await clientsRes.json()) as {
         error?: string;
         message?: string;
         clients?: ClientOption[];
-      };
-      const teamsData = (await teamsRes.json()) as {
-        error?: string;
-        message?: string;
-        teams?: TeamOption[];
       };
 
       if (projectsRes.status === 403) {
@@ -96,7 +113,7 @@ export default function AdminProjectsPage() {
         setLoadFailed(true);
         return;
       }
-      if (!projectsRes.ok || !projectsData.projects) {
+      if (!projectsRes.ok || !projectsData.projects || !projectsData.assignmentTeams) {
         setError(adminApiError(projectsData, "Failed to load projects."));
         setLoadFailed(true);
         return;
@@ -106,15 +123,11 @@ export default function AdminProjectsPage() {
         setLoadFailed(true);
         return;
       }
-      if (!teamsRes.ok || !teamsData.teams) {
-        setError(adminApiError(teamsData, "Failed to load teams for project form."));
-        setLoadFailed(true);
-        return;
-      }
 
       setProjects(projectsData.projects);
       setClients(clientsData.clients);
-      setTeams(teamsData.teams);
+      setTeams(projectsData.assignmentTeams);
+      setViewer(projectsData.viewer ?? null);
     } catch {
       setError("Failed to load projects.");
       setLoadFailed(true);
@@ -130,6 +143,151 @@ export default function AdminProjectsPage() {
   function toggleTeam(teamId: string) {
     setSelectedTeamIds((prev) =>
       prev.includes(teamId) ? prev.filter((id) => id !== teamId) : [...prev, teamId]
+    );
+  }
+
+  function startEditTeams(project: ProjectRow) {
+    const classified = classifyProjectTeamAssignments(project.teams, teams);
+    setEditingProjectId(project.id);
+    setEditTeamIds(initialEditableTeamIds(classified, policy));
+    setError(null);
+    setSuccessMessage(null);
+  }
+
+  function cancelEditTeams() {
+    setEditingProjectId(null);
+    setEditTeamIds([]);
+  }
+
+  async function saveProjectTeams(projectId: string) {
+    setSavingTeams(true);
+    setError(null);
+    setSuccessMessage(null);
+    try {
+      const res = await fetch(`/api/admin/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamIds: editTeamIds }),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        project?: ProjectRow;
+      };
+      if (!res.ok) {
+        // Keep editor open and preserve last confirmed projects[] + current draft selection.
+        setError(adminApiError(data, "Failed to update project teams."));
+        return;
+      }
+      setEditingProjectId(null);
+      setEditTeamIds([]);
+      setSuccessMessage("Project teams updated.");
+      await load();
+    } catch {
+      setError("Failed to update project teams.");
+    } finally {
+      setSavingTeams(false);
+    }
+  }
+
+  function renderTeamEditor(project: ProjectRow) {
+    const classified = classifyProjectTeamAssignments(project.teams, teams);
+    const warning = invalidAssignmentWarning(classified.invalid);
+    const selectable = selectableTeamsForEditor(activeTeams, policy);
+
+    if (editingProjectId !== project.id) {
+      return (
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span>{formatTeams(project.teams)}</span>
+            <button
+              type="button"
+              onClick={() => startEditTeams(project)}
+              className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-700 hover:bg-zinc-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-900"
+            >
+              Edit teams
+            </button>
+          </div>
+          {warning ? (
+            <p className="text-[11px] text-amber-700 dark:text-amber-300">{warning}</p>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {warning ? (
+          <div className="rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-[11px] text-amber-800 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            <p>{warning}</p>
+            <ul className="mt-1 list-disc pl-4">
+              {classified.invalid.map((team) => (
+                <li key={`${project.id}-invalid-${team.id}`}>{formatInvalidAssignmentLabel(team)}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
+        {selectable.length === 0 ? (
+          <p className="text-xs text-zinc-500">No active teams available.</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            {selectable.map((team) => {
+              const locked =
+                policy.mode === "own-team-only" && policy.ownTeamId === team.id;
+              return (
+                <label
+                  key={`${project.id}-${team.id}`}
+                  className="flex items-center gap-2 rounded-md border border-zinc-200 px-2 py-1 text-xs dark:border-zinc-700"
+                >
+                  <input
+                    type="checkbox"
+                    checked={editTeamIds.includes(team.id)}
+                    disabled={locked}
+                    onChange={() =>
+                      setEditTeamIds((prev) => toggleEditableTeamId(prev, team.id, policy))
+                    }
+                    className="rounded border-zinc-300 dark:border-zinc-600"
+                  />
+                  {team.name}
+                  {locked ? " (required)" : ""}
+                </label>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={savingTeams}
+            onClick={() => void saveProjectTeams(project.id)}
+            className="rounded-md bg-zinc-900 px-2 py-1 text-xs font-medium text-white disabled:opacity-60 dark:bg-zinc-100 dark:text-zinc-900"
+          >
+            {savingTeams ? "Saving..." : "Save teams"}
+          </button>
+          <button
+            type="button"
+            disabled={savingTeams}
+            onClick={cancelEditTeams}
+            className="rounded-md border border-zinc-300 px-2 py-1 text-xs font-medium text-zinc-700 disabled:opacity-60 dark:border-zinc-700 dark:text-zinc-300"
+          >
+            Cancel
+          </button>
+        </div>
+
+        {policy.mode === "own-team-only" ? (
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            Your assigned team must remain attached to this project. Saving replaces other
+            assignments with your team.
+          </p>
+        ) : (
+          <p className="text-[11px] text-zinc-500 dark:text-zinc-400">
+            Saving replaces all team assignments. Clear all boxes to leave the project unassigned
+            (manager-only).
+          </p>
+        )}
+      </div>
     );
   }
 
@@ -203,7 +361,8 @@ export default function AdminProjectsPage() {
       <div>
         <h2 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">Projects</h2>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Create and assign projects. Open a project to continue work in its workspace.
+          Create projects and manage team assignments. Open a project to continue work in its
+          workspace.
         </p>
       </div>
 
@@ -332,9 +491,9 @@ export default function AdminProjectsPage() {
                   {project.client?.name ?? "—"}
                 </p>
                 <p>
-                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Teams:</span>{" "}
-                  {formatTeams(project.teams)}
+                  <span className="font-medium text-zinc-700 dark:text-zinc-300">Teams:</span>
                 </p>
+                <div className="text-xs text-zinc-600 dark:text-zinc-300">{renderTeamEditor(project)}</div>
                 <p>
                   <span className="font-medium text-zinc-700 dark:text-zinc-300">Updated:</span>{" "}
                   {formatDate(project.updatedAt)}
@@ -378,7 +537,7 @@ export default function AdminProjectsPage() {
                   <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{project.slug}</td>
                   <td className="px-4 py-3">{project.status}</td>
                   <td className="px-4 py-3">{project.client?.name ?? "—"}</td>
-                  <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{formatTeams(project.teams)}</td>
+                  <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{renderTeamEditor(project)}</td>
                   <td className="px-4 py-3 text-zinc-500 dark:text-zinc-400">{formatDate(project.updatedAt)}</td>
                 </tr>
               ))
