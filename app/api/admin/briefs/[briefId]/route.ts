@@ -4,6 +4,10 @@ import { db } from "@/lib/db";
 import { formatAdminRouteError, requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
 import { canViewBriefForActor, toBriefActorContextFromManager } from "@/lib/briefAccess";
 import {
+  projectTeamAssignmentAccessSelect,
+  toProjectAccessTargetFromAssignments,
+} from "@/lib/projectAccess";
+import {
   briefDocumentPatchSchema,
   hasBriefIntakeContent,
   mergeBriefDocument,
@@ -80,7 +84,7 @@ export async function PATCH(
             id: true,
             workspaceId: true,
             status: true,
-            teamAssignments: { select: { teamId: true } },
+            teamAssignments: { select: projectTeamAssignmentAccessSelect },
           },
         },
       },
@@ -90,13 +94,10 @@ export async function PATCH(
       return NextResponse.json({ error: "Brief not found." }, { status: 404 });
     }
 
-    const assignedTeamIds = brief.project.teamAssignments.map((assignment) => assignment.teamId);
     if (
       !canViewBriefForActor(actor, {
         id: brief.project.id,
-        workspaceId: brief.project.workspaceId,
-        status: brief.project.status,
-        assignedTeamIds,
+        ...toProjectAccessTargetFromAssignments(brief.project, brief.project.teamAssignments),
       })
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

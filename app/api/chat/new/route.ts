@@ -4,6 +4,8 @@ import { authErrorStatus, requireUserIdWithWorkspace } from "@/lib/auth";
 import { formatAdminRouteError, requireWorkspaceMemberManagerContext } from "@/lib/adminAuth";
 import {
   canViewProjectForActor,
+  projectTeamAssignmentAccessSelect,
+  toProjectAccessTargetFromAssignments,
   toProjectActorContextFromManager,
 } from "@/lib/projectAccess";
 
@@ -72,7 +74,7 @@ export async function POST(req: NextRequest) {
         id: true,
         workspaceId: true,
         status: true,
-        teamAssignments: { select: { teamId: true } },
+        teamAssignments: { select: projectTeamAssignmentAccessSelect },
       },
     });
 
@@ -80,13 +82,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
-    const assignedTeamIds = project.teamAssignments.map((assignment) => assignment.teamId);
     if (
-      !canViewProjectForActor(actor, {
-        workspaceId: project.workspaceId,
-        status: project.status,
-        assignedTeamIds,
-      })
+      !canViewProjectForActor(
+        actor,
+        toProjectAccessTargetFromAssignments(project, project.teamAssignments),
+        { includeArchivedProjects: true }
+      )
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

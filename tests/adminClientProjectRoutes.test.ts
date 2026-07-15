@@ -300,7 +300,12 @@ describe("admin projects route", () => {
       expect.objectContaining({
         where: expect.objectContaining({
           workspaceId,
-          teamAssignments: { some: { teamId: teamA } },
+          teamAssignments: {
+            some: {
+              teamId: teamA,
+              team: { isArchived: false, workspaceId },
+            },
+          },
         }),
       })
     );

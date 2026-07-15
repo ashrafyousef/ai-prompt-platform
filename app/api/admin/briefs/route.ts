@@ -10,6 +10,10 @@ import {
   canViewBriefForActor,
   toBriefActorContextFromManager,
 } from "@/lib/briefAccess";
+import {
+  projectTeamAssignmentAccessSelect,
+  toProjectAccessTargetFromAssignments,
+} from "@/lib/projectAccess";
 
 const briefStatusValues = ["DRAFT", "SUBMITTED", "IN_REVIEW", "APPROVED", "ARCHIVED"] as const;
 
@@ -37,7 +41,7 @@ const briefSelect = {
       status: true,
       workspaceId: true,
       client: { select: { id: true, name: true, slug: true } },
-      teamAssignments: { select: { teamId: true } },
+      teamAssignments: { select: projectTeamAssignmentAccessSelect },
     },
   },
 } as const;
@@ -132,7 +136,7 @@ export async function POST(req: NextRequest) {
         id: true,
         workspaceId: true,
         status: true,
-        teamAssignments: { select: { teamId: true } },
+        teamAssignments: { select: projectTeamAssignmentAccessSelect },
       },
     });
 
@@ -144,13 +148,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Cannot create a brief for an archived project." }, { status: 400 });
     }
 
-    const assignedTeamIds = project.teamAssignments.map((a) => a.teamId);
     if (
       !canViewBriefForActor(actor, {
         id: project.id,
-        workspaceId: project.workspaceId,
-        status: project.status,
-        assignedTeamIds,
+        ...toProjectAccessTargetFromAssignments(project, project.teamAssignments),
       })
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

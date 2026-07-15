@@ -66,7 +66,10 @@ function projectRow(overrides: {
     id: projectId,
     workspaceId: overrides.workspaceId ?? workspaceId,
     status: "ACTIVE" as const,
-    teamAssignments: (overrides.teamIds ?? [teamA]).map((teamId) => ({ teamId })),
+    teamAssignments: (overrides.teamIds ?? [teamA]).map((teamId) => ({
+      teamId,
+      team: { id: teamId, workspaceId, isArchived: false },
+    })),
   };
 }
 
@@ -140,6 +143,24 @@ describe("GET /api/admin/projects/[projectId]/chats", () => {
 
     expect(res.status).toBe(403);
     expect(body.error).toBe("Forbidden");
+    expect(db.chatSession.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 and skips chat list when assignment Team metadata is invalid", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(teamAdminContext());
+    db.project.findFirst.mockResolvedValue({
+      ...projectRow({ teamIds: [teamA] }),
+      teamAssignments: [
+        {
+          teamId: teamA,
+          team: { id: teamA, workspaceId, isArchived: true },
+        },
+      ],
+    });
+    const { GET } = await import("@/app/api/admin/projects/[projectId]/chats/route");
+    const res = await GET({} as any, { params: { projectId } });
+
+    expect(res.status).toBe(403);
     expect(db.chatSession.findMany).not.toHaveBeenCalled();
   });
 

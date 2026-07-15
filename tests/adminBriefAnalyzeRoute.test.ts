@@ -109,7 +109,10 @@ function briefRow(overrides: {
       id: projectId,
       workspaceId: overrides.workspaceId ?? workspaceId,
       status: overrides.projectStatus ?? "ACTIVE",
-      teamAssignments: (overrides.teamIds ?? [teamA]).map((teamId) => ({ teamId })),
+      teamAssignments: (overrides.teamIds ?? [teamA]).map((teamId) => ({
+      teamId,
+      team: { id: teamId, workspaceId, isArchived: false },
+    })),
     },
   };
 }
@@ -142,6 +145,24 @@ describe("admin brief analyze route", () => {
     const { POST } = await import("@/app/api/admin/briefs/[briefId]/analyze/route");
     const res = await POST(request() as any, { params: { briefId } });
     expect(res.status).toBe(403);
+    expect(db.brief.update).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 and skips analysis when assignment Team metadata is missing", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(teamAdminContext());
+    const existing = briefRow({ teamIds: [teamA] });
+    db.brief.findFirst.mockResolvedValue({
+      ...existing,
+      project: {
+        ...existing.project,
+        teamAssignments: [{ teamId: teamA, team: null }],
+      },
+    });
+
+    const { POST } = await import("@/app/api/admin/briefs/[briefId]/analyze/route");
+    const res = await POST(request() as any, { params: { briefId } });
+    expect(res.status).toBe(403);
+    expect(db.brief.update).not.toHaveBeenCalled();
   });
 
   it("returns 400 when brief is not DRAFT", async () => {

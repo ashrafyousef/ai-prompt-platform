@@ -14,12 +14,21 @@ const teamA = "team-a";
 const teamB = "team-b";
 const projectId = "project-1";
 
-function project(overrides: Partial<{ assignedTeamIds: string[]; status: "DRAFT" | "ACTIVE" | "ARCHIVED" }> = {}) {
+function project(
+  overrides: Partial<{
+    assignedTeams: Array<{ id: string; workspaceId: string | null; isArchived: boolean }>;
+    assignedTeamIds: string[];
+    status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+  }> = {}
+) {
+  const teamIds = overrides.assignedTeamIds ?? [teamA];
   return {
     id: projectId,
     workspaceId,
     status: overrides.status ?? ("ACTIVE" as const),
-    assignedTeamIds: overrides.assignedTeamIds ?? [teamA],
+    assignedTeams:
+      overrides.assignedTeams ??
+      teamIds.map((id) => ({ id, workspaceId, isArchived: false })),
   };
 }
 
@@ -34,7 +43,7 @@ describe("canViewBriefForActor", () => {
     expect(canViewBriefForActor(owner, project({ assignedTeamIds: [teamB] }))).toBe(true);
   });
 
-  it("allows team-scoped ADMIN when project team matches", () => {
+  it("allows team-scoped ADMIN when project team metadata matches", () => {
     const teamAdmin = {
       workspaceId,
       workspaceRole: "ADMIN" as const,
@@ -43,6 +52,15 @@ describe("canViewBriefForActor", () => {
     };
     expect(canViewBriefForActor(teamAdmin, project({ assignedTeamIds: [teamA] }))).toBe(true);
     expect(canViewBriefForActor(teamAdmin, project({ assignedTeamIds: [teamB] }))).toBe(false);
+    expect(
+      canViewBriefForActor(teamAdmin, {
+        id: projectId,
+        workspaceId,
+        status: "ACTIVE",
+        assignedTeams: [],
+        assignedTeamIds: [teamA],
+      })
+    ).toBe(false);
   });
 });
 
@@ -159,7 +177,12 @@ describe("buildAdminBriefListWhere", () => {
     expect(where).toEqual({
       project: {
         workspaceId,
-        teamAssignments: { some: { teamId: teamA } },
+        teamAssignments: {
+          some: {
+            teamId: teamA,
+            team: { isArchived: false, workspaceId },
+          },
+        },
       },
       status: { not: "ARCHIVED" },
     });

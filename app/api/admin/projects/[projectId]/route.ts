@@ -6,6 +6,8 @@ import { parseBriefDocumentJson } from "@/lib/briefIntake";
 import { parseStrategyDocumentJson } from "@/lib/strategyDocument";
 import {
   canViewProjectForActor,
+  projectTeamAssignmentAccessSelect,
+  toProjectAccessTargetFromAssignments,
   toProjectActorContextFromManager,
 } from "@/lib/projectAccess";
 import {
@@ -30,7 +32,15 @@ const projectDetailSelect = {
   teamAssignments: {
     select: {
       teamId: true,
-      team: { select: { id: true, name: true, slug: true } },
+      team: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          workspaceId: true,
+          isArchived: true,
+        },
+      },
     },
   },
   brief: {
@@ -86,7 +96,14 @@ function serializeProjectDetail(
     updatedAt: Date;
     client: { id: string; name: string; slug: string } | null;
     teamAssignments: Array<{
-      team: { id: string; name: string; slug: string };
+      teamId?: string;
+      team: {
+        id: string;
+        name: string;
+        slug: string;
+        workspaceId?: string | null;
+        isArchived?: boolean;
+      };
     }>;
     brief: {
       id: string;
@@ -216,13 +233,12 @@ export async function GET(
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
-    const assignedTeamIds = project.teamAssignments.map((assignment) => assignment.teamId);
     if (
-      !canViewProjectForActor(actor, {
-        workspaceId: project.workspaceId,
-        status: project.status,
-        assignedTeamIds,
-      })
+      !canViewProjectForActor(
+        actor,
+        toProjectAccessTargetFromAssignments(project, project.teamAssignments),
+        { includeArchivedProjects: true }
+      )
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
@@ -277,7 +293,7 @@ export async function PATCH(
         id: true,
         workspaceId: true,
         status: true,
-        teamAssignments: { select: { teamId: true } },
+        teamAssignments: { select: projectTeamAssignmentAccessSelect },
       },
     });
 
@@ -285,13 +301,12 @@ export async function PATCH(
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
-    const assignedTeamIds = project.teamAssignments.map((assignment) => assignment.teamId);
     if (
-      !canViewProjectForActor(actor, {
-        workspaceId: project.workspaceId,
-        status: project.status,
-        assignedTeamIds,
-      })
+      !canViewProjectForActor(
+        actor,
+        toProjectAccessTargetFromAssignments(project, project.teamAssignments),
+        { includeArchivedProjects: true }
+      )
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }

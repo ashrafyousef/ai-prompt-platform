@@ -76,7 +76,10 @@ function projectRow(overrides: {
     id: projectId,
     workspaceId: overrides.workspaceId ?? workspaceId,
     status: "ACTIVE" as const,
-    teamAssignments: (overrides.teamIds ?? [teamA]).map((teamId) => ({ teamId })),
+    teamAssignments: (overrides.teamIds ?? [teamA]).map((teamId) => ({
+      teamId,
+      team: { id: teamId, workspaceId, isArchived: false },
+    })),
   };
 }
 
@@ -194,7 +197,18 @@ describe("POST /api/chat/new", () => {
         id: true,
         workspaceId: true,
         status: true,
-        teamAssignments: { select: { teamId: true } },
+        teamAssignments: {
+          select: {
+            teamId: true,
+            team: {
+              select: {
+                id: true,
+                workspaceId: true,
+                isArchived: true,
+              },
+            },
+          },
+        },
       },
     });
     expect(db.chatSession.create).toHaveBeenCalledWith({
@@ -238,6 +252,19 @@ describe("POST /api/chat/new", () => {
 
     expect(res.status).toBe(403);
     expect(body.error).toBe("Forbidden");
+    expect(db.chatSession.create).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 and skips chat creation when assignment Team metadata is invalid", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(teamAdminContext());
+    db.project.findFirst.mockResolvedValue({
+      ...projectRow({ teamIds: [teamA] }),
+      teamAssignments: [{ teamId: teamA, team: null }],
+    });
+    const { POST } = await import("@/app/api/chat/new/route");
+    const res = await POST(makePostRequest({ projectId }));
+
+    expect(res.status).toBe(403);
     expect(db.chatSession.create).not.toHaveBeenCalled();
   });
 

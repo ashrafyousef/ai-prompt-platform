@@ -9,6 +9,10 @@ import {
   toStrategyActorContextFromManager,
 } from "@/lib/strategyAccess";
 import {
+  projectTeamAssignmentAccessSelect,
+  toProjectAccessTargetFromAssignments,
+} from "@/lib/projectAccess";
+import {
   hasStrategyContent,
   mergeStrategyDocument,
   parseStrategyDocumentJson,
@@ -79,7 +83,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { strategyId
             id: true,
             workspaceId: true,
             status: true,
-            teamAssignments: { select: { teamId: true } },
+            teamAssignments: { select: projectTeamAssignmentAccessSelect },
           },
         },
       },
@@ -89,13 +93,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { strategyId
       return NextResponse.json({ error: "Strategy not found." }, { status: 404 });
     }
 
-    const assignedTeamIds = strategy.project.teamAssignments.map((a) => a.teamId);
     if (
       !canViewStrategyForActor(actor, {
         id: strategy.project.id,
-        workspaceId: strategy.project.workspaceId,
-        status: strategy.project.status,
-        assignedTeamIds,
+        ...toProjectAccessTargetFromAssignments(
+          strategy.project,
+          strategy.project.teamAssignments
+        ),
       })
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

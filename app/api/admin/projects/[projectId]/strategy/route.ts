@@ -6,6 +6,10 @@ import {
   canViewStrategyForActor,
   toStrategyActorContextFromManager,
 } from "@/lib/strategyAccess";
+import {
+  projectTeamAssignmentAccessSelect,
+  toProjectAccessTargetFromAssignments,
+} from "@/lib/projectAccess";
 import { parseBriefDocumentJson } from "@/lib/briefIntake";
 import {
   buildPrefilledStrategyDocument,
@@ -67,7 +71,7 @@ async function loadProjectForActor(
       id: true,
       workspaceId: true,
       status: true,
-      teamAssignments: { select: { teamId: true } },
+      teamAssignments: { select: projectTeamAssignmentAccessSelect },
       brief: { select: { id: true, status: true, responsesJson: true } },
     },
   });
@@ -84,13 +88,10 @@ export async function GET(_req: Request, { params }: { params: { projectId: stri
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
-    const assignedTeamIds = project.teamAssignments.map((a) => a.teamId);
     if (
       !canViewStrategyForActor(actor, {
         id: project.id,
-        workspaceId: project.workspaceId,
-        status: project.status,
-        assignedTeamIds,
+        ...toProjectAccessTargetFromAssignments(project, project.teamAssignments),
       })
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -122,13 +123,10 @@ export async function POST(_req: Request, { params }: { params: { projectId: str
       return NextResponse.json({ error: "Project not found." }, { status: 404 });
     }
 
-    const assignedTeamIds = project.teamAssignments.map((a) => a.teamId);
     if (
       !canViewStrategyForActor(actor, {
         id: project.id,
-        workspaceId: project.workspaceId,
-        status: project.status,
-        assignedTeamIds,
+        ...toProjectAccessTargetFromAssignments(project, project.teamAssignments),
       })
     ) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });

@@ -78,7 +78,10 @@ function existingProject(overrides: { teamIds?: string[]; workspaceId?: string }
     id: projectId,
     workspaceId: overrides.workspaceId ?? workspaceId,
     status: "ACTIVE" as const,
-    teamAssignments: teamIds.map((teamId) => ({ teamId })),
+    teamAssignments: teamIds.map((teamId) => ({
+      teamId,
+      team: { id: teamId, workspaceId, isArchived: false },
+    })),
   };
 }
 

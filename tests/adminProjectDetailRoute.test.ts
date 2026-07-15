@@ -83,7 +83,13 @@ function projectRow(overrides: {
     client: null,
     teamAssignments: teamIds.map((teamId) => ({
       teamId,
-      team: { id: teamId, name: teamId, slug: teamId },
+      team: {
+        id: teamId,
+        name: teamId,
+        slug: teamId,
+        workspaceId,
+        isArchived: false,
+      },
     })),
     brief: overrides.brief ?? null,
   };
@@ -142,6 +148,55 @@ describe("admin project detail route", () => {
 
     expect(res.status).toBe(403);
     expect(body.error).toBe("Forbidden");
+  });
+
+  it("returns 403 when assignment Team metadata is missing, archived, or cross-workspace", async () => {
+    requireWorkspaceMemberManagerContext.mockResolvedValue(teamAdminContext());
+    const { GET } = await import("@/app/api/admin/projects/[projectId]/route");
+
+    const cases = [
+      {
+        teamAssignments: [{ teamId: teamA, team: null }],
+      },
+      {
+        teamAssignments: [
+          {
+            teamId: teamA,
+            team: {
+              id: teamA,
+              name: teamA,
+              slug: teamA,
+              workspaceId,
+              isArchived: true,
+            },
+          },
+        ],
+      },
+      {
+        teamAssignments: [
+          {
+            teamId: teamA,
+            team: {
+              id: teamA,
+              name: teamA,
+              slug: teamA,
+              workspaceId: otherWorkspaceId,
+              isArchived: false,
+            },
+          },
+        ],
+      },
+    ];
+
+    for (const teamAssignments of cases) {
+      db.project.findFirst.mockResolvedValue({
+        ...projectRow(),
+        ...teamAssignments,
+      });
+      const res = await GET({} as any, { params: { projectId } });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ error: "Forbidden" });
+    }
   });
 
   it("returns project without brief for OWNER", async () => {

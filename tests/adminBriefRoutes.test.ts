@@ -79,7 +79,10 @@ function activeProject(overrides: Partial<{ id: string; workspaceId: string; tea
     id,
     workspaceId: wsId,
     status: "ACTIVE" as const,
-    teamAssignments: teamIds.map((teamId) => ({ teamId })),
+    teamAssignments: teamIds.map((teamId) => ({
+      teamId,
+      team: { id: teamId, workspaceId: wsId, isArchived: false },
+    })),
   };
 }
 
@@ -129,7 +132,10 @@ describe("admin briefs route", () => {
           status: "ACTIVE",
           workspaceId,
           client: null,
-          teamAssignments: [{ teamId: teamA }],
+          teamAssignments: [{
+          teamId: teamA,
+          team: { id: teamA, workspaceId, isArchived: false },
+        }],
         },
       },
     ]);
@@ -197,7 +203,12 @@ describe("admin briefs route", () => {
         where: expect.objectContaining({
           project: {
             workspaceId,
-            teamAssignments: { some: { teamId: teamA } },
+            teamAssignments: {
+              some: {
+                teamId: teamA,
+                team: { isArchived: false, workspaceId },
+              },
+            },
           },
         }),
       })
@@ -224,7 +235,10 @@ describe("admin briefs route", () => {
         status: "ACTIVE",
         workspaceId,
         client: null,
-        teamAssignments: [{ teamId: teamA }],
+        teamAssignments: [{
+          teamId: teamA,
+          team: { id: teamA, workspaceId, isArchived: false },
+        }],
       },
     });
 
@@ -303,7 +317,10 @@ describe("admin briefs route", () => {
         status: "ACTIVE",
         workspaceId,
         client: null,
-        teamAssignments: [{ teamId: teamA }],
+        teamAssignments: [{
+          teamId: teamA,
+          team: { id: teamA, workspaceId, isArchived: false },
+        }],
       },
     });
 

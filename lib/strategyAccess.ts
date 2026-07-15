@@ -14,7 +14,7 @@ export function canViewStrategyForActor(
   actor: ProjectActorContext,
   project: StrategyAccessProject
 ): boolean {
-  return canViewProjectForActor(actor, project);
+  return canViewProjectForActor(actor, project, { includeArchivedProjects: true });
 }
 
 export function toStrategyActorContextFromManager(

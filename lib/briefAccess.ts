@@ -17,7 +17,7 @@ export function canViewBriefForActor(
   actor: ProjectActorContext,
   project: BriefAccessProject
 ): boolean {
-  return canViewProjectForActor(actor, project);
+  return canViewProjectForActor(actor, project, { includeArchivedProjects: true });
 }
 
 export function toBriefActorContextFromManager(
