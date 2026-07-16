@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const getServerSession = vi.fn();
+const redirect = vi.fn((url: string) => {
+  throw new Error(`NEXT_REDIRECT:${url}`);
+});
 
 const db = {
   user: {
@@ -13,6 +16,10 @@ const db = {
     findFirst: vi.fn(),
   },
 };
+
+vi.mock("next/navigation", () => ({
+  redirect,
+}));
 
 vi.mock("next-auth", () => ({
   getServerSession,
@@ -263,5 +270,80 @@ describe("requireProjectActorContext", () => {
       { createdAt: "asc" },
       { id: "asc" },
     ]);
+  });
+});
+
+describe("getProjectSessionOrRedirect", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+  });
+
+  it("redirects to sign-in when there is no authenticated session", async () => {
+    getServerSession.mockResolvedValue(null);
+    const { getProjectSessionOrRedirect } = await import("@/lib/projectActorContext");
+    await expect(getProjectSessionOrRedirect()).rejects.toThrow(
+      "NEXT_REDIRECT:/sign-in?callbackUrl=%2Fprojects"
+    );
+    expect(redirect).toHaveBeenCalledWith("/sign-in?callbackUrl=%2Fprojects");
+  });
+
+  it("redirects Unauthorized from actor resolution to sign-in", async () => {
+    getServerSession
+      .mockResolvedValueOnce({ user: { id: "user-1" } })
+      .mockResolvedValueOnce(null);
+
+    const { getProjectSessionOrRedirect } = await import("@/lib/projectActorContext");
+    await expect(getProjectSessionOrRedirect()).rejects.toThrow(
+      "NEXT_REDIRECT:/sign-in?callbackUrl=%2Fprojects"
+    );
+    expect(redirect).toHaveBeenCalledWith("/sign-in?callbackUrl=%2Fprojects");
+    expect(redirect).not.toHaveBeenCalledWith("/unauthorized");
+  });
+
+  it("returns viewer without userId for valid MEMBER actor", async () => {
+    getServerSession.mockResolvedValue({ user: { id: "user-1" } });
+    db.user.findUnique.mockResolvedValue(
+      userSnapshot({
+        memberships: [
+          {
+            workspaceId: "ws-1",
+            role: "MEMBER",
+            teamId: "team-a",
+            team: { id: "team-a", workspaceId: "ws-1", isArchived: false },
+          },
+        ],
+      })
+    );
+
+    const { getProjectSessionOrRedirect } = await import("@/lib/projectActorContext");
+    const result = await getProjectSessionOrRedirect();
+
+    expect(result.viewer).toEqual({
+      workspaceRole: "MEMBER",
+      platformRole: "USER",
+      teamId: "team-a",
+      canManageProjects: false,
+    });
+    expect(result.viewer).not.toHaveProperty("userId");
+    expect(result.actor.userId).toBe("user-1");
+  });
+
+  it("redirects Forbidden actor to /unauthorized", async () => {
+    getServerSession.mockResolvedValue({ user: { id: "user-1" } });
+    db.user.findUnique.mockResolvedValue(null);
+
+    const { getProjectSessionOrRedirect } = await import("@/lib/projectActorContext");
+    await expect(getProjectSessionOrRedirect()).rejects.toThrow("NEXT_REDIRECT:/unauthorized");
+    expect(redirect).toHaveBeenCalledWith("/unauthorized");
+  });
+
+  it("propagates unexpected infrastructure errors without auth redirects", async () => {
+    getServerSession.mockResolvedValue({ user: { id: "user-1" } });
+    db.user.findUnique.mockRejectedValue(new Error("Prisma connection failed"));
+
+    const { getProjectSessionOrRedirect } = await import("@/lib/projectActorContext");
+    await expect(getProjectSessionOrRedirect()).rejects.toThrow("Prisma connection failed");
+    expect(redirect).not.toHaveBeenCalled();
   });
 });

@@ -1,13 +1,53 @@
+import { redirect } from "next/navigation";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db } from "@/lib/db";
 import type { ProjectActorContext } from "@/lib/projectAccess";
+import { serializeProjectReadViewer } from "@/lib/projectReadModel";
 
 export type ProjectActor = ProjectActorContext & {
   userId: string;
   workspaceRole: "OWNER" | "ADMIN" | "MEMBER";
   platformRole: "USER" | "TEAM_LEAD" | "ADMIN";
 };
+
+export type ProjectSessionViewer = ReturnType<typeof serializeProjectReadViewer>;
+
+/**
+ * DB-backed projects layout gate.
+ * - No session / Unauthorized → sign-in with /projects callback
+ * - Forbidden (invalid actor) → /unauthorized
+ * - Unexpected infrastructure/programming errors are rethrown (not treated as auth)
+ */
+export async function getProjectSessionOrRedirect(): Promise<{
+  actor: ProjectActor;
+  viewer: ProjectSessionViewer;
+}> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
+    redirect("/sign-in?callbackUrl=%2Fprojects");
+  }
+
+  try {
+    const actor = await requireProjectActorContext();
+    return {
+      actor,
+      viewer: serializeProjectReadViewer(actor),
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+
+    if (message === "Unauthorized") {
+      redirect("/sign-in?callbackUrl=%2Fprojects");
+    }
+
+    if (message === "Forbidden") {
+      redirect("/unauthorized");
+    }
+
+    throw error;
+  }
+}
 
 /**
  * DB-backed project authorization actor resolved from one consistent User query.

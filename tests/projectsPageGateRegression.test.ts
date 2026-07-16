@@ -2,43 +2,48 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-describe("Phase 4B.1B page-gate regression", () => {
-  it("keeps /projects middleware manager-gated", () => {
-    const source = readFileSync(join(process.cwd(), "middleware.ts"), "utf8");
+function readSource(relative: string): string {
+  return readFileSync(join(process.cwd(), relative), "utf8");
+}
+
+describe("Phase 4B.2 page-gate regression", () => {
+  it("admits authenticated workspace users to /projects middleware without MEMBER denial", () => {
+    const source = readSource("middleware.ts");
     expect(source).toContain('pathname === "/projects"');
     expect(source).toContain("isProjectsPath");
+    expect(source).toMatch(/Phase 4B\.2/);
+    expect(source).toContain('pathname.startsWith("/admin")');
+    expect(source).not.toMatch(
+      /isProjectsPath[\s\S]*workspaceRole === "MEMBER"[\s\S]*\/unauthorized/
+    );
+  });
+
+  it("keeps /admin manager-gated in middleware", () => {
+    const source = readSource("middleware.ts");
     expect(source).toMatch(/workspaceRole === "OWNER" \|\| workspaceRole === "ADMIN"/);
     expect(source).toContain('token?.role === "ADMIN"');
     expect(source).toContain("/unauthorized");
-    expect(source).toMatch(/Phase 4A keeps \/projects manager-gated/);
   });
 
-  it("keeps projects layout on getAdminSessionOrRedirect", () => {
-    const source = readFileSync(
-      join(process.cwd(), "app/(app)/projects/layout.tsx"),
-      "utf8"
-    );
-    expect(source).toContain("getAdminSessionOrRedirect");
-    expect(source).not.toContain("requireProjectActorContext");
+  it("uses DB-backed getProjectSessionOrRedirect in projects layout", () => {
+    const source = readSource("app/(app)/projects/layout.tsx");
+    expect(source).toContain("getProjectSessionOrRedirect");
+    expect(source).not.toContain("getAdminSessionOrRedirect");
+    expect(source).toContain("ProjectAccessProvider");
   });
 
-  it("does not add MEMBER projects navigation entries", () => {
-    const navCandidates = [
-      "components/layout/AppSidebar.tsx",
-      "components/layout/Sidebar.tsx",
-      "components/nav/AppNav.tsx",
-      "components/AppNav.tsx",
-      "components/admin/AdminNav.tsx",
-    ];
-    for (const relative of navCandidates) {
-      try {
-        const source = readFileSync(join(process.cwd(), relative), "utf8");
-        if (source.includes("/projects") && source.toLowerCase().includes("member")) {
-          expect(source).not.toMatch(/href:\s*["']\/projects["']/);
-        }
-      } catch {
-        // optional path
-      }
-    }
+  it("branches project detail on canManageProjects from useProjectAccess", () => {
+    const source = readSource("app/(app)/projects/[projectId]/page.tsx");
+    expect(source).toContain("useProjectAccess");
+    expect(source).toContain("canManageProjects");
+    expect(source).toContain("ProjectDetailPage");
+    expect(source).toContain("MemberProjectDetailPage");
+  });
+
+  it("uses GET /api/projects for the workspace project list", () => {
+    const source = readSource("app/(app)/projects/page.tsx");
+    expect(source).toContain('fetch("/api/projects"');
+    expect(source).not.toContain("/api/admin/projects");
+    expect(source).toContain("useProjectAccess");
   });
 });

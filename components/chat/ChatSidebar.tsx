@@ -288,6 +288,7 @@ export function ChatSidebar({
             collapsed={collapsed}
             userName={session?.user?.name}
             userEmail={session?.user?.email}
+            canAccessProjects={Boolean(session?.user?.workspaceId)}
             isAdmin={
               session?.user?.role === "ADMIN" ||
               session?.user?.workspaceRole === "OWNER" ||

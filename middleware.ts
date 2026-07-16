@@ -41,14 +41,14 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(noWorkspace);
   }
 
-  // Align with server admin gates: workspace OWNER/ADMIN may access /admin and /projects,
-  // not only User.role=ADMIN. Phase 4A keeps /projects manager-gated (MEMBER denied until 4B).
+  // Phase 4B.2: /admin remains manager-only; /projects admits any authenticated workspace user.
+  // Final authorization is enforced by the DB-backed projects layout gate.
   const workspaceRole = token?.workspaceRole as string | undefined;
   const isWorkspaceAdmin =
     workspaceRole === "OWNER" || workspaceRole === "ADMIN";
   const isPlatformAdmin = token?.role === "ADMIN";
   if (
-    (pathname.startsWith("/admin") || isProjectsPath) &&
+    pathname.startsWith("/admin") &&
     !isWorkspaceAdmin &&
     !isPlatformAdmin
   ) {

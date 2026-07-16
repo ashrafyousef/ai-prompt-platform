@@ -1,3 +1,15 @@
+export { ProjectAccessProvider, useProjectAccess } from "./ProjectAccessProvider";
+export type { ProjectAccessViewer } from "./ProjectAccessProvider";
+export { MemberProjectDetailPage } from "./MemberProjectDetailPage";
+export { MemberProjectBriefSection } from "./MemberProjectBriefSection";
+export { MemberProjectStrategySection } from "./MemberProjectStrategySection";
+export {
+  MemberProjectAccessPanel,
+  MemberProjectBreadcrumbs,
+  MemberProjectContextPanel,
+  MemberProjectFilesPanel,
+  MemberProjectSideRail,
+} from "./MemberProjectSideRail";
 export { ProjectBriefPanel } from "./ProjectBriefPanel";
 export type { ProjectBriefPanelProps } from "./ProjectBriefPanel";
 export { ProjectChatsPanel } from "./ProjectChatsPanel";

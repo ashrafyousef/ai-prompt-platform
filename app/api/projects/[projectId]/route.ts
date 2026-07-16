@@ -4,7 +4,7 @@ import { logJson } from "@/lib/logger";
 import { requireProjectActorContext } from "@/lib/projectActorContext";
 import { buildProjectReadTargetWhere } from "@/lib/projectAccess";
 import {
-  projectReadSummarySelect,
+  projectReadDetailSelect,
   serializeProjectReadDetail,
   serializeProjectReadViewer,
 } from "@/lib/projectReadModel";
@@ -48,7 +48,7 @@ export async function GET(
 
     const project = await db.project.findFirst({
       where: buildProjectReadTargetWhere(actor, projectId),
-      select: projectReadSummarySelect,
+      select: projectReadDetailSelect,
     });
 
     if (!project) {

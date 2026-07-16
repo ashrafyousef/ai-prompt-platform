@@ -63,6 +63,8 @@ function readProjectRow(overrides: {
   } | null>;
   status?: string;
   workspaceId?: string;
+  brief?: Record<string, unknown> | null;
+  strategy?: Record<string, unknown> | null;
 } = {}) {
   const teams = overrides.teamIds ?? [{ id: teamA }];
   return {
@@ -90,6 +92,52 @@ function readProjectRow(overrides: {
         },
       };
     }),
+    brief:
+      overrides.brief === null
+        ? null
+        : {
+            id: "brief-1",
+            projectId: overrides.id ?? projectId,
+            title: "Campaign Brief",
+            status: "APPROVED",
+            responsesJson: {
+              version: 2,
+              fields: { objective: "Grow awareness" },
+              source: { rawText: "Client asks for summer push" },
+              analysis: {
+                generatedAt: "2026-01-03T00:00:00.000Z",
+                mode: "deterministic",
+                issues: [
+                  {
+                    code: "complete",
+                    severity: "info",
+                    message: "Looks complete",
+                  },
+                ],
+              },
+            },
+            submittedAt: new Date("2026-01-03T00:00:00.000Z"),
+            createdAt: new Date("2026-01-02T00:00:00.000Z"),
+            updatedAt: new Date("2026-01-03T00:00:00.000Z"),
+            ...(overrides.brief ?? {}),
+          },
+    strategy:
+      overrides.strategy === null
+        ? null
+        : {
+            id: "strategy-1",
+            projectId: overrides.id ?? projectId,
+            sourceBriefId: "brief-1",
+            status: "DRAFT",
+            responsesJson: {
+              version: 1,
+              fields: { strategicSummary: "Lead with brand story" },
+            },
+            readyAt: null,
+            createdAt: new Date("2026-01-04T00:00:00.000Z"),
+            updatedAt: new Date("2026-01-04T00:00:00.000Z"),
+            ...(overrides.strategy ?? {}),
+          },
   };
 }
 
@@ -304,6 +352,18 @@ describe("GET /api/projects", () => {
     expect(body.projects[0].teams).toEqual([{ id: teamA, name: teamA, slug: teamA }]);
   });
 
+  it("keeps list response free of brief and strategy payloads", async () => {
+    requireProjectActorContext.mockResolvedValue(memberActor());
+    db.project.findMany.mockResolvedValue([readProjectRow()]);
+
+    const { GET } = await import("@/app/api/projects/route");
+    const res = await GET();
+    const body = await res.json();
+
+    expect(body.projects[0]).not.toHaveProperty("brief");
+    expect(body.projects[0]).not.toHaveProperty("strategy");
+  });
+
   it("sanitizes unexpected actor resolution errors to Internal server error", async () => {
     requireProjectActorContext.mockRejectedValue(
       new Error("PrismaClientKnownRequestError: connection refused to postgres://secret")
@@ -336,7 +396,7 @@ describe("GET /api/projects/[projectId]", () => {
     vi.resetModules();
   });
 
-  it("returns restricted detail for matching-team MEMBER", async () => {
+  it("returns normalized brief and strategy for matching-team MEMBER detail", async () => {
     requireProjectActorContext.mockResolvedValue(memberActor());
     db.project.findFirst.mockResolvedValue(readProjectRow());
 
@@ -351,9 +411,24 @@ describe("GET /api/projects/[projectId]", () => {
       teams: [{ id: teamA, name: teamA, slug: teamA }],
     });
     expect(body.viewer.canManageProjects).toBe(false);
-    expect(JSON.stringify(body)).not.toMatch(/brief|strategy|knowledge|memory/i);
-    expect(body.project).not.toHaveProperty("brief");
-    expect(body.project).not.toHaveProperty("strategy");
+    expect(body.project.brief).toMatchObject({
+      id: "brief-1",
+      title: "Campaign Brief",
+      status: "APPROVED",
+    });
+    expect(body.project.brief.responsesJson.source?.rawText).toBe(
+      "Client asks for summer push"
+    );
+    expect(body.project.brief.responsesJson.analysis?.issues).toHaveLength(1);
+    expect(body.project.strategy).toMatchObject({
+      id: "strategy-1",
+      status: "DRAFT",
+    });
+    expect(body.project.strategy.responsesJson.fields.strategicSummary).toBe(
+      "Lead with brand story"
+    );
+    expect(JSON.stringify(body)).not.toMatch(/chat|knowledge|memory|assignmentTeams/i);
+    expect(body.project).not.toHaveProperty("chats");
   });
 
   it("returns sanitized 404 for different-team MEMBER when findFirst misses", async () => {

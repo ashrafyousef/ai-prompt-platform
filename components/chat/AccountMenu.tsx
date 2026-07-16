@@ -11,6 +11,7 @@ type AccountMenuProps = {
   collapsed: boolean;
   userName?: string | null;
   userEmail?: string | null;
+  canAccessProjects: boolean;
   isAdmin: boolean;
   onToggle: () => void;
   onClose: () => void;
@@ -47,9 +48,11 @@ function AccountIdentity({
 }
 
 function AccountActions({
+  canAccessProjects,
   isAdmin,
   onClose,
 }: {
+  canAccessProjects: boolean;
   isAdmin: boolean;
   onClose: () => void;
 }) {
@@ -63,25 +66,25 @@ function AccountActions({
         <User className="h-4 w-4" />
         Profile
       </Link>
+      {canAccessProjects ? (
+        <Link
+          href="/projects"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          onClick={onClose}
+        >
+          <FolderKanban className="h-4 w-4" />
+          Projects
+        </Link>
+      ) : null}
       {isAdmin ? (
-        <>
-          <Link
-            href="/projects"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            onClick={onClose}
-          >
-            <FolderKanban className="h-4 w-4" />
-            Projects
-          </Link>
-          <Link
-            href="/admin"
-            className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
-            onClick={onClose}
-          >
-            <Shield className="h-4 w-4" />
-            Admin
-          </Link>
-        </>
+        <Link
+          href="/admin"
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-sm text-zinc-800 transition hover:bg-zinc-100 dark:text-zinc-200 dark:hover:bg-zinc-800"
+          onClick={onClose}
+        >
+          <Shield className="h-4 w-4" />
+          Admin
+        </Link>
       ) : null}
       <div className="my-1.5 h-px bg-zinc-300 dark:bg-zinc-700" />
       <SignOutButton
@@ -100,6 +103,7 @@ export function AccountMenu({
   collapsed,
   userName,
   userEmail,
+  canAccessProjects,
   isAdmin,
   onToggle,
   onClose,
@@ -120,7 +124,7 @@ export function AccountMenu({
       />
       <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] left-1/2 z-[100] max-h-[min(70dvh,520px)] w-[calc(100vw-24px)] max-w-[420px] -translate-x-1/2 overflow-y-auto rounded-3xl border border-zinc-200/90 bg-white/95 p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] shadow-2xl dark:border-zinc-700/80 dark:bg-zinc-900/95">
         <AccountIdentity userName={userName} userEmail={userEmail} />
-        <AccountActions isAdmin={isAdmin} onClose={onClose} />
+        <AccountActions canAccessProjects={canAccessProjects} isAdmin={isAdmin} onClose={onClose} />
       </div>
     </div>
   );
@@ -152,7 +156,7 @@ export function AccountMenu({
             }`}
           >
             <AccountIdentity userName={userName} userEmail={userEmail} />
-            <AccountActions isAdmin={isAdmin} onClose={onClose} />
+            <AccountActions canAccessProjects={canAccessProjects} isAdmin={isAdmin} onClose={onClose} />
           </div>
 
           {mounted ? createPortal(mobileSheet, document.body) : null}
